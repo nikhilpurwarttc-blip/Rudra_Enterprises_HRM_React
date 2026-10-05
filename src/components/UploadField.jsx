@@ -29,15 +29,6 @@ const getFileType = (file) => {
   return "document";
 };
 
-const getFileIcon = (file) => {
-  const type = getFileType(file);
-
-  if (type === "image") return FileImage;
-  if (type === "pdf") return FileText;
-
-  return File;
-};
-
 const isBrowserFile = (file) =>
   typeof File !== "undefined" && file instanceof File;
 
@@ -337,22 +328,21 @@ const FilePreview = ({
   onPreview,
   onRemove,
 }) => {
-  const [previewUrl, setPreviewUrl] = useState("");
+  const [browserPreviewUrl, setBrowserPreviewUrl] = useState("");
 
   const type = getFileType(file);
-  const Icon = getFileIcon(file);
+  const previewUrl = isBrowserFile(file) ? browserPreviewUrl : getFileUrl(file);
 
   useEffect(() => {
-    if (!isBrowserFile(file)) {
-      setPreviewUrl(getFileUrl(file));
-      return;
-    }
+    if (!isBrowserFile(file)) return undefined;
 
     const url = URL.createObjectURL(file);
+    const frame = window.requestAnimationFrame(() => setBrowserPreviewUrl(url));
 
-    setPreviewUrl(url);
-
-    return () => URL.revokeObjectURL(url);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      URL.revokeObjectURL(url);
+    };
   }, [file]);
 
   return (
@@ -384,7 +374,7 @@ const FilePreview = ({
               text-[var(--color-accent)]
             "
           >
-            <Icon size={21} />
+            {type === "image" ? <FileImage size={21} /> : type === "pdf" ? <FileText size={21} /> : <File size={21} />}
           </div>
         )}
       </div>
@@ -458,21 +448,21 @@ const FilePreview = ({
 };
 
 const PreviewModal = ({ file, onClose }) => {
-  const [previewUrl, setPreviewUrl] = useState("");
+  const [browserPreviewUrl, setBrowserPreviewUrl] = useState("");
 
   const type = getFileType(file);
+  const previewUrl = isBrowserFile(file) ? browserPreviewUrl : getFileUrl(file);
 
   useEffect(() => {
-    if (!isBrowserFile(file)) {
-      setPreviewUrl(getFileUrl(file));
-      return;
-    }
+    if (!isBrowserFile(file)) return undefined;
 
     const url = URL.createObjectURL(file);
+    const frame = window.requestAnimationFrame(() => setBrowserPreviewUrl(url));
 
-    setPreviewUrl(url);
-
-    return () => URL.revokeObjectURL(url);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      URL.revokeObjectURL(url);
+    };
   }, [file]);
 
   useEffect(() => {

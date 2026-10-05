@@ -87,7 +87,7 @@ const AddEditEmployee = ({
     departments: buildSelectOptions(departments, (item) => item.name),
     designations: buildSelectOptions(designations, (item) => item.name),
     shifts: buildSelectOptions(shifts, (item) => item.name),
-    charges: buildSelectOptions(charges, (item) => item.name),
+    charges: buildSelectOptions(charges, (item) => item.name ?? item.deduction),
   };
   const steps = EMPLOYEE_STEPS.map((step) => ({
     ...step,

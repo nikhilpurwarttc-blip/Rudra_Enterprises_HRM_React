@@ -21,7 +21,7 @@ const isSortableCol = (col) => {
 const Th = ({ children, className = "", sortable, active, dir, onClick }) => (
   <th
     onClick={sortable ? onClick : undefined}
-    className={`bg-(--color-accent-soft) px-2 py-3.5 text-left text-sm font-semibold uppercase text-(--color-text) border-r last:border-r-0 border-(--color-border) ${sortable ? 'group cursor-pointer select-none' : ''} ${className}`}
+    className={`bg-[#e2eeed] dark:bg-[#172323] px-2 py-3.5 text-left text-sm font-semibold uppercase text-[var(--color-text)] border-r last:border-r-0 border-[var(--color-border)] ${sortable ? 'group cursor-pointer select-none' : ''} ${className}`}
   >
     <span className="flex items-center gap-1.5">
       {children}
@@ -66,6 +66,7 @@ const PageTable = ({
   label = "records",
   emptyText = "No data found",
   onRowClick,
+  onScroll,
   isLoading = false,
   pagination,
   rowClass,
@@ -91,7 +92,7 @@ const PageTable = ({
 
   return (
     <div className="box-border space-y-3">
-      <div className={`${className} glass-card overflow-auto rounded-xl border-(--color-border) bg-(--color-surface) shadow-none print:bg-transparent`} >
+      <div onScroll={onScroll} className={`${className} glass-card overflow-auto rounded-xl border-(--color-border) bg-(--color-surface) shadow-none print:bg-transparent`} >
         <table className="w-full">
           <thead className="sticky top-0 z-30 border-b-2 border-(--color-border-strong) print:bg-(--color-bg-elevated)">
             <tr>

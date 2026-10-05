@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { Menu, LogOut, User, Search, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { useSelector, useDispatch } from "react-redux";
 import { selectUser, selectRole, clearCredentials } from "../store/authSlice";
@@ -10,8 +11,8 @@ import { useSearch } from "../contexts/SearchContext";
 import UserProfilePanel from "./UserProfilePanel";
 
 const Header = ({ onToggleSidebar }) => {
-  const user     = useSelector(selectUser);
-  const role     = useSelector(selectRole);
+  const user = useSelector(selectUser);
+  const role = useSelector(selectRole);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [logout, { isLoading }] = useLogoutMutation();
@@ -85,73 +86,76 @@ const Header = ({ onToggleSidebar }) => {
       </div>
 
       {/* Middle — nav + search */}
-      <div className="flex items-center gap-1 rounded-full bg-[var(--color-accent-soft)] ">
-        <button
-          onClick={() => navigate(-1)}
-          className="p-2 rounded-l-full hover:bg-[var(--color-border)] transition-colors"
-          title="Back"
-        >
-          <ChevronLeft size={15} className="text-[var(--color-text)]" />
-        </button>
-
-        {isSearchOpen ? (
-          <div className="relative" ref={searchRef}>
-            <div className="flex items-center gap-1.5 px-2 py-1">
-              <Search size={13} className="text-[var(--color-text-muted)] shrink-0" />
-              <input
-                type="text"
-                placeholder="Search pages…"
-                value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); setSelectedIndex(-1); }}
-                onKeyDown={handleKeyDown}
-                className="w-32 sm:w-44 bg-transparent outline-none border-none text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-muted)]"
-                autoFocus
-              />
-              <button onClick={closeSearch}>
-                <X size={13} className="text-[var(--color-text-muted)] hover:text-[var(--color-text)]" />
-              </button>
-            </div>
-            {searchResults.length > 0 && (
-              <div className="absolute top-full left-0 mt-2 w-64 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-xl shadow-xl z-60 max-h-72 overflow-y-auto">
-                {searchResults.map((result, index) => (
-                  <button
-                    key={result.path}
-                    onClick={() => handleNavigate(result.path)}
-                    className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-2 border-b border-[var(--color-border)] last:border-0 transition-colors hover:bg-[var(--color-accent-soft)] ${index === selectedIndex ? 'bg-[var(--color-accent-soft)]' : ''}`}
-                  >
-                    <Search size={13} className="text-[var(--color-text-muted)] shrink-0" />
-                    <div>
-                      <p className="font-medium text-[var(--color-text)]">{result.name}</p>
-                      {result.breadcrumbs?.length > 1 && (
-                        <p className="text-[10px] text-[var(--color-text-muted)]">{result.breadcrumbs.slice(0, -1).join(' › ')}</p>
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : (
-          <button
-            onClick={() => setIsSearchOpen(true)}
-            className="p-2 hover:bg-[var(--color-border)] rounded-md transition-colors"
-            title="Search (type to find pages)"
-          >
-            <Search size={15} className="text-[var(--color-text)]" />
-          </button>
-        )}
-
-        <button
-          onClick={() => navigate(1)}
-          className="p-2 rounded-r-full hover:bg-[var(--color-border)] transition-colors"
-          title="Forward"
-        >
-          <ChevronRight size={15} className="text-[var(--color-text)]" />
-        </button>
-      </div>
+      <Link to="/" className="flex items-center gap-2 shrink-0">
+        <img src="/favicon.png" alt="Logo" className="h-11 dark:grayscale dark:invert" />
+      </Link>
 
       {/* Right */}
       <div className="flex-1 flex justify-end items-center gap-1.5">
+        <div className="flex items-center gap-1 rounded-full bg-[var(--color-accent-soft)] ">
+          <button
+            onClick={() => navigate(-1)}
+            className="p-2 rounded-l-full hover:bg-[var(--color-border)] transition-colors"
+            title="Back"
+          >
+            <ChevronLeft size={15} className="text-[var(--color-text)]" />
+          </button>
+
+          {isSearchOpen ? (
+            <div className="relative" ref={searchRef}>
+              <div className="flex items-center gap-1.5 px-2 py-1">
+                <Search size={13} className="text-[var(--color-text-muted)] shrink-0" />
+                <input
+                  type="text"
+                  placeholder="Search pages…"
+                  value={searchQuery}
+                  onChange={(e) => { setSearchQuery(e.target.value); setSelectedIndex(-1); }}
+                  onKeyDown={handleKeyDown}
+                  className="w-32 sm:w-44 bg-transparent outline-none border-none text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-muted)]"
+                  autoFocus
+                />
+                <button onClick={closeSearch}>
+                  <X size={13} className="text-[var(--color-text-muted)] hover:text-[var(--color-text)]" />
+                </button>
+              </div>
+              {searchResults.length > 0 && (
+                <div className="absolute top-full left-0 mt-2 w-64 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-xl shadow-xl z-60 max-h-72 overflow-y-auto">
+                  {searchResults.map((result, index) => (
+                    <button
+                      key={result.path}
+                      onClick={() => handleNavigate(result.path)}
+                      className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-2 border-b border-[var(--color-border)] last:border-0 transition-colors hover:bg-[var(--color-accent-soft)] ${index === selectedIndex ? 'bg-[var(--color-accent-soft)]' : ''}`}
+                    >
+                      <Search size={13} className="text-[var(--color-text-muted)] shrink-0" />
+                      <div>
+                        <p className="font-medium text-[var(--color-text)]">{result.name}</p>
+                        {result.breadcrumbs?.length > 1 && (
+                          <p className="text-[10px] text-[var(--color-text-muted)]">{result.breadcrumbs.slice(0, -1).join(' › ')}</p>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <button
+              onClick={() => setIsSearchOpen(true)}
+              className="p-2 hover:bg-[var(--color-border)] rounded-md transition-colors"
+              title="Search (type to find pages)"
+            >
+              <Search size={15} className="text-[var(--color-text)]" />
+            </button>
+          )}
+
+          <button
+            onClick={() => navigate(1)}
+            className="p-2 rounded-r-full hover:bg-[var(--color-border)] transition-colors"
+            title="Forward"
+          >
+            <ChevronRight size={15} className="text-[var(--color-text)]" />
+          </button>
+        </div>
         <ThemeToggle />
 
         {/* User Info */}

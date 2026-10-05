@@ -10,7 +10,7 @@ const normalizePagedResponse = (payload) => {
       : [];
 
   const meta = payload && typeof payload === 'object' && !Array.isArray(payload)
-    ? payload
+    ? payload.meta ?? payload
     : {};
 
   const currentPage = Number(meta.current_page ?? meta.page ?? 1) || 1;
@@ -231,7 +231,7 @@ const AsyncSearchableSelect = ({
       return;
     }
 
-    onChange(optionValue);
+    onChange(optionValue, option);
     setIsOpen(false);
     setInputValue('');
     setDebouncedSearch('');

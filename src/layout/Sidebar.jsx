@@ -43,7 +43,7 @@ const MENU = [
   },
   {
     type: "item",
-    icon: CalendarDays,
+    icon: ClipboardList,
     label: "Daily Attendance",
     to: "/attendance",
     paths: ["/attendance"],
@@ -69,7 +69,7 @@ const MENU = [
   // },
   {
     type: "item",
-    icon: ClipboardList,
+    icon: CalendarDays,
     label: "Attendance Reports",
     to: "/reports/attendance",
     paths: ["/reports/attendance"],

@@ -8,6 +8,7 @@ const SearchableSelect = ({
   onChange, 
   placeholder = "Select...",
   label,
+  ariaLabel,
   required = false,
   className = "",
   btnClass = "",
@@ -19,6 +20,7 @@ const SearchableSelect = ({
   disabled = false,
   clearable = true,
   multiSelect = false,
+  showSearch = true,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -53,7 +55,7 @@ const SearchableSelect = ({
     onChange(nextValues);
   };
 
-  const DROPDOWN_HEIGHT = 256; // max-h-60 (240px) + search bar (~40px)
+  const DROPDOWN_HEIGHT = showSearch ? 256 : 200;
   const GAP = 4;
 
   const updatePosition = () => {
@@ -121,9 +123,10 @@ const SearchableSelect = ({
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
+        aria-label={ariaLabel}
         className={`flex min-h-12.5 w-full items-center justify-between rounded-md border bg-transparent px-3 text-sm text-(--color-text) transition-colors focus:outline-none focus:ring-1 ${error ? 'border-(--color-danger) focus:border-(--color-danger) focus:ring-(--color-danger)' : 'border-(--color-border-strong) focus:border-(--color-accent) focus:ring-(--color-accent)'} ${disabled ? 'cursor-not-allowed opacity-60' : 'hover:border-(--color-accent)'} ${btnClass}`}
       >
-        <span className={selected || selectedOptions.length > 0 ? 'text-(--color-text)' : 'text-(--color-text-muted)'}>
+        <span className={selected || selectedOptions.length > 0 ? 'text-(--color-text) truncate' : 'text-(--color-text-muted) truncate'}>
           {isLoading
             ? 'Loading...'
             : multiSelect
@@ -152,25 +155,27 @@ const SearchableSelect = ({
       
       {isOpen && createPortal(
         <div ref={dropdownRef} style={dropdownStyle} className="max-h-60 overflow-hidden rounded-md border border-(--color-border-strong) bg-(--color-bg-elevated) text-(--color-text) shadow-lg">
-          <div className="border-b border-(--color-border) p-2">
-            <div className="flex items-center gap-2">
-              <Search size={16} className="text-(--color-text-muted)" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search..."
-                className="min-w-0 flex-1 bg-transparent px-2 py-1 text-sm text-(--color-text) outline-none placeholder:text-(--color-text-muted)"
-                autoFocus
-                autoComplete="off"
-              />
-              {search && (
-                <button type="button" onClick={() => setSearch('')} className="text-(--color-text-muted) hover:text-(--color-text)">
-                  <X size={14} />
-                </button>
-              )}
+          {showSearch && (
+            <div className="border-b border-(--color-border) p-2">
+              <div className="flex items-center gap-2">
+                <Search size={16} className="text-(--color-text-muted)" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search..."
+                  className="min-w-0 flex-1 bg-transparent px-2 py-1 text-sm text-(--color-text) outline-none placeholder:text-(--color-text-muted)"
+                  autoFocus
+                  autoComplete="off"
+                />
+                {search && (
+                  <button type="button" onClick={() => setSearch('')} className="text-(--color-text-muted) hover:text-(--color-text)">
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
+          )}
           <div className="overflow-y-auto max-h-48">
             {onAdd && (
               <button

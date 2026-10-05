@@ -1,6 +1,6 @@
 const env = import.meta.env;
 
-export const API_BASE_URL = env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}:8000/api`;
+export const API_BASE_URL = env.DEV ? '/api' : env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}:8000/api`;
 console.log(window.location.protocol, window.location.hostname, API_BASE_URL);
 export const CSRF_URL = API_BASE_URL.replace(/\/api\/?$/, '/sanctum/csrf-cookie');
 export const API_CONFIG = {

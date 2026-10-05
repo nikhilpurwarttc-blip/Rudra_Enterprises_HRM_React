@@ -107,7 +107,7 @@ const timedBaseQuery = async (args, api, extraOptions) => {
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: timedBaseQuery,
-  tagTypes: ['User', 'Users', 'Employee', 'EmployeeDocument', 'EmployeeBankAccount', 'Role', 'Permission', 'Shift', 'Charge', 'Plant', 'Department', 'Holiday', 'Designation'],
+  tagTypes: ['User', 'Users', 'Employee', 'EmployeeDocument', 'EmployeeBankAccount', 'EmployeeAdvance', 'Attendance', 'Role', 'Permission', 'Shift', 'Charge', 'Plant', 'Department', 'Holiday', 'Designation'],
   endpoints: (builder) => ({
     login: builder.mutation({
       query: (credentials) => ({ url: '/login', method: 'POST', body: credentials }),
@@ -130,7 +130,7 @@ export const api = createApi({
 
     // Users
     getUsers: builder.query({
-      query: () => '/users',
+      query: (arg) => buildSearchQuery('/users', arg),
       providesTags: ['Users'],
     }),
     getUserById: builder.query({
@@ -152,12 +152,16 @@ export const api = createApi({
 
     // Employees
     getEmployees: builder.query({
-      query: () => '/employees',
+      query: (arg) => buildSearchQuery('/employees', arg),
       providesTags: ['Employee'],
     }),
     getEmployeeById: builder.query({
       query: (id) => `/employees/${id}`,
       providesTags: (_result, _error, id) => [{ type: 'Employee', id }],
+    }),
+    getEmployeeAttendance: builder.query({
+      query: ({ employeeId, ...params }) => ({ url: `/employees/${employeeId}/attendance`, params }),
+      providesTags: ['Attendance'],
     }),
     createEmployee: builder.mutation({
       query: (body) => ({ url: '/employees', method: 'POST', body: toEmployeeRequestBody(body) }),
@@ -173,6 +177,64 @@ export const api = createApi({
     deleteEmployee: builder.mutation({
       query: (id) => ({ url: `/employees/${id}`, method: 'DELETE' }),
       invalidatesTags: ['Employee'],
+    }),
+    getAttendanceFilters: builder.query({
+      query: () => '/attendances/filters',
+    }),
+    getAttendanceReportFilters: builder.query({
+      query: () => '/attendance-report/filters',
+    }),
+    getAttendanceReport: builder.query({
+      query: (filters = {}) => {
+        const params = { page: filters.page ?? 1, per_page: filters.per_page ?? 15 };
+        ['date_from', 'date_to', 'plant_id', 'department_id', 'shift_id', 'search'].forEach((key) => {
+          if (filters[key] !== undefined && filters[key] !== null && filters[key] !== '') params[key] = filters[key];
+        });
+        return { url: '/attendance-report', params };
+      },
+      providesTags: ['Attendance'],
+    }),
+    getAttendanceRoster: builder.query({
+      query: (filters = {}) => {
+        const params = {
+          page: filters.page ?? 1,
+          per_page: filters.per_page ?? 15,
+          date: filters.date,
+        };
+        ['plant_id', 'department_id', 'shift_id', 'search'].forEach((key) => {
+          if (filters[key] !== undefined && filters[key] !== null && filters[key] !== '') params[key] = filters[key];
+        });
+        return { url: '/attendances/roster', params };
+      },
+      providesTags: ['Attendance'],
+    }),
+    checkInAttendance: builder.mutation({
+      query: (body) => ({ url: '/attendances/check-in', method: 'POST', body }),
+      invalidatesTags: ['Attendance'],
+    }),
+    checkOutAttendance: builder.mutation({
+      query: (body) => ({ url: '/attendances/check-out', method: 'POST', body }),
+      invalidatesTags: ['Attendance'],
+    }),
+    getEmployeeAdvances: builder.query({
+      query: (filters = {}) => ({ url: '/employee-advances', params: filters }),
+      providesTags: ['EmployeeAdvance'],
+    }),
+    createEmployeeAdvance: builder.mutation({
+      query: (body) => ({ url: '/employee-advances', method: 'POST', body }),
+      invalidatesTags: ['EmployeeAdvance'],
+    }),
+    updateEmployeeAdvance: builder.mutation({
+      query: ({ id, ...body }) => ({ url: `/employee-advances/${id}`, method: 'PUT', body }),
+      invalidatesTags: ['EmployeeAdvance'],
+    }),
+    recoverEmployeeAdvance: builder.mutation({
+      query: ({ id, ...body }) => ({ url: `/employee-advances/${id}/recover`, method: 'POST', body }),
+      invalidatesTags: ['EmployeeAdvance'],
+    }),
+    cancelEmployeeAdvance: builder.mutation({
+      query: (id) => ({ url: `/employee-advances/${id}/cancel`, method: 'POST' }),
+      invalidatesTags: ['EmployeeAdvance'],
     }),
     getEmployeeDocuments: builder.query({
       query: (employeeId) => `/employee-documents?employee_id=${employeeId}`,
@@ -308,7 +370,7 @@ export const api = createApi({
 
     // Roles
     getRoles: builder.query({
-      query: () => '/roles',
+      query: (arg) => buildSearchQuery('/roles', arg),
       providesTags: ['Role'],
     }),
     createRole: builder.mutation({
@@ -353,15 +415,29 @@ export const {
   useLogoutMutation,
   useGetUserQuery,
   useGetUsersQuery,
+  useLazyGetUsersQuery,
   useGetUserByIdQuery,
   useCreateUserMutation,
   useUpdateUserMutation,
   useDeleteUserMutation,
   useGetEmployeesQuery,
+  useLazyGetEmployeesQuery,
   useGetEmployeeByIdQuery,
+  useGetEmployeeAttendanceQuery,
   useCreateEmployeeMutation,
   useUpdateEmployeeMutation,
   useDeleteEmployeeMutation,
+  useGetAttendanceFiltersQuery,
+  useGetAttendanceReportFiltersQuery,
+  useGetAttendanceReportQuery,
+  useGetAttendanceRosterQuery,
+  useCheckInAttendanceMutation,
+  useCheckOutAttendanceMutation,
+  useGetEmployeeAdvancesQuery,
+  useCreateEmployeeAdvanceMutation,
+  useUpdateEmployeeAdvanceMutation,
+  useRecoverEmployeeAdvanceMutation,
+  useCancelEmployeeAdvanceMutation,
   useGetEmployeeDocumentsQuery,
   useCreateEmployeeDocumentMutation,
   useDeleteEmployeeDocumentMutation,
@@ -393,6 +469,7 @@ export const {
   useUpdateChargeMutation,
   useDeleteChargeMutation,
   useGetRolesQuery,
+  useLazyGetRolesQuery,
   useCreateRoleMutation,
   useUpdateRoleMutation,
   useDeleteRoleMutation,

@@ -266,15 +266,11 @@ const RoleEditor = ({ role, plants, plantsLoading, plantsError, allPermissions, 
             </span>
           )}
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <InputField label="Role Name" value={name}
             disabled={readOnly}
             onChange={(e) => { setName(e.target.value); setNameError(''); }}
             error={nameError} required />
-          <InputField label="Description" value={description}
-            disabled={readOnly}
-            onChange={(e) => setDescription(e.target.value)} />
-        </div>
         <SearchableSelect
           label="Plants this role can access"
           options={plants.map((plant) => ({
@@ -289,6 +285,10 @@ const RoleEditor = ({ role, plants, plantsLoading, plantsError, allPermissions, 
           isLoading={plantsLoading}
           disabled={readOnly || plantsError}
         />
+          <InputField label="Description" value={description}
+            disabled={readOnly}
+            onChange={(e) => setDescription(e.target.value)} />
+        </div>
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <Switch checked={status} disabled={readOnly} onClick={() => !readOnly && setStatus(v => !v)} ariaLabel="Active" />
