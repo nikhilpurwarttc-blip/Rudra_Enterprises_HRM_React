@@ -273,7 +273,14 @@ export const getBreadcrumbs = (path) => {
 // Flat list of permissionable routes
 export const ROUTE_PERMISSIONS = ROUTES
   .filter(r => r.permission)
-  .map(r => ({ key: r.permissionKey, label: r.name, group: r.group, permissionKey: r.permissionKey, permissionAction: r.permissionAction }));
+  .map(r => ({ key: r.permissionKey, label: r.name, group: r.group, permissionKey: r.permissionKey, permissionAction: r.permissionAction }))
+  .concat([{
+    key: 'plant-shutdowns',
+    label: 'Plant Shutdown Requests',
+    group: 'Attendance',
+    permissionKey: 'plant-shutdowns',
+    permissionAction: 'view',
+  }]);
 
 // Grouped: [{ group, routes: [{key, label}] }]
 export const PERMISSION_GROUPS = ROUTE_PERMISSIONS.reduce((acc, r) => {

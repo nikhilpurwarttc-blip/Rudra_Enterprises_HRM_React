@@ -14,6 +14,9 @@ const ConfirmDelete = ({
   rejectLabel,
   rejectClass,
   icon,
+  children,
+  confirmLoadingLabel,
+  confirmDisabled = false,
 }) => {
   const [loading, setLoading] = useState(false);
 
@@ -23,7 +26,7 @@ const ConfirmDelete = ({
   const btnClass = confirmClass ?? 'bg-red-600 hover:bg-red-700';
   const BtnIcon  = icon ?? Trash2;
   const label    = confirmLabel ?? 'Delete';
-  const loadingLabel = isDelete ? 'Deleting…' : `${label}ing…`;
+  const loadingLabel = confirmLoadingLabel ?? (isDelete ? 'Deleting…' : `${label}ing…`);
 
   const handleConfirm = async () => {
     setLoading(true);
@@ -32,8 +35,8 @@ const ConfirmDelete = ({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-9999 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={loading ? undefined : onCancel} />
+    <div className="fixed top-[6%] sm:left-[3.1%] right-[0.55%] bottom-[2.7%] inset-0 z-9991 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-xs rounded-2xl" onClick={loading ? undefined : onCancel} />
       <div className="glass-card relative mx-4 w-full max-w-sm rounded-2xl border-(--color-border) bg-(--color-surface-strong) shadow-(--shadow-card)">
         <div className="flex items-center justify-between px-5 pt-5 pb-3">
           <div className="flex items-center gap-3">
@@ -49,6 +52,8 @@ const ConfirmDelete = ({
 
         <p className="px-5 pb-5 text-sm text-(--color-text-muted)">{message}</p>
 
+        {children && <div className="px-5 pb-5">{children}</div>}
+
         <div className="flex gap-3 px-5 pb-5 justify-end">
           <button onClick={onCancel} disabled={loading}
             className="rounded-lg border border-(--color-border-strong) px-4 py-2 text-sm text-(--color-text) hover:bg-(--color-accent-soft) disabled:cursor-not-allowed disabled:opacity-40">
@@ -60,7 +65,7 @@ const ConfirmDelete = ({
               {rejectLabel ?? 'Reject'}
             </button>
           )}
-          <button onClick={handleConfirm} disabled={loading}
+          <button onClick={handleConfirm} disabled={loading || confirmDisabled}
             className={`flex min-w-22.5 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60 ${btnClass}`}>
             {loading
               ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> {loadingLabel}</>

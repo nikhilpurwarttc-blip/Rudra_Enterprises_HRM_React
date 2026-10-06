@@ -23,12 +23,18 @@ import Badge from '../../components/Badge';
 import Switch from '../../components/Switch';
 import ConfirmDelete from '../../components/ConfirmDelete';
 import Button from '../../components/Button';
+import ChipSwitcher from '../../components/ChipSwitcher';
 import { useRenderPerformance } from '../../utils/performance';
 import { getApiErrorMessage } from '../../components/feedbackUtils';
 
 const EMPTY_FORM = { name: '', username: '', email: '', password: '', role_id: '', employee_id: '', selected_role: null, selected_employee: null, status: true };
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ROLE_BADGES = { admin: 'blue', manager: 'gold', supervisor: 'aqua', employee: 'gray' };
+const STATUS_OPTIONS = [
+  { value: true, label: 'Active' },
+  { value: false, label: 'Inactive' },
+];
+
 const FIELD_LABELS = {
   employee_id: 'Employee',
   name: 'Full name',
@@ -112,10 +118,12 @@ const UserForm = ({ form, setForm, roles, employees, loadEmployees, loadRoles, e
         required
         error={errors.role_id}
       />
-      <label className="flex items-center gap-2 cursor-pointer">
-        <input type="checkbox" checked={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.checked }))} className="accent-primary-600 w-4 h-4" />
-        <span className="text-sm dark:text-gray-300">Active account</span>
-      </label>
+      <ChipSwitcher
+        label="Account Status"
+        options={STATUS_OPTIONS}
+        value={form.status}
+        onChange={(val) => setForm((current) => ({ ...current, status: Boolean(val) }))}
+      />
     </>
   );
 };
@@ -457,7 +465,6 @@ const Users = () => {
     <div className="p-4 sm:p-6 space-y-4">
       <SectionCard
         title={pageTitle}
-        // sectionClass="max-w-7xl mx-auto"
         action={canCreate && !isReadOnly && (
           <Button type="button" onClick={openAdd} className="flex items-center gap-1.5">
             <Plus size={15} /> Add User

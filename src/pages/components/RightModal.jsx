@@ -3,7 +3,7 @@ import { useRightPanel } from '../../contexts/RightPanelContext';
 import { useEffect, useId, useRef, useState } from 'react';
 import Button from '../../components/Button';
 
-const RightModal = ({ isOpen, onClose, onSubmit, title, children, showCancel = true, settingoff = true, saving = false, submitDisabled = false, className = '', bodyClassName = '' }) => {
+const RightModal = ({ isOpen, onClose, onSubmit, title, children, showCancel = true, settingoff = true, saving = false, submitDisabled = false, submitLabel, submitLoadingLabel, className = '', bodyClassName = '' }) => {
   const { activePanel, setActivePanel } = useRightPanel();
   // default to panel mode (slide-in from right inside layout)
   const panelMode = 'panel';
@@ -151,8 +151,8 @@ const RightModal = ({ isOpen, onClose, onSubmit, title, children, showCancel = t
             disabled={saving || submitDisabled}
           >
             {saving
-              ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> Saving…</>
-              : (title?.toLowerCase().includes('edit') ? 'Update' : 'Save')
+              ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> {submitLoadingLabel ?? 'Saving…'}</>
+              : (submitLabel ?? (title?.toLowerCase().includes('edit') ? 'Update' : 'Save'))
             }
           </Button>
         </div>

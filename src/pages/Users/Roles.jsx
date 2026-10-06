@@ -19,7 +19,18 @@ import { PERMISSION_GROUPS, ROUTE_PERMISSIONS } from '../../constants/routes';
 import usePermission from '../../hooks/usePermission';
 import { useRenderPerformance } from '../../utils/performance';
 
-const ACTIONS = ['view', 'create', 'edit', 'delete'];
+const STANDARD_ACTIONS = ['view', 'create', 'edit', 'delete', 'approve', 'reject', 'shutdown', 'import', 'export'];
+const ACTION_LABELS = {
+  view: 'View',
+  create: 'Create',
+  edit: 'Edit',
+  delete: 'Delete',
+  approve: 'Approve',
+  reject: 'Reject',
+  shutdown: 'Shutdown',
+  import: 'Import',
+  export: 'Export',
+};
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -56,16 +67,16 @@ const mapToIds = (permMap, allPermissions) => {
 // Toggle all actions for a group
 const toggleGroup = (map, routes) => {
   const allFull = routes.every(r => {
-    const actions = r.actions ?? ACTIONS;
+    const actions = r.actions ?? [];
     return actions.length > 0 && actions.every(a => map[r.key]?.includes(a));
   });
   const next = { ...map };
-  routes.forEach(r => { next[r.key] = allFull ? [] : [...(r.actions ?? ACTIONS)]; });
+  routes.forEach(r => { next[r.key] = allFull ? [] : [...(r.actions ?? [])]; });
   return next;
 };
 
 // Toggle all actions for a single row
-const toggleRow = (map, key, actions = ACTIONS) => {
+const toggleRow = (map, key, actions = []) => {
   const allFull = actions.length > 0 && actions.every(a => map[key]?.includes(a));
   return { ...map, [key]: allFull ? [] : [...actions] };
 };
@@ -79,7 +90,7 @@ const toggleCell = (map, key, action, checked) => {
 
 // ── PermissionMatrix ──────────────────────────────────────────────────────────
 
-const PermissionMatrix = ({ permissions, onChange, readOnly = false }) => {
+const PermissionMatrix = ({ permissions, onChange, allPermissions, readOnly = false }) => {
   const [collapsed, setCollapsed] = useState(
     Object.fromEntries(PERMISSION_GROUPS.map(({ group }) => [group, false]))
   );
@@ -88,8 +99,23 @@ const PermissionMatrix = ({ permissions, onChange, readOnly = false }) => {
     <div className="space-y-2">
       {PERMISSION_GROUPS.map(({ group, routes }) => {
         const isOpen  = !collapsed[group];
-        const routesWithActions = routes.map(route => ({ ...route, actions: ACTIONS }));
-        const groupActions = ACTIONS.filter(action => routesWithActions.some(route => route.actions.includes(action)));
+        const routesWithActions = routes.map(route => {
+          const available = new Set(
+            allPermissions
+              .filter(permission => permission.module === route.key)
+              .map(permission => permission.action),
+          );
+          const actions = [
+            ...STANDARD_ACTIONS.filter(action => available.has(action)),
+            ...[...available].filter(action => !STANDARD_ACTIONS.includes(action)).sort(),
+          ];
+          return { ...route, actions };
+        });
+        const availableGroupActions = new Set(routesWithActions.flatMap(route => route.actions));
+        const groupActions = [
+          ...STANDARD_ACTIONS.filter(action => availableGroupActions.has(action)),
+          ...[...availableGroupActions].filter(action => !STANDARD_ACTIONS.includes(action)).sort(),
+        ];
         const allFull = routesWithActions.every(route => (
           route.actions.length > 0 && route.actions.every(action => permissions[route.key]?.includes(action))
         ));
@@ -132,12 +158,13 @@ const PermissionMatrix = ({ permissions, onChange, readOnly = false }) => {
 
             {/* Routes table */}
             {isOpen && (
+              <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-[var(--color-border)]">
-                    <th className="text-left py-1.5 pl-4 pr-2 text-xs font-medium text-[var(--color-text-muted)] w-full">Page</th>
+                    <th className="sticky left-0 z-10 bg-(--color-bg-elevated) text-left py-1.5 pl-4 pr-2 text-xs font-medium text-[var(--color-text-muted)] min-w-48">Page</th>
                     {groupActions.map(a => (
-                      <th key={a} className="text-center py-1.5 px-3 text-xs font-medium text-[var(--color-text-muted)] capitalize whitespace-nowrap">{a}</th>
+                          <th key={a} className="text-center py-1.5 px-3 text-xs font-medium text-[var(--color-text-muted)] whitespace-nowrap">{ACTION_LABELS[a] ?? a}</th>
                     ))}
                     {!readOnly && (
                       <th className="text-center py-1.5 px-3 text-xs font-medium text-[var(--color-text-muted)]">All</th>
@@ -147,7 +174,7 @@ const PermissionMatrix = ({ permissions, onChange, readOnly = false }) => {
                 <tbody>
                   {routesWithActions.map(({ key, label, actions }) => (
                     <tr key={key} className="border-t border-[var(--color-border)]/50 hover:bg-[var(--color-accent-soft)]/40">
-                      <td className="py-2 pl-4 pr-2 text-sm text-[var(--color-text)]">{label}</td>
+                      <td className="sticky left-0 z-10 bg-(--color-surface) py-2 pl-4 pr-2 text-sm text-[var(--color-text)]">{label}</td>
                       {groupActions.map(action => (
                         <td key={action} className="text-center py-2 px-3">
                           <input
@@ -175,6 +202,7 @@ const PermissionMatrix = ({ permissions, onChange, readOnly = false }) => {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         );
@@ -324,7 +352,7 @@ const RoleEditor = ({ role, plants, plantsLoading, plantsError, allPermissions, 
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto pr-1">
-          <PermissionMatrix permissions={permissions} onChange={setPermissions} readOnly={readOnly} />
+          <PermissionMatrix permissions={permissions} onChange={setPermissions} allPermissions={allPermissions} readOnly={readOnly} />
         </div>
       )}
     </div>
@@ -400,7 +428,7 @@ const Roles = () => {
 
   useEffect(() => {
     if (!canSeed) return;
-    seedPermissions({ modules: ROUTE_PERMISSIONS.map(route => route.permissionKey) });
+    seedPermissions({ modules: [...new Set(ROUTE_PERMISSIONS.map(route => route.permissionKey))] });
   }, [canSeed, seedPermissions]);
 
   return (

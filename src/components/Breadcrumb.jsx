@@ -1,4 +1,4 @@
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Home } from 'lucide-react';
 import { useLocation, Link } from 'react-router-dom';
 import { getBreadcrumbs, ROUTES } from '../constants/routes';
 
@@ -18,11 +18,11 @@ const Breadcrumb = () => {
   return (
     <nav>
       <ol className="flex items-center gap-1">
-        {/* <li>
+        <li>
           <Link to="/" className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors" title="Go to Dashboard">
-            <Home size={16} />
+            <Home size={20} />
           </Link>
-        </li> */}
+        </li>
         {breadcrumbs.map((crumb, index) => {
           const isLast = index === breadcrumbs.length - 1;
           const path = crumbPathMap[crumb];

@@ -68,6 +68,7 @@ const buildSearchQuery = (resource, value) => {
   } else if (payload.ids !== undefined && payload.ids !== null && payload.ids !== '') {
     params['ids[]'] = Array.isArray(payload.ids) ? payload.ids : [payload.ids];
   }
+  if (payload.all !== undefined) params.all = payload.all;
   if (page) params.page = page;
   if (perPage) params.per_page = perPage;
 
@@ -107,7 +108,7 @@ const timedBaseQuery = async (args, api, extraOptions) => {
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: timedBaseQuery,
-  tagTypes: ['User', 'Users', 'Employee', 'EmployeeDocument', 'EmployeeBankAccount', 'EmployeeAdvance', 'Attendance', 'Role', 'Permission', 'Shift', 'Charge', 'Plant', 'Department', 'Holiday', 'Designation'],
+  tagTypes: ['User', 'Users', 'Employee', 'EmployeeDocument', 'EmployeeBankAccount', 'EmployeeAdvance', 'Attendance', 'PlantShutdown', 'Role', 'Permission', 'Shift', 'Charge', 'Plant', 'Department', 'Holiday', 'Designation'],
   endpoints: (builder) => ({
     login: builder.mutation({
       query: (credentials) => ({ url: '/login', method: 'POST', body: credentials }),
@@ -174,12 +175,40 @@ export const api = createApi({
       },
       invalidatesTags: ['Employee'],
     }),
+    approveEmployee: builder.mutation({
+      query: (id) => ({ url: `/employees/${id}/approve`, method: 'POST' }),
+      invalidatesTags: ['Employee'],
+    }),
+    rejectEmployee: builder.mutation({
+      query: ({ id, reason }) => ({ url: `/employees/${id}/reject`, method: 'POST', body: { reason } }),
+      invalidatesTags: ['Employee'],
+    }),
     deleteEmployee: builder.mutation({
       query: (id) => ({ url: `/employees/${id}`, method: 'DELETE' }),
       invalidatesTags: ['Employee'],
     }),
     getAttendanceFilters: builder.query({
       query: () => '/attendances/filters',
+    }),
+    getPlantShutdowns: builder.query({
+      query: (filters = {}) => ({ url: '/plant-shutdowns', params: filters }),
+      providesTags: ['PlantShutdown'],
+    }),
+    createPlantShutdown: builder.mutation({
+      query: (body) => ({ url: '/plant-shutdowns', method: 'POST', body }),
+      invalidatesTags: ['PlantShutdown'],
+    }),
+    updatePlantShutdown: builder.mutation({
+      query: ({ id, ...body }) => ({ url: `/plant-shutdowns/${id}`, method: 'PUT', body }),
+      invalidatesTags: ['PlantShutdown'],
+    }),
+    approvePlantShutdown: builder.mutation({
+      query: ({ id, ...body }) => ({ url: `/plant-shutdowns/${id}/approve`, method: 'POST', body }),
+      invalidatesTags: ['PlantShutdown'],
+    }),
+    rejectPlantShutdown: builder.mutation({
+      query: ({ id, ...body }) => ({ url: `/plant-shutdowns/${id}/reject`, method: 'POST', body }),
+      invalidatesTags: ['PlantShutdown'],
     }),
     getAttendanceReportFilters: builder.query({
       query: () => '/attendance-report/filters',
@@ -214,6 +243,14 @@ export const api = createApi({
     }),
     checkOutAttendance: builder.mutation({
       query: (body) => ({ url: '/attendances/check-out', method: 'POST', body }),
+      invalidatesTags: ['Attendance'],
+    }),
+    markShutdownPresent: builder.mutation({
+      query: (body) => ({ url: '/attendances/shutdown-present', method: 'POST', body }),
+      invalidatesTags: ['Attendance'],
+    }),
+    deleteAttendance: builder.mutation({
+      query: (id) => ({ url: `/attendances/${id}`, method: 'DELETE' }),
       invalidatesTags: ['Attendance'],
     }),
     getEmployeeAdvances: builder.query({
@@ -426,13 +463,22 @@ export const {
   useGetEmployeeAttendanceQuery,
   useCreateEmployeeMutation,
   useUpdateEmployeeMutation,
+  useApproveEmployeeMutation,
+  useRejectEmployeeMutation,
   useDeleteEmployeeMutation,
   useGetAttendanceFiltersQuery,
+  useGetPlantShutdownsQuery,
+  useCreatePlantShutdownMutation,
+  useUpdatePlantShutdownMutation,
+  useApprovePlantShutdownMutation,
+  useRejectPlantShutdownMutation,
   useGetAttendanceReportFiltersQuery,
   useGetAttendanceReportQuery,
   useGetAttendanceRosterQuery,
   useCheckInAttendanceMutation,
   useCheckOutAttendanceMutation,
+  useMarkShutdownPresentMutation,
+  useDeleteAttendanceMutation,
   useGetEmployeeAdvancesQuery,
   useCreateEmployeeAdvanceMutation,
   useUpdateEmployeeAdvanceMutation,

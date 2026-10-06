@@ -1,5 +1,6 @@
 import { Save } from 'lucide-react';
 import Button from '../../../components/Button';
+import EmployeeApprovalActions from './EmployeeApprovalActions';
 
 const EmployeeFormHeader = ({ employee, draftSavedAt, onSaveDraft, onClose }) => (
   <div className="flex flex-wrap items-center justify-between gap-3">
@@ -11,6 +12,9 @@ const EmployeeFormHeader = ({ employee, draftSavedAt, onSaveDraft, onClose }) =>
       <p className="mt-1 text-xs text-(--color-text-muted)" aria-live="polite">
         {draftSavedAt ? `Draft saved ${draftSavedAt}` : 'Drafts stay on this device'}
       </p>
+      <div className="mt-2">
+        <EmployeeApprovalActions employee={employee} />
+      </div>
     </div>
     <div className="flex items-center gap-2">
       <Button type="button" variant="ghost" onClick={onSaveDraft} className="flex items-center gap-2">

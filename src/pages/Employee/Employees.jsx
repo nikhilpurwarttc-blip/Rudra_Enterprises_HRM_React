@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays, LoaderCircle, MoreVertical, Pencil, Plus, Search, UserRound, IdCard, WalletCards } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -36,6 +36,16 @@ import { selectRole } from '../../store/authSlice';
 
 const unwrap = (value) => Array.isArray(value) ? value : value?.data ?? [];
 const initials = (name) => String(name ?? '?').split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
+const matchesEmployeeSearch = (employee, query) => {
+  const normalizedQuery = query.toLocaleLowerCase();
+  return [
+    employee.name,
+    employee.employee_code,
+    employee.barcode,
+    employee.email,
+    employee.mobile_number,
+  ].some((value) => String(value ?? '').toLocaleLowerCase().includes(normalizedQuery));
+};
 const EmployeePlaceholder = ({ employee, type }) => {
   const isAttendance = type === 'attendance';
   const Icon = isAttendance ? CalendarDays : WalletCards;
@@ -60,6 +70,7 @@ const Employees = () => {
   const { canCreate, canEdit, isReadOnly } = usePermission('/employees');
   const role = useSelector(selectRole);
   const [loadedEmployees, setLoadedEmployees] = useState([]);
+  const [cachedEmployees, setCachedEmployees] = useState([]);
   const [totalEmployees, setTotalEmployees] = useState(0);
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [fetchEmployees, { isLoading, isFetching }] = useLazyGetEmployeesQuery();
@@ -90,14 +101,33 @@ const Employees = () => {
   const [errors, setErrors] = useState({});
   const [hasLoadError, setHasLoadError] = useState(false);
 
-  const employeesData = loadedEmployees;
   const plants       = unwrap(plantsData).length      ? unwrap(plantsData)      : unwrap(attendanceFilters?.plants);
   const departments  = unwrap(departmentsData).length  ? unwrap(departmentsData)  : unwrap(attendanceFilters?.departments);
   const designations = unwrap(designationsData);
   const shifts       = unwrap(shiftsData).length       ? unwrap(shiftsData)       : unwrap(attendanceFilters?.shifts);
   const charges      = unwrap(chargesData).length      ? unwrap(chargesData)      : unwrap(attendanceFilters?.charges);
   const isSinglePlantRole = Array.isArray(role?.plant_ids) && role.plant_ids.length === 1;
-  const selectedEmployee = employeesData.find((employee) => String(employee.id) === String(id)) ?? (selectedEmployeeData?.data ?? selectedEmployeeData);
+  const searchQuery = search.trim();
+  const localEmployees = useMemo(() => cachedEmployees.filter((employee) => {
+    const matchesPlant = !plantFilter || String(employee.plant_id ?? employee.plant?.id) === String(plantFilter);
+    return matchesPlant && (!searchQuery || matchesEmployeeSearch(employee, searchQuery));
+  }), [cachedEmployees, plantFilter, searchQuery]);
+  const hasLocalSearchResults = Boolean(searchQuery) && localEmployees.length > 0;
+  const employeesData = cachedEmployees.length > 0 && (!searchQuery || hasLocalSearchResults)
+    ? localEmployees
+    : searchQuery && debouncedSearch !== searchQuery
+      ? []
+      : loadedEmployees;
+  const displayedEmployeeCount = hasLocalSearchResults ? localEmployees.length : totalEmployees || employeesData.length;
+  const refreshedEmployee = selectedEmployeeData?.data ?? selectedEmployeeData;
+  const selectedEmployee = refreshedEmployee?.id
+    ? refreshedEmployee
+    : employeesData.find((employee) => String(employee.id) === String(id));
+  const displayEmployeesData = employeesData.map((employee) => (
+    String(employee.id) === String(refreshedEmployee?.id)
+      ? { ...employee, ...refreshedEmployee }
+      : employee
+  ));
   const workflowEmployee = selectedEmployee ?? createdEmployee;
   const workflowEmployeeId = workflowEmployee?.id ?? (location.pathname.endsWith('/edit') ? id : null);
   const { data: employeeDocumentsData, isLoading: employeeDocumentsLoading } = useGetEmployeeDocumentsQuery(workflowEmployeeId, { skip: !workflowEmployeeId });
@@ -133,6 +163,14 @@ const Employees = () => {
           const existingIds = new Set(current.map((employee) => employee.id));
           return [...current, ...pageEmployees.filter((employee) => !existingIds.has(employee.id))];
         });
+        if (!query && !plantId) {
+          setCachedEmployees((current) => {
+            if (replacePage) return pageEmployees;
+
+            const existingIds = new Set(current.map((employee) => employee.id));
+            return [...current, ...pageEmployees.filter((employee) => !existingIds.has(employee.id))];
+          });
+        }
         setTotalEmployees(Number(response.meta?.total ?? pageEmployees.length));
         const currentPage = Number(response.meta?.current_page ?? page);
         const lastPage = Number(response.meta?.last_page ?? currentPage);
@@ -166,6 +204,13 @@ const Employees = () => {
     setSearch(value);
     setHasLoadError(false);
     window.clearTimeout(searchTimeout.current);
+    if (query && cachedEmployees.some((employee) => {
+      const matchesPlant = !plantFilter || String(employee.plant_id ?? employee.plant?.id) === String(plantFilter);
+      return matchesPlant && matchesEmployeeSearch(employee, query);
+    })) {
+      setDebouncedSearch(query);
+      return;
+    }
     searchTimeout.current = window.setTimeout(() => {
       setDebouncedSearch(query);
       loadEmployeePages(1, query, plantFilter, true, version);
@@ -178,8 +223,15 @@ const Employees = () => {
     loadingEmployees.current = false;
     window.clearTimeout(searchTimeout.current);
     setPlantFilter(plantId);
-    setDebouncedSearch(query);
     setHasLoadError(false);
+    if (query && cachedEmployees.some((employee) => {
+      const matchesPlant = !plantId || String(employee.plant_id ?? employee.plant?.id) === String(plantId);
+      return matchesPlant && matchesEmployeeSearch(employee, query);
+    })) {
+      setDebouncedSearch(query);
+      return;
+    }
+    setDebouncedSearch(query);
     loadEmployeePages(1, query, plantId, true, version);
   };
 
@@ -199,6 +251,9 @@ const Employees = () => {
     setLoadedEmployees((current) => current.map((item) => (
       String(item.id) === String(employee.id) ? { ...item, status: nextStatus } : item
     )));
+    setCachedEmployees((current) => current.map((item) => (
+      String(item.id) === String(employee.id) ? { ...item, status: nextStatus } : item
+    )));
 
     try {
       const response = await updateEmployee({ id: employee.id, status: nextStatus }).unwrap();
@@ -206,9 +261,15 @@ const Employees = () => {
       setLoadedEmployees((current) => current.map((item) => (
         String(item.id) === String(employee.id) ? { ...item, ...updatedEmployee } : item
       )));
+      setCachedEmployees((current) => current.map((item) => (
+        String(item.id) === String(employee.id) ? { ...item, ...updatedEmployee } : item
+      )));
       toast(`${employee.name} marked ${nextStatus ? 'active' : 'inactive'}.`, 'success');
     } catch (error) {
       setLoadedEmployees((current) => current.map((item) => (
+        String(item.id) === String(employee.id) ? { ...item, status: previousStatus } : item
+      )));
+      setCachedEmployees((current) => current.map((item) => (
         String(item.id) === String(employee.id) ? { ...item, status: previousStatus } : item
       )));
       toast(getApiErrorMessage(error, `Unable to update ${employee.name}'s status.`), 'error');
@@ -246,8 +307,21 @@ const Employees = () => {
             ? { ...employee, ...employeeRecord }
             : employee
         )));
+        setCachedEmployees((current) => current.map((employee) => (
+          String(employee.id) === String(employeeRecord.id)
+            ? { ...employee, ...employeeRecord }
+            : employee
+        )));
       }
-      toast(payload.id ? 'Employee updated successfully.' : 'Employee created successfully.', 'success');
+      const createdStatus = employeeRecord?.approval_status_label ?? 'Pending';
+      toast(
+        payload.id
+          ? 'Employee updated successfully.'
+          : createdStatus === 'Approved'
+            ? 'Employee created and approved successfully.'
+            : 'Employee created and sent for approval.',
+        'success',
+      );
       setErrors({});
       return employeeRecord;
     } catch (error) {
@@ -306,7 +380,7 @@ const Employees = () => {
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-(--color-text-muted)">Employee Management</p>
               <div className="flex items-center gap-2">
-                <h1 className="text-lg font-semibold text-(--color-text)">Employees <span className="ml-1 text-xs font-normal text-(--color-text-muted)">{totalEmployees || employeesData.length}</span></h1>
+                <h1 className="text-lg font-semibold text-(--color-text)">Employees <span className="ml-1 text-xs font-normal text-(--color-text-muted)">{displayedEmployeeCount}</span></h1>
               </div>
             </div>
             {canCreate && !isReadOnly && <Button type="button" onClick={() => { setCreatedEmployee(null); navigate('/employees/add'); }} className="flex items-center gap-1.5 "><Plus size={18} /></Button>}
@@ -321,7 +395,7 @@ const Employees = () => {
         <div className="min-h-0 flex-1 overflow-y-auto p-2">
           {hasLoadError && employeesData.length === 0 && <Feedback type="error" title="Unable to load employees" message="Please refresh the page and try again." />}
           {!isSearchPending && !isLoading && !isFetching && !hasLoadError && employeesData.length === 0 && <p className="py-10 text-center text-sm text-(--color-text-muted)">No employees found.</p>}
-          {employeesData.map((employee) => (
+          {displayEmployeesData.map((employee) => (
             <div
               key={employee.id}
               role="button"
@@ -341,6 +415,12 @@ const Employees = () => {
                 <span className="block truncate text-sm font-semibold text-(--color-text)">{employee.name}</span>
                 <span className="mt-0.5 block truncate text-xs text-(--color-text-muted)">{employee.employee_code} · {employee.plant?.name}</span>
                 <span className="mt-1 block truncate text-xs text-(--color-accent)">{employee.department?.name ?? employee.designation?.name}</span>
+                {employee.approval_status_label && employee.approval_status !== 1 && (
+                  <span className={`mt-1 block truncate text-xs font-medium ${employee.approval_status === 2 ? 'text-red-600' : 'text-amber-700 dark:text-amber-300'}`}>
+                    {employee.approval_status_label}
+                    {employee.approval_status === 2 && employee.rejection_reason ? ` · ${employee.rejection_reason}` : ''}
+                  </span>
+                )}
               </span>
               <span
                 className={`h-2 w-2 shrink-0 rounded-full animate-pulse ${employee.status ? 'bg-emerald-500' : 'bg-red-500'
