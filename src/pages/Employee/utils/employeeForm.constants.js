@@ -13,7 +13,7 @@ export const EMPTY_EMPLOYEE_FORM = {
   address: '',
   gender: '',
   marital_status: '',
-  status: true,
+  status: 1,
   image: null,
 };
 

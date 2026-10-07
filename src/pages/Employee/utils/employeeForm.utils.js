@@ -18,7 +18,7 @@ export const normalizeEmployee = (employee) => ({
   gender: String(employee?.gender ?? ''),
   marital_status: String(employee?.marital_status ?? ''),
   image: null,
-  status: employee?.status == null ? true : Boolean(employee.status),
+  status: employee?.status == null ? 1 : Number(employee.status),
 });
 
 export const createEmployeePayload = (form, employeeId) => ({

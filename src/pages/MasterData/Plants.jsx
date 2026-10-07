@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { Building2, CalendarDays, Check, ChevronLeft, ChevronRight, LoaderCircle, Pencil, Plus, Power, Search, Trash2, XCircle } from 'lucide-react';
 import {
@@ -14,6 +14,7 @@ import {
 import usePermission from '../../hooks/usePermission';
 import { useToast } from '../../contexts/ToastContext';
 import InputField from '../../components/InputField';
+import Switch from '../../components/Switch';
 import ConfirmDelete from '../../components/ConfirmDelete';
 import Button from '../../components/Button';
 import { Feedback } from '../../components/Feedback';
@@ -73,6 +74,7 @@ const Plants = () => {
   });
   const [editor, setEditor] = useState({ open: false, plant: null });
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [togglingId, setTogglingId] = useState(null);
   const [shutdownToApprove, setShutdownToApprove] = useState(null);
   const [shutdownToReject, setShutdownToReject] = useState(null);
   const [shutdownRequestOpen, setShutdownRequestOpen] = useState(false);
@@ -189,6 +191,23 @@ const Plants = () => {
     }
   };
 
+  const handleStatusChange = useCallback(
+    async (plant) => {
+      if (!canEdit || isReadOnly) return;
+      const newStatus = Number(plant.status) === 1 ? 0 : 1;
+      setTogglingId(plant.id);
+      try {
+        await updatePlant({ id: plant.id, status: newStatus }).unwrap();
+        toast('Plant status updated.', 'success');
+      } catch (error) {
+        toast(getApiErrorMessage(error, 'Unable to update plant status.'), 'error');
+      } finally {
+        setTogglingId(null);
+      }
+    },
+    [canEdit, isReadOnly, toast, updatePlant]
+  );
+
   const handleSave = async ({ id, ...payload }) => {
     if (!payload.plant_code || !payload.name) return toast('Plant code and name are required.', 'error');
     try {
@@ -249,11 +268,13 @@ const Plants = () => {
                       </button>
                       {(canEdit && !isReadOnly) && <button type="button" aria-label={`Edit ${plant.name}`} onClick={() => setEditor({ open: true, plant })} className="rounded px-2 text-(--color-accent) hover:scale-110"><Pencil size={15} /></button>}
                       {(canDelete && !isReadOnly) && <button type="button" aria-label={`Delete ${plant.name}`} onClick={() => setDeleteTarget(plant)} className="mr-1 rounded px-2 text-red-500 hover:scale-110"><Trash2 size={15} /></button>}
-                      <span
-                        role="img"
-                        aria-label={`${String(plant.status) === '1' ? 'Active' : 'Inactive'} plant`}
-                        title={String(plant.status) === '1' ? 'Active' : 'Inactive'}
-                        className={`mr-2 h-2.5 w-2.5 shrink-0 rounded-full ${String(plant.status) === '1' ? 'bg-emerald-500' : 'bg-gray-400'}`}
+                      <Switch
+                        checked={Number(plant.status) === 1}
+                        disabled={!canEdit || isReadOnly}
+                        loading={togglingId === plant.id}
+                        onClick={() => handleStatusChange(plant)}
+                        ariaLabel={Number(plant.status) === 1 ? 'Active' : 'Inactive'}
+                        className="mr-2"
                       />
                     </div>
                   );

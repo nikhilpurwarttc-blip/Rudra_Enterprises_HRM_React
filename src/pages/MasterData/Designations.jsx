@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { BriefcaseBusiness, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import {
   useCreateDesignationMutation,
@@ -11,6 +11,7 @@ import { useToast } from '../../contexts/ToastContext';
 import SectionCard from '../../components/SectionCard';
 import PageTable from '../../components/PageTable';
 import InputField from '../../components/InputField';
+import Switch from '../../components/Switch';
 import ConfirmDelete from '../../components/ConfirmDelete';
 import Button from '../../components/Button';
 import { Feedback } from '../../components/Feedback';
@@ -23,13 +24,14 @@ const unwrap = (value) => Array.isArray(value) ? value : value?.data ?? [];
 const Designations = () => {
   const toast = useToast();
   const { canCreate, canEdit, canDelete, isReadOnly } = usePermission('/designations');
-  const { data, isLoading, isError } = useGetDesignationsQuery();
+  const { data, isLoading, isError } = useGetDesignationsQuery({ all: true, per_page: 100 });
   const [createDesignation, { isLoading: creating }] = useCreateDesignationMutation();
   const [updateDesignation, { isLoading: updating }] = useUpdateDesignationMutation();
   const [deleteDesignation] = useDeleteDesignationMutation();
   const [search, setSearch] = useState('');
   const [editor, setEditor] = useState({ open: false, designation: null });
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [togglingId, setTogglingId] = useState(null);
   const designations = unwrap(data);
 
   useRenderPerformance('getDesignations', data);
@@ -60,6 +62,23 @@ const Designations = () => {
     }
   };
 
+  const handleStatusChange = useCallback(
+    async (designation) => {
+      if (!canEdit || isReadOnly) return;
+      const newStatus = Number(designation.status) === 1 ? 0 : 1;
+      setTogglingId(designation.id);
+      try {
+        await updateDesignation({ id: designation.id, status: newStatus }).unwrap();
+        toast('Designation status updated.', 'success');
+      } catch (error) {
+        toast(getApiErrorMessage(error, 'Unable to update designation status.'), 'error');
+      } finally {
+        setTogglingId(null);
+      }
+    },
+    [canEdit, isReadOnly, toast, updateDesignation]
+  );
+
   const columns = useMemo(() => [
     {
       key: 'name',
@@ -74,8 +93,19 @@ const Designations = () => {
     { key: 'description', label: 'Description', render: (designation) => designation.description || '—' },
     {
       key: 'status',
-      label: 'Status',
-      render: (designation) => <span className={designation.status ? 'text-green-600' : 'text-(--color-text-muted)'}>{designation.status ? 'Active' : 'Inactive'}</span>,
+      label: 'Active',
+      render: (designation) => {
+        const active = Number(designation.status) === 1;
+        return (
+          <Switch
+            checked={active}
+            disabled={!canEdit || isReadOnly}
+            loading={togglingId === designation.id}
+            onClick={() => handleStatusChange(designation)}
+            ariaLabel={active ? 'Active' : 'Inactive'}
+          />
+        );
+      },
     },
     {
       key: 'actions',
@@ -89,7 +119,7 @@ const Designations = () => {
         </div>
       ),
     },
-  ], [canDelete, canEdit, isReadOnly]);
+  ], [canDelete, canEdit, handleStatusChange, isReadOnly, togglingId]);
 
   return (
     <div className="space-y-4 p-4 sm:p-6">

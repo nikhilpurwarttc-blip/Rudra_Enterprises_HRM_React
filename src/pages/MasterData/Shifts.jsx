@@ -35,6 +35,7 @@ const Shifts = () => {
   const [editor, setEditor] = useState({ open: false, shift: null });
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [errors, setErrors] = useState({});
+  const [togglingId, setTogglingId] = useState(null);
 
   const shifts = unwrap(data);
   useRenderPerformance('getShifts', data);
@@ -91,15 +92,15 @@ const Shifts = () => {
   const handleStatusChange = useCallback(
   async (shift) => {
     if (!canEdit || isReadOnly) return;
-
-    // If currently 0 (active), send 1 (inactive). Otherwise send 0.
-    const newStatus = Number(shift.status) === 0 ? 1 : 0;
-
+    const newStatus = Number(shift.status) === 1 ? 0 : 1;
+    setTogglingId(shift.id);
     try {
       await updateShift({ id: shift.id, status: newStatus }).unwrap();
       toast('Shift status updated.', 'success');
     } catch (error) {
       toast(getApiErrorMessage(error, 'Unable to update shift status.'), 'error');
+    } finally {
+      setTogglingId(null);
     }
   },
   [canEdit, isReadOnly, toast, updateShift]
@@ -138,13 +139,12 @@ const Shifts = () => {
   key: 'status',
   label: 'Active',
   render: (shift) => {
-    // 0 is active, 1 is inactive
-    const isActive = Number(shift.status) === 0;
-
+    const isActive = Number(shift.status) === 1;
     return (
       <Switch
         checked={isActive}
         disabled={!canEdit || isReadOnly}
+        loading={togglingId === shift.id}
         onClick={() => handleStatusChange(shift)}
         ariaLabel={isActive ? 'Active' : 'Inactive'}
       />
@@ -184,7 +184,7 @@ const Shifts = () => {
         ),
       },
     ],
-    [canDelete, canEdit, handleStatusChange, isReadOnly]
+    [canDelete, canEdit, handleStatusChange, isReadOnly, togglingId]
   );
 
   return (

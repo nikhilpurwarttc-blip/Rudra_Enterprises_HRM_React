@@ -21,7 +21,7 @@ const EmployeeAdditionalDetails = ({ form, charges, updateForm, setField }) => (
         placeholder="Select charges"
       />
       <label className="flex items-center gap-2 text-sm text-(--color-text)">
-        <input type="checkbox" checked={form.status} onChange={setField('status')} className="h-4 w-4 accent-primary-600" />
+        <input type="checkbox" checked={form.status === 1} onChange={setField('status')} className="h-4 w-4 accent-primary-600" />
         Active employee
       </label>
     </div>

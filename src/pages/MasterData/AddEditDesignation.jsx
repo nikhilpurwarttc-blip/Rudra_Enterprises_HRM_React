@@ -9,7 +9,7 @@ const normalize = (designation) => ({
   ...(designation ?? {}),
   name: designation?.name ?? '',
   description: designation?.description ?? '',
-  status: designation?.status == null ? true : Boolean(designation.status),
+  status: designation?.status == null ? 1 : Number(designation.status),
 });
 
 const AddEditDesignation = ({ isOpen, designation, saving = false, onClose, onSubmit }) => {
@@ -17,7 +17,7 @@ const AddEditDesignation = ({ isOpen, designation, saving = false, onClose, onSu
   const [errors, setErrors] = useState({});
 
   const setField = (field) => (event) => {
-    const value = event.target.type === 'checkbox' ? event.target.checked : event.target.value;
+    const value = event.target.type === 'checkbox' ? (event.target.checked ? 1 : 0) : event.target.value;
     setForm((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: '' }));
   };
@@ -61,7 +61,7 @@ const AddEditDesignation = ({ isOpen, designation, saving = false, onClose, onSu
         error={errors.description}
       />
       <label className="flex items-center gap-2 text-sm text-(--color-text)">
-        <input type="checkbox" checked={form.status} onChange={setField('status')} className="h-4 w-4 accent-primary-600" />
+        <input type="checkbox" checked={form.status === 1} onChange={setField('status')} className="h-4 w-4 accent-primary-600" />
         Active designation
       </label>
     </RightModal>

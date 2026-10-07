@@ -23,8 +23,8 @@ import AddEditCharge from './AddEditCharge';
 
 // Helper utilities
 const unwrap = (value) => (Array.isArray(value) ? value : value?.data ?? []);
-const normalizeStatus = (value) =>
-  value === false || value === 0 || value === '0' || value === 'false';
+const isActive = (value) =>
+  value === true || value === 1 || value === '1' || value === 'true';
 
 const Charges = () => {
   const toast = useToast();
@@ -41,6 +41,7 @@ const Charges = () => {
   const [editor, setEditor] = useState({ open: false, charge: null });
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [errors, setErrors] = useState({});
+  const [togglingId, setTogglingId] = useState(null);
 
   const charges = unwrap(data);
   useRenderPerformance('getCharges', data);
@@ -106,15 +107,17 @@ const Charges = () => {
   const handleStatusChange = useCallback(
     async (charge) => {
       if (!canEdit || isReadOnly) return;
-
+      setTogglingId(charge.id);
       try {
         await updateCharge({
           id: charge.id,
-          status: normalizeStatus(charge.status),
+          status: isActive(charge.status) ? 0 : 1,
         }).unwrap();
         toast('Charge status updated.', 'success');
       } catch (error) {
         toast(getApiErrorMessage(error, 'Unable to update charge status.'), 'error');
+      } finally {
+        setTogglingId(null);
       }
     },
     [canEdit, isReadOnly, toast, updateCharge]
@@ -153,10 +156,11 @@ const Charges = () => {
         label: 'Active',
         render: (charge) => (
           <Switch
-            checked={normalizeStatus(charge.status)}
+            checked={isActive(charge.status)}
             disabled={!canEdit || isReadOnly}
+            loading={togglingId === charge.id}
             onClick={() => handleStatusChange(charge)}
-            ariaLabel={normalizeStatus(charge.status) ? 'Active' : 'Inactive'}
+            ariaLabel={isActive(charge.status) ? 'Active' : 'Inactive'}
           />
         ),
       },
@@ -193,7 +197,7 @@ const Charges = () => {
         ),
       },
     ],
-    [canDelete, canEdit, handleStatusChange, isReadOnly]
+    [canDelete, canEdit, handleStatusChange, isReadOnly, togglingId]
   );
 
   return (

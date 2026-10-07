@@ -27,7 +27,7 @@ const Departments = () => {
   const toast = useToast();
   const { canCreate, canEdit, canDelete, isReadOnly } = usePermission('/departments');
 
-  const { data, isLoading, isError } = useGetDepartmentsQuery();
+  const { data, isLoading, isError } = useGetDepartmentsQuery({ all: true, per_page: 100 });
   const { data: plantsData, isLoading: plantsLoading } = useGetPlantsQuery();
 
   const [createDepartment, { isLoading: creating }] = useCreateDepartmentMutation();
@@ -37,6 +37,7 @@ const Departments = () => {
   const [search, setSearch] = useState('');
   const [editor, setEditor] = useState({ open: false, department: null });
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [togglingId, setTogglingId] = useState(null);
 
   const departments = unwrap(data);
   const plants = unwrap(plantsData);
@@ -99,15 +100,15 @@ const Departments = () => {
   const handleStatusChange = useCallback(
     async (department) => {
       if (!canEdit || isReadOnly) return;
-
-      // 0 = Active, 1 = Inactive (toggle logic)
-      const newStatus = Number(department.status) === 0 ? 1 : 0;
-
+      const newStatus = Number(department.status) === 1 ? 0 : 1;
+      setTogglingId(department.id);
       try {
         await updateDepartment({ id: department.id, status: newStatus }).unwrap();
         toast('Department status updated.', 'success');
       } catch (error) {
         toast(getApiErrorMessage(error, 'Unable to update department status.'), 'error');
+      } finally {
+        setTogglingId(null);
       }
     },
     [canEdit, isReadOnly, toast, updateDepartment]
@@ -146,13 +147,12 @@ const Departments = () => {
         key: 'status',
         label: 'Active',
         render: (department) => {
-          // 0 is Active, 1 is Inactive
-          const isActive = Number(department.status) === 0;
-
+          const isActive = Number(department.status) === 1;
           return (
             <Switch
               checked={isActive}
               disabled={!canEdit || isReadOnly}
+              loading={togglingId === department.id}
               onClick={() => handleStatusChange(department)}
               ariaLabel={isActive ? 'Active' : 'Inactive'}
             />
@@ -189,7 +189,7 @@ const Departments = () => {
         ),
       },
     ],
-    [canDelete, canEdit, handleStatusChange, isReadOnly, plantMap]
+    [canDelete, canEdit, handleStatusChange, isReadOnly, plantMap, togglingId]
   );
 
   return (

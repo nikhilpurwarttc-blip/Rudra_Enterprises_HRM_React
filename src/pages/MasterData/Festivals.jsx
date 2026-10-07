@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { CalendarDays, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import {
   useCreateHolidayMutation,
@@ -12,6 +12,7 @@ import { useToast } from '../../contexts/ToastContext';
 import SectionCard from '../../components/SectionCard';
 import PageTable from '../../components/PageTable';
 import InputField from '../../components/InputField';
+import Switch from '../../components/Switch';
 import ConfirmDelete from '../../components/ConfirmDelete';
 import Button from '../../components/Button';
 import { Feedback } from '../../components/Feedback';
@@ -33,6 +34,7 @@ const Festivals = () => {
   const [search, setSearch] = useState('');
   const [editor, setEditor] = useState({ open: false, festival: null });
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [togglingId, setTogglingId] = useState(null);
   const holidays = unwrap(data);
   const plants = unwrap(plantsData);
 
@@ -70,13 +72,39 @@ const Festivals = () => {
     }
   };
 
+  const handleStatusChange = useCallback(async (holiday) => {
+    if (!canEdit || isReadOnly) return;
+    const newStatus = Number(holiday.status) === 1 ? 0 : 1;
+    setTogglingId(holiday.id);
+    try {
+      await updateHoliday({ id: holiday.id, status: newStatus }).unwrap();
+      toast('Holiday status updated.', 'success');
+    } catch (error) {
+      toast(getApiErrorMessage(error, 'Unable to update holiday status.'), 'error');
+    } finally {
+      setTogglingId(null);
+    }
+  }, [canEdit, isReadOnly, toast, updateHoliday]);
+
   const columns = useMemo(() => [
     { key: 'name', label: 'Holiday', render: (holiday) => <div className="flex items-center gap-2"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-(--color-accent) text-white"><CalendarDays size={14} /></span><span className="font-medium">{holiday.name}</span></div> },
     { key: 'holiday_date', label: 'Date', render: (holiday) => formatDate(holiday.holiday_date) },
     { key: 'plant_id', label: 'Plants', render: (holiday) => (holiday.plant_id ?? []).map((id) => plantMap[id]?.name ?? `#${id}`).join(', ') || '—' },
-    { key: 'status', label: 'Status', render: (holiday) => <span className={holiday.status ? 'text-green-600' : 'text-(--color-text-muted)'}>{holiday.status ? 'Active' : 'Inactive'}</span> },
+    {
+      key: 'status',
+      label: 'Active',
+      render: (holiday) => (
+        <Switch
+          checked={Number(holiday.status) === 1}
+          disabled={!canEdit || isReadOnly}
+          loading={togglingId === holiday.id}
+          onClick={() => handleStatusChange(holiday)}
+          ariaLabel={Number(holiday.status) === 1 ? 'Active' : 'Inactive'}
+        />
+      ),
+    },
     { key: 'actions', label: 'Actions', sortable: false, render: (holiday) => <div className="flex items-center gap-3">{canEdit && !isReadOnly && <button type="button" aria-label="Edit holiday" onClick={() => setEditor({ open: true, festival: holiday })} className="text-(--color-accent)"><Pencil size={16} /></button>}{canDelete && !isReadOnly && <button type="button" aria-label="Delete holiday" onClick={() => setDeleteTarget(holiday)} className="text-red-500"><Trash2 size={16} /></button>}</div> },
-  ], [canDelete, canEdit, isReadOnly, plantMap]);
+  ], [canDelete, canEdit, handleStatusChange, isReadOnly, plantMap, togglingId]);
 
   return (
     <div className="space-y-4 p-4 sm:p-6">

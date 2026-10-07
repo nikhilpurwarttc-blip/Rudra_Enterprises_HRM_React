@@ -13,7 +13,7 @@ const EMPTY_FORM = {
     duration_hours: '',
     start_time: '',
     end_time: '',
-    status: 0, // 0 = Active
+    status: 1, // 1 = Active
 };
 
 // --------------------------------------------------
@@ -25,14 +25,14 @@ const formatTime = (value) => {
 };
 
 const normalize = (shift) => {
-    let status = 0; // Default to Active (0)
+    let status = 1; // Default to Active (1)
 
     if (shift?.status != null) {
-        // Map true / 0 to Active (0), false / 1 to Inactive (1)
+        // 1 = Active, 0 = Inactive
         if (typeof shift.status === 'boolean') {
-            status = shift.status ? 0 : 1;
+            status = shift.status ? 1 : 0;
         } else {
-            status = Number(shift.status) === 0 ? 0 : 1;
+            status = Number(shift.status) === 1 ? 1 : 0;
         }
     }
 
@@ -330,12 +330,12 @@ const AddEditShift = ({
                 form.duration_hours === ''
                     ? null
                     : Number(form.duration_hours),
-            status: Number(form.status), // Submits 0 for Active, 1 for Inactive
+            status: Number(form.status), // Submits 1 for Active, 0 for Inactive
         });
     };
 
     // Helper flag for UI
-    const isActive = Number(form.status) === 0;
+    const isActive = Number(form.status) === 1;
 
     // ------------------------------------------------
     // Render
@@ -422,7 +422,7 @@ const AddEditShift = ({
                     onClick={() =>
                         setForm((current) => ({
                             ...current,
-                            status: Number(current.status) === 0 ? 1 : 0,
+                            status: Number(current.status) === 1 ? 0 : 1,
                         }))
                     }
                     ariaLabel="Toggle shift status"

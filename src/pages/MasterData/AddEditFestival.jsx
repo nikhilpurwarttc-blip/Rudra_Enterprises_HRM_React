@@ -8,7 +8,7 @@ const EMPTY_FORM = {
   name: '',
   holiday_date: '',
   description: '',
-  status: true,
+  status: 1,
 };
 
 const normalizeFestival = (festival) => ({
@@ -16,7 +16,7 @@ const normalizeFestival = (festival) => ({
   ...(festival ?? {}),
   plant_id: (festival?.plant_id ?? []).map(String),
   holiday_date: String(festival?.holiday_date ?? '').slice(0, 10),
-  status: festival?.status == null ? true : Boolean(festival.status),
+  status: festival?.status == null ? 1 : Number(festival.status),
 });
 
 const AddEditFestival = ({
@@ -31,7 +31,7 @@ const AddEditFestival = ({
   const [form, setForm] = useState(() => normalizeFestival(festival));
 
   const setField = (field) => (event) => {
-    const value = event.target.type === 'checkbox' ? event.target.checked : event.target.value;
+    const value = event.target.type === 'checkbox' ? (event.target.checked ? 1 : 0) : event.target.value;
     setForm((current) => ({ ...current, [field]: value }));
   };
 
@@ -72,7 +72,7 @@ const AddEditFestival = ({
       <InputField label="Date" type="date" value={form.holiday_date} onChange={setField('holiday_date')} required />
       <InputField label="Description" value={form.description} onChange={setField('description')} />
       <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={form.status} onChange={setField('status')} className="h-4 w-4 accent-primary-600" />
+        <input type="checkbox" checked={form.status === 1} onChange={setField('status')} className="h-4 w-4 accent-primary-600" />
         Active holiday
       </label>
     </RightModal>

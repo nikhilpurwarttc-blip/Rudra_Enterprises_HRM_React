@@ -11,7 +11,7 @@ export default function useEmployeeForm(employee, restoreDraft, markDraftChanged
   };
 
   const handleFieldChange = (field) => (event) => {
-    const value = event.target.type === 'checkbox' ? event.target.checked : event.target.value;
+    const value = event.target.type === 'checkbox' ? (event.target.checked ? 1 : 0) : event.target.value;
     updateForm((current) => ({ ...current, [field]: value }));
     clearFieldErrors(field);
   };
