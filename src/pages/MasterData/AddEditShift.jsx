@@ -4,7 +4,6 @@ import InputField from '../../components/InputField';
 import RightModal from '../components/RightModal';
 import Switch from '../../components/Switch';
 
-
 // --------------------------------------------------
 // Constants
 // --------------------------------------------------
@@ -14,9 +13,8 @@ const EMPTY_FORM = {
     duration_hours: '',
     start_time: '',
     end_time: '',
-    status: true,
+    status: 0, // 0 = Active
 };
-
 
 // --------------------------------------------------
 // Helpers
@@ -26,20 +24,26 @@ const formatTime = (value) => {
     return String(value ?? '').slice(0, 5);
 };
 
+const normalize = (shift) => {
+    let status = 0; // Default to Active (0)
 
-const normalize = (shift) => ({
-    ...EMPTY_FORM,
-    ...(shift ?? {}),
+    if (shift?.status != null) {
+        // Map true / 0 to Active (0), false / 1 to Inactive (1)
+        if (typeof shift.status === 'boolean') {
+            status = shift.status ? 0 : 1;
+        } else {
+            status = Number(shift.status) === 0 ? 0 : 1;
+        }
+    }
 
-    start_time: formatTime(shift?.start_time),
-    end_time: formatTime(shift?.end_time),
-
-    status:
-        shift?.status == null
-            ? true
-            : Boolean(shift.status),
-});
-
+    return {
+        ...EMPTY_FORM,
+        ...(shift ?? {}),
+        start_time: formatTime(shift?.start_time),
+        end_time: formatTime(shift?.end_time),
+        status,
+    };
+};
 
 /**
  * Convert HH:mm into minutes.
@@ -50,20 +54,14 @@ const normalize = (shift) => ({
 const timeToMinutes = (time) => {
     if (!time) return null;
 
-    const [hours, minutes] = time
-        .split(':')
-        .map(Number);
+    const [hours, minutes] = time.split(':').map(Number);
 
-    if (
-        Number.isNaN(hours) ||
-        Number.isNaN(minutes)
-    ) {
+    if (Number.isNaN(hours) || Number.isNaN(minutes)) {
         return null;
     }
 
     return hours * 60 + minutes;
 };
-
 
 /**
  * Convert minutes into HH:mm.
@@ -72,20 +70,13 @@ const timeToMinutes = (time) => {
  * by wrapping around the next day.
  */
 const minutesToTime = (minutes) => {
-    const normalized =
-        ((minutes % 1440) + 1440) % 1440;
+    const normalized = ((minutes % 1440) + 1440) % 1440;
 
-    const hours = Math.floor(
-        normalized / 60
-    );
-
+    const hours = Math.floor(normalized / 60);
     const mins = normalized % 60;
 
-    return `${String(hours).padStart(2, '0')}:${String(
-        mins
-    ).padStart(2, '0')}`;
+    return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
 };
-
 
 /**
  * Calculate duration between start and end.
@@ -96,17 +87,11 @@ const minutesToTime = (minutes) => {
  * Overnight:
  * 22:00 → 06:00 = 8
  */
-const calculateDuration = (
-    startTime,
-    endTime
-) => {
+const calculateDuration = (startTime, endTime) => {
     const start = timeToMinutes(startTime);
     const end = timeToMinutes(endTime);
 
-    if (
-        start === null ||
-        end === null
-    ) {
+    if (start === null || end === null) {
         return '';
     }
 
@@ -120,62 +105,37 @@ const calculateDuration = (
     return difference / 60;
 };
 
-
 /**
  * Calculate end time from start + duration.
  */
-const calculateEndTime = (
-    startTime,
-    duration
-) => {
+const calculateEndTime = (startTime, duration) => {
     const start = timeToMinutes(startTime);
-
     const durationHours = Number(duration);
 
-    if (
-        start === null ||
-        !Number.isFinite(durationHours) ||
-        durationHours < 0
-    ) {
+    if (start === null || !Number.isFinite(durationHours) || durationHours < 0) {
         return '';
     }
 
-    const durationMinutes =
-        durationHours * 60;
+    const durationMinutes = durationHours * 60;
 
-    return minutesToTime(
-        start + durationMinutes
-    );
+    return minutesToTime(start + durationMinutes);
 };
-
 
 /**
  * Calculate start time from end + duration.
  */
-const calculateStartTime = (
-    endTime,
-    duration
-) => {
+const calculateStartTime = (endTime, duration) => {
     const end = timeToMinutes(endTime);
-
     const durationHours = Number(duration);
 
-    if (
-        end === null ||
-        !Number.isFinite(durationHours) ||
-        durationHours < 0
-    ) {
+    if (end === null || !Number.isFinite(durationHours) || durationHours < 0) {
         return '';
     }
 
-    const durationMinutes =
-        durationHours * 60;
+    const durationMinutes = durationHours * 60;
 
-    return minutesToTime(
-        end - durationMinutes
-    );
+    return minutesToTime(end - durationMinutes);
 };
-
 
 /**
  * Remove unnecessary decimal zeros.
@@ -194,11 +154,8 @@ const formatDuration = (value) => {
         return '';
     }
 
-    return String(
-        Number(number.toFixed(2))
-    );
+    return String(Number(number.toFixed(2)));
 };
-
 
 // --------------------------------------------------
 // Component
@@ -212,20 +169,13 @@ const AddEditShift = ({
     onClose,
     onSubmit,
 }) => {
-    const [form, setForm] = useState(() =>
-        normalize(shift)
-    );
+    const [form, setForm] = useState(() => normalize(shift));
 
     /**
-     * Keep track of which field the user
-     * changed most recently.
-     *
-     * This is important because all three
-     * fields depend on each other.
+     * Keep track of which field the user changed most recently.
+     * This is important because all three fields depend on each other.
      */
-    const [lastChanged, setLastChanged] =
-        useState(null);
-
+    const [, setLastChanged] = useState(null);
 
     // ------------------------------------------------
     // Reset form when modal / shift changes
@@ -236,173 +186,135 @@ const AddEditShift = ({
         setLastChanged(null);
     }, [shift, isOpen]);
 
-
     // ------------------------------------------------
     // Field Change
     // ------------------------------------------------
 
-    const handleFieldChange =
-        (field) => (event) => {
-            const value =
-                event.target.type === 'checkbox'
-                    ? event.target.checked
-                    : event.target.value;
+    const handleFieldChange = (field) => (event) => {
+        const value =
+            event.target.type === 'checkbox'
+                ? event.target.checked
+                : event.target.value;
 
-            // Normal fields
-            if (
-                field !== 'duration_hours' &&
-                field !== 'start_time' &&
-                field !== 'end_time'
-            ) {
-                setForm((current) => ({
+        // Normal fields
+        if (
+            field !== 'duration_hours' &&
+            field !== 'start_time' &&
+            field !== 'end_time'
+        ) {
+            setForm((current) => ({
+                ...current,
+                [field]: value,
+            }));
+
+            return;
+        }
+
+        // --------------------------------------------
+        // Duration
+        // --------------------------------------------
+
+        if (field === 'duration_hours') {
+            setLastChanged('duration_hours');
+
+            setForm((current) => {
+                const next = {
                     ...current,
-                    [field]: value,
-                }));
+                    duration_hours: value,
+                };
 
-                return;
-            }
+                /*
+                 * Duration + Start Time
+                 * → calculate End Time
+                 */
+                if (value !== '' && current.start_time) {
+                    next.end_time = calculateEndTime(current.start_time, value);
+                }
 
+                return next;
+            });
 
-            // --------------------------------------------
-            // Duration
-            // --------------------------------------------
+            return;
+        }
 
-            if (field === 'duration_hours') {
-                setLastChanged('duration_hours');
+        // --------------------------------------------
+        // Start Time
+        // --------------------------------------------
 
-                setForm((current) => {
-                    const next = {
-                        ...current,
-                        duration_hours: value,
-                    };
+        if (field === 'start_time') {
+            setLastChanged('start_time');
 
-                    /*
-                     * Duration + Start Time
-                     * → calculate End Time
-                     */
-                    if (
-                        value !== '' &&
-                        current.start_time
-                    ) {
-                        next.end_time =
-                            calculateEndTime(
-                                current.start_time,
-                                value
-                            );
-                    }
+            setForm((current) => {
+                const next = {
+                    ...current,
+                    start_time: value,
+                };
 
-                    return next;
-                });
+                /*
+                 * Start Time + Duration
+                 * → calculate End Time
+                 */
+                if (value && current.duration_hours !== '') {
+                    next.end_time = calculateEndTime(
+                        value,
+                        current.duration_hours
+                    );
+                }
 
-                return;
-            }
+                /*
+                 * Start Time + End Time
+                 * → calculate Duration
+                 */
+                else if (value && current.end_time) {
+                    next.duration_hours = formatDuration(
+                        calculateDuration(value, current.end_time)
+                    );
+                }
 
+                return next;
+            });
 
-            // --------------------------------------------
-            // Start Time
-            // --------------------------------------------
+            return;
+        }
 
-            if (field === 'start_time') {
-                setLastChanged('start_time');
+        // --------------------------------------------
+        // End Time
+        // --------------------------------------------
 
-                setForm((current) => {
-                    const next = {
-                        ...current,
-                        start_time: value,
-                    };
+        if (field === 'end_time') {
+            setLastChanged('end_time');
 
-                    /*
-                     * Start Time + Duration
-                     * → calculate End Time
-                     */
-                    if (
-                        value &&
-                        current.duration_hours !== ''
-                    ) {
-                        next.end_time =
-                            calculateEndTime(
-                                value,
-                                current.duration_hours
-                            );
-                    }
+            setForm((current) => {
+                const next = {
+                    ...current,
+                    end_time: value,
+                };
 
-                    /*
-                     * Start Time + End Time
-                     * → calculate Duration
-                     *
-                     * This happens when duration
-                     * has not been entered yet.
-                     */
-                    else if (
-                        value &&
-                        current.end_time
-                    ) {
-                        next.duration_hours =
-                            formatDuration(
-                                calculateDuration(
-                                    value,
-                                    current.end_time
-                                )
-                            );
-                    }
+                /*
+                 * Start Time + End Time
+                 * → calculate Duration
+                 */
+                if (value && current.start_time) {
+                    next.duration_hours = formatDuration(
+                        calculateDuration(current.start_time, value)
+                    );
+                }
 
-                    return next;
-                });
+                /*
+                 * End Time + Duration
+                 * → calculate Start Time
+                 */
+                else if (value && current.duration_hours !== '') {
+                    next.start_time = calculateStartTime(
+                        value,
+                        current.duration_hours
+                    );
+                }
 
-                return;
-            }
-
-
-            // --------------------------------------------
-            // End Time
-            // --------------------------------------------
-
-            if (field === 'end_time') {
-                setLastChanged('end_time');
-
-                setForm((current) => {
-                    const next = {
-                        ...current,
-                        end_time: value,
-                    };
-
-                    /*
-                     * Start Time + End Time
-                     * → calculate Duration
-                     */
-                    if (
-                        value &&
-                        current.start_time
-                    ) {
-                        next.duration_hours =
-                            formatDuration(
-                                calculateDuration(
-                                    current.start_time,
-                                    value
-                                )
-                            );
-                    }
-
-                    /*
-                     * End Time + Duration
-                     * → calculate Start Time
-                     */
-                    else if (
-                        value &&
-                        current.duration_hours !== ''
-                    ) {
-                        next.start_time =
-                            calculateStartTime(
-                                value,
-                                current.duration_hours
-                            );
-                    }
-
-                    return next;
-                });
-            }
-        };
-
+                return next;
+            });
+        }
+    };
 
     // ------------------------------------------------
     // Submit
@@ -411,22 +323,19 @@ const AddEditShift = ({
     const handleSubmit = () => {
         onSubmit({
             id: form.id,
-
             name: form.name.trim(),
-
             start_time: form.start_time,
-
             end_time: form.end_time,
-
             duration_hours:
                 form.duration_hours === ''
                     ? null
                     : Number(form.duration_hours),
-
-            status: form.status,
+            status: Number(form.status), // Submits 0 for Active, 1 for Inactive
         });
     };
 
+    // Helper flag for UI
+    const isActive = Number(form.status) === 0;
 
     // ------------------------------------------------
     // Render
@@ -438,14 +347,9 @@ const AddEditShift = ({
             isOpen={isOpen}
             onClose={onClose}
             onSubmit={handleSubmit}
-            title={
-                form.id
-                    ? `Edit — ${form.name}`
-                    : 'Add Shift'
-            }
+            title={form.id ? `Edit — ${form.name}` : 'Add Shift'}
             saving={saving}
         >
-
             {/* ------------------------------------------
           Shift Name
       ------------------------------------------ */}
@@ -458,7 +362,6 @@ const AddEditShift = ({
                 required
             />
 
-
             {/* ------------------------------------------
           Shift Timing
       ------------------------------------------ */}
@@ -470,23 +373,18 @@ const AddEditShift = ({
                 min="0"
                 step="0.25"
                 value={form.duration_hours}
-                onChange={handleFieldChange(
-                    'duration_hours'
-                )}
+                onChange={handleFieldChange('duration_hours')}
                 error={errors.duration_hours}
                 helperText="e.g. 8 or 8.5"
             />
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-
                 {/* Start */}
                 <InputField
                     label="Start Time"
                     type="time"
                     value={form.start_time}
-                    onChange={handleFieldChange(
-                        'start_time'
-                    )}
+                    onChange={handleFieldChange('start_time')}
                     error={errors.start_time}
                     required
                 />
@@ -496,17 +394,11 @@ const AddEditShift = ({
                     label="End Time"
                     type="time"
                     value={form.end_time}
-                    onChange={handleFieldChange(
-                        'end_time'
-                    )}
+                    onChange={handleFieldChange('end_time')}
                     error={errors.end_time}
                     required
                 />
-
             </div>
-
-
-
 
             {/* ------------------------------------------
           Status
@@ -519,32 +411,26 @@ const AddEditShift = ({
                     </p>
 
                     <p className="text-xs text-(--color-text-muted)">
-                        {form.status
+                        {isActive
                             ? 'This shift is active'
                             : 'This shift is inactive'}
                     </p>
                 </div>
 
                 <Switch
-                    checked={form.status}
+                    checked={isActive}
                     onClick={() =>
                         setForm((current) => ({
                             ...current,
-                            status: !current.status,
+                            status: Number(current.status) === 0 ? 1 : 0,
                         }))
                     }
                     ariaLabel="Toggle shift status"
-                    title={
-                        form.status
-                            ? 'Deactivate shift'
-                            : 'Activate shift'
-                    }
+                    title={isActive ? 'Deactivate shift' : 'Activate shift'}
                 />
             </div>
-
         </RightModal>
     );
 };
-
 
 export default AddEditShift;

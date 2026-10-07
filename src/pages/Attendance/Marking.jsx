@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BadgeCheck, CalendarDays, Clock3, LoaderCircle, LogIn, LogOut, Power, RefreshCw, RotateCcw, Search, Users } from 'lucide-react';
+import { BadgeCheck, CalendarDays, CheckCheck, Clock3, LoaderCircle, LogIn, LogOut, Power, RefreshCw, RotateCcw, Search, UserRoundX, Users, XCircle } from 'lucide-react';
 import {
+  useApproveAllAttendanceMutation,
   useCheckInAttendanceMutation,
   useCheckOutAttendanceMutation,
   useCreatePlantShutdownMutation,
@@ -8,7 +9,9 @@ import {
   useGetAttendanceFiltersQuery,
   useGetAttendanceRosterQuery,
   useGetPlantShutdownsQuery,
+  useMarkAttendanceAbsentMutation,
   useMarkShutdownPresentMutation,
+  useRejectAllAttendanceMutation,
 } from '../../store/api';
 import { useToast } from '../../contexts/ToastContext';
 import { Feedback } from '../../components/Feedback';
@@ -79,8 +82,10 @@ const getShiftTime = (shift) => {
 
 const Marking = () => {
   const toast = useToast();
-  const { can } = usePermission();
+  const { can, isReadOnly } = usePermission();
   const canRequestShutdown = can('plant-shutdowns', 'shutdown');
+  const canApproveAttendance = !isReadOnly && can('attendance', 'approve');
+  const canRejectAttendance = !isReadOnly && can('attendance', 'reject');
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -89,9 +94,16 @@ const Marking = () => {
   const [shutdownDialogOpen, setShutdownDialogOpen] = useState(false);
   const [shutdownForm, setShutdownForm] = useState(getShutdownDefaults);
   const [pendingPresenceEmployee, setPendingPresenceEmployee] = useState(null);
+  const [rejectAllOpen, setRejectAllOpen] = useState(false);
+  const [rejectAllReason, setRejectAllReason] = useState('');
+  const [pendingAbsentEmployee, setPendingAbsentEmployee] = useState(null);
+  const [absentReason, setAbsentReason] = useState('');
   const [checkIn] = useCheckInAttendanceMutation();
   const [checkOut] = useCheckOutAttendanceMutation();
   const [markShutdownPresent] = useMarkShutdownPresentMutation();
+  const [approveAllAttendance, { isLoading: approvingAll }] = useApproveAllAttendanceMutation();
+  const [rejectAllAttendance, { isLoading: rejectingAll }] = useRejectAllAttendanceMutation();
+  const [markAttendanceAbsent] = useMarkAttendanceAbsentMutation();
   const [deleteAttendance] = useDeleteAttendanceMutation();
   const [createPlantShutdown, { isLoading: submittingShutdown }] = useCreatePlantShutdownMutation();
 
@@ -193,12 +205,80 @@ const Marking = () => {
       return total;
     }
     const punch = employee.attendance;
+    if (Number(punch?.workflow_status) === 1) total.pendingVerification += 1;
+    if (Number(punch?.status) === 0) return total;
     if (!punch) total.notStarted += 1;
     else if (punch.check_out) total.completed += 1;
     else total.punchedIn += 1;
     return total;
-  }, { roster: 0, notStarted: 0, punchedIn: 0, completed: 0, shutdownPresent: 0 }), [displayedEmployees]);
+  }, { roster: 0, notStarted: 0, punchedIn: 0, completed: 0, shutdownPresent: 0, pendingVerification: 0 }), [displayedEmployees]);
   const counts = useCachedSearchResults ? pageCounts : employeeQuery.data?.summary ?? pageCounts;
+  const pendingApprovalCount = Number(
+    employeeQuery.currentData?.summary?.pending_verification
+      ?? employeeQuery.data?.summary?.pending_verification
+      ?? pageCounts.pendingVerification,
+  );
+  const bulkDecisionFilters = {
+    date: today,
+    ...(effectivePlant ? { plant_id: effectivePlant } : {}),
+    ...(filters.department ? { department_id: filters.department } : {}),
+    ...(filters.shift ? { shift_id: filters.shift } : {}),
+    ...(debouncedSearch ? { search: debouncedSearch } : {}),
+  };
+  const isBulkActionDisabled = pendingApprovalCount < 1
+    || employeeQuery.isFetching
+    || isSearchPending
+    || approvingAll
+    || rejectingAll;
+
+  const handleApproveAll = async () => {
+    try {
+      const response = await approveAllAttendance(bulkDecisionFilters).unwrap();
+      toast(response.message ?? `${response.count ?? 0} attendance records approved.`, response.count ? 'success' : 'info');
+    } catch (error) {
+      toast(getApiErrorMessage(error, 'Unable to approve attendance records.'), 'error');
+    }
+  };
+
+  const handleRejectAll = async () => {
+    try {
+      const response = await rejectAllAttendance({
+        ...bulkDecisionFilters,
+        rejection_reason: rejectAllReason.trim(),
+      }).unwrap();
+      toast(response.message ?? `${response.count ?? 0} attendance records rejected.`, response.count ? 'success' : 'info');
+      setRejectAllOpen(false);
+      setRejectAllReason('');
+    } catch (error) {
+      toast(getApiErrorMessage(error, 'Unable to reject attendance records.'), 'error');
+    }
+  };
+
+  const handleMarkAbsent = useCallback(async (employee) => {
+    const attendanceId = employee.attendance?.id;
+    if (!attendanceId) {
+      toast('There is no pending attendance record to reject for this employee.', 'error');
+      return;
+    }
+    setBusyEmployeeActions((current) => ({ ...current, [employee.id]: 'absent' }));
+    try {
+      const response = await markAttendanceAbsent({
+        attendance_id: attendanceId,
+        rejection_reason: absentReason.trim(),
+      }).unwrap();
+      toast(response.message ?? `${employee.name} marked absent.`, 'success');
+      setPendingAbsentEmployee(null);
+      setAbsentReason('');
+    } catch (error) {
+      toast(getApiErrorMessage(error, `Unable to mark ${employee.name} absent.`), 'error');
+    } finally {
+      setBusyEmployeeActions((current) => {
+        const next = { ...current };
+        delete next[employee.id];
+        return next;
+      });
+    }
+  }, [absentReason, markAttendanceAbsent, toast]);
 
   const updateFilter = (key, value) => {
     setFilters((current) => ({ ...current, [key]: value }));
@@ -348,6 +428,15 @@ const Marking = () => {
         if (employee.attendance?.shutdown_present) {
           return <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-800 dark:text-amber-200"><Power size={13} /> Shutdown present</span>;
         }
+        if (Number(employee.attendance?.status) === 0) {
+          return <span title={employee.attendance?.rejection_reason || undefined} className="inline-flex items-center gap-1.5 rounded-full bg-red-500/10 px-2.5 py-1 text-xs font-medium text-red-700 dark:text-red-300"><UserRoundX size={14} /> Absent · rejected</span>;
+        }
+        if (Number(employee.attendance?.workflow_status) === 1) {
+          return <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-800 dark:text-amber-200"><Clock3 size={13} /> Pending review</span>;
+        }
+        if (Number(employee.attendance?.workflow_status) === 3) {
+          return <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/10 px-2.5 py-1 text-xs font-medium text-red-700 dark:text-red-300"><XCircle size={14} /> Rejected</span>;
+        }
         const punch = employee.open_attendance ?? employee.attendance;
         if (!punch) {
           return <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-500/10 px-2.5 py-1 text-xs font-medium text-(--color-text-muted)"><Clock3 size={13} /> Not started</span>;
@@ -375,50 +464,98 @@ const Marking = () => {
         const openPunch = employee.open_attendance;
         const punch = employee.attendance;
         const activePunch = openPunch ?? (punch && !punch.check_out ? punch : null);
+        const isPendingReview = Number(punch?.workflow_status) === 1;
+        const absentAction = canRejectAttendance
+          && isPendingReview
+          && Number(punch?.status) !== 0 ? (
+          <button
+            type="button"
+            onClick={() => {
+              setAbsentReason('');
+              setPendingAbsentEmployee(employee);
+            }}
+            aria-label={`Mark ${employee.name} absent and reject attendance`}
+            title="Reject this pending attendance and mark the employee absent"
+            className="inline-flex min-h-9 items-center gap-2 rounded-md border border-red-500/40 px-3 text-sm font-semibold text-red-700 hover:bg-red-500/10 dark:text-red-300"
+          >
+            <UserRoundX size={15} /> Mark absent
+          </button>
+        ) : null;
         const busyAction = busyEmployeeActions[employee.id];
         if (busyAction) {
-          const busyLabel = busyAction === 'present' ? 'Marking present...' : busyAction === 'undo' ? 'Undoing...' : busyAction === 'in' ? 'Punching in...' : 'Punching out...';
+          const busyLabel = busyAction === 'absent' ? 'Marking absent...' : busyAction === 'present' ? 'Marking present...' : busyAction === 'undo' ? 'Undoing...' : busyAction === 'in' ? 'Punching in...' : 'Punching out...';
           return (
             <button type="button" disabled aria-label={`${busyLabel} ${employee.name}`} className="inline-flex min-h-9 items-center gap-2 rounded-md bg-(--color-accent) px-3 text-sm font-semibold text-white opacity-80">
               <LoaderCircle size={16} className="animate-spin" /> {busyLabel}
             </button>
           );
         }
+        if (Number(punch?.status) === 0) {
+          return <span title={punch?.rejection_reason || undefined} className="text-sm font-medium text-red-700 dark:text-red-300">Absent · Rejected</span>;
+        }
         if (hasPendingShutdown(employee)) {
-          return <button type="button" disabled aria-label={`Punching disabled for ${employee.name} while shutdown approval is pending`} title="Punching is disabled until the shutdown request is approved or rejected." className="inline-flex min-h-9 cursor-not-allowed items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 text-sm font-semibold text-amber-800 opacity-80 dark:text-amber-200"><Power size={15} /> Shutdown pending</button>;
+          return (
+            <div className="flex flex-wrap items-center gap-2">
+              <span aria-label={`Punching disabled for ${employee.name} while shutdown approval is pending`} title="Punching is disabled until the shutdown request is approved or rejected." className="inline-flex min-h-9 items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 text-sm font-semibold text-amber-800 opacity-80 dark:text-amber-200"><Power size={15} /> Shutdown pending</span>
+              {absentAction}
+            </div>
+          );
         }
         if (employee.attendance?.shutdown_present) {
-          return <button type="button" onClick={() => undoShutdownPresence(employee)} aria-label={`Undo shutdown attendance for ${employee.name}`} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-(--color-border-strong) px-3 py-2 text-sm font-semibold text-(--color-text) hover:bg-(--color-accent-soft)"><RotateCcw size={15} /> Undo present</button>;
+          return (
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={() => undoShutdownPresence(employee)} aria-label={`Undo shutdown attendance for ${employee.name}`} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-(--color-border-strong) px-3 py-2 text-sm font-semibold text-(--color-text) hover:bg-(--color-accent-soft)"><RotateCcw size={15} /> Undo present</button>
+              {absentAction}
+            </div>
+          );
         }
         if (activePunch) {
           return (
-            <button
-              type="button"
-              onClick={() => recordPunch({ ...employee, attendance: activePunch }, 'out')}
-              aria-label={`Punch out ${employee.name}`}
-              disabled={shutdownQuery.isFetching || shutdownQuery.isError}
-              title={shutdownQuery.isFetching || shutdownQuery.isError ? 'Refresh to confirm this plant\'s shutdown status.' : undefined}
-              className="inline-flex min-h-9 items-center gap-2 rounded-md bg-rose-600 px-3 text-sm font-semibold text-white transition-colors hover:bg-rose-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <LogOut size={16} /> Punch Out
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => recordPunch({ ...employee, attendance: activePunch }, 'out')}
+                aria-label={`Punch out ${employee.name}`}
+                disabled={shutdownQuery.isFetching || shutdownQuery.isError}
+                title={shutdownQuery.isFetching || shutdownQuery.isError ? 'Refresh to confirm this plant\'s shutdown status.' : undefined}
+                className="inline-flex min-h-9 items-center gap-2 rounded-md bg-rose-600 px-3 text-sm font-semibold text-white transition-colors hover:bg-rose-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <LogOut size={16} /> Punch Out
+              </button>
+              {absentAction}
+            </div>
+          );
+        }
+        if (punch) {
+          const status = isPendingReview
+            ? 'Pending verification'
+            : Number(punch.workflow_status) === 3
+              ? 'Rejected'
+              : 'Verified';
+          return (
+            <div className="flex flex-wrap items-center gap-2">
+              <span title={punch.rejection_reason || undefined} className="text-sm font-medium text-(--color-text-muted)">{status}</span>
+              {absentAction}
+            </div>
           );
         }
         return (
-          <button
-            type="button"
-            onClick={() => recordPunch(employee, 'in')}
-            disabled={!employee.department_id || !employee.designation_id || !employee.shift_id || shutdownQuery.isFetching || shutdownQuery.isError}
-            title={shutdownQuery.isFetching || shutdownQuery.isError ? 'Refresh to confirm this plant\'s shutdown status.' : !employee.department_id || !employee.designation_id || !employee.shift_id ? 'Assign department, designation, and shift before punching in.' : undefined}
-            aria-label={`Punch in ${employee.name}`}
-            className="inline-flex min-h-9 items-center gap-2 rounded-md bg-emerald-700 px-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
-          >
-            <LogIn size={16} /> Punch In
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => recordPunch(employee, 'in')}
+              disabled={!employee.department_id || !employee.designation_id || !employee.shift_id || shutdownQuery.isFetching || shutdownQuery.isError}
+              title={shutdownQuery.isFetching || shutdownQuery.isError ? 'Refresh to confirm this plant\'s shutdown status.' : !employee.department_id || !employee.designation_id || !employee.shift_id ? 'Assign department, designation, and shift before punching in.' : undefined}
+              aria-label={`Punch in ${employee.name}`}
+              className="inline-flex min-h-9 items-center gap-2 rounded-md bg-emerald-700 px-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+            >
+              <LogIn size={16} /> Punch In
+            </button>
+          </div>
         );
       },
     },
-  ], [busyEmployeeActions, departmentMap, hasPendingShutdown, plantMap, recordPunch, shiftMap, shutdownQuery.isError, shutdownQuery.isFetching, undoShutdownPresence]);
+  ], [busyEmployeeActions, canRejectAttendance, departmentMap, hasPendingShutdown, plantMap, recordPunch, shiftMap, shutdownQuery.isError, shutdownQuery.isFetching, undoShutdownPresence]);
 
   return (
     <div className="space-y-4 p-4 sm:p-6">
@@ -426,6 +563,28 @@ const Marking = () => {
         title="Mark Daily Attendance"
         action={<div className="flex flex-wrap items-center gap-2">
           <span className="ml-2 hidden items-center gap-1.5 text-sm text-(--color-text-muted) sm:inline-flex"><CalendarDays size={15} />{todayLabel}</span>
+          {canApproveAttendance && (
+            <button
+              type="button"
+              onClick={handleApproveAll}
+              disabled={isBulkActionDisabled}
+              title="Approve all pending attendance matching the current filters"
+              className="inline-flex min-h-9 items-center gap-2 rounded-md bg-emerald-700 px-3 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <CheckCheck size={15} /> Approve all{pendingApprovalCount > 0 ? ` (${pendingApprovalCount})` : ''}
+            </button>
+          )}
+          {canRejectAttendance && (
+            <button
+              type="button"
+              onClick={() => setRejectAllOpen(true)}
+              disabled={isBulkActionDisabled}
+              title="Reject all pending attendance matching the current filters"
+              className="inline-flex min-h-9 items-center gap-2 rounded-md bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <XCircle size={15} /> Reject all · mark absent{pendingApprovalCount > 0 ? ` (${pendingApprovalCount})` : ''}
+            </button>
+          )}
           {canRequestShutdown && (pendingShutdown
             ? <span className="inline-flex min-h-9 items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 text-sm font-medium text-amber-800 dark:text-amber-200"><Power size={15} /> Shutdown pending approval</span>
             : activeShutdown
@@ -537,6 +696,66 @@ const Marking = () => {
         }}
         onCancel={() => setPendingPresenceEmployee(null)}
       />
+
+      <ConfirmDelete
+        isOpen={rejectAllOpen}
+        title="Reject pending attendance?"
+        message={`Mark all ${pendingApprovalCount} pending attendance record(s) matching the current date and filters as absent and rejected? This cannot be undone.`}
+        confirmLabel="Mark absent & reject all"
+        confirmLoadingLabel="Marking absent..."
+        confirmClass="bg-red-600 hover:bg-red-700"
+        confirmDisabled={!rejectAllReason.trim() || rejectingAll}
+        icon={XCircle}
+        onConfirm={handleRejectAll}
+        onCancel={() => {
+          setRejectAllOpen(false);
+          setRejectAllReason('');
+        }}
+      >
+        <label htmlFor="attendance-reject-all-reason" className="mb-1 block text-sm font-medium text-(--color-text)">
+          Rejection reason <span className="text-red-600">*</span>
+        </label>
+        <textarea
+          id="attendance-reject-all-reason"
+          value={rejectAllReason}
+          onChange={(event) => setRejectAllReason(event.target.value)}
+          maxLength={1000}
+          rows={3}
+          required
+          className="w-full rounded-lg border border-(--color-border) bg-(--color-bg) px-3 py-2 text-sm text-(--color-text) outline-none focus:border-(--color-accent)"
+        />
+      </ConfirmDelete>
+
+      <ConfirmDelete
+        isOpen={Boolean(pendingAbsentEmployee)}
+        title="Mark employee absent?"
+        message={`${pendingAbsentEmployee?.name ?? 'This employee'}${pendingAbsentEmployee?.attendance?.shift_id && shiftMap.get(String(pendingAbsentEmployee.attendance.shift_id))?.name ? ` (${shiftMap.get(String(pendingAbsentEmployee.attendance.shift_id)).name})` : ''} will be marked absent for the shift on this pending attendance record. It will be rejected and cannot be approved afterwards.`}
+        confirmLabel="Mark absent & reject"
+        confirmLoadingLabel="Marking absent..."
+        confirmClass="bg-red-600 hover:bg-red-700"
+        confirmDisabled={!absentReason.trim() || Boolean(busyEmployeeActions[pendingAbsentEmployee?.id])}
+        icon={UserRoundX}
+        onConfirm={async () => {
+          if (pendingAbsentEmployee) await handleMarkAbsent(pendingAbsentEmployee);
+        }}
+        onCancel={() => {
+          setPendingAbsentEmployee(null);
+          setAbsentReason('');
+        }}
+      >
+        <label htmlFor="attendance-absence-reason" className="mb-1 block text-sm font-medium text-(--color-text)">
+          Reason <span className="text-red-600">*</span>
+        </label>
+        <textarea
+          id="attendance-absence-reason"
+          value={absentReason}
+          onChange={(event) => setAbsentReason(event.target.value)}
+          maxLength={1000}
+          rows={3}
+          required
+          className="w-full rounded-lg border border-(--color-border) bg-(--color-bg) px-3 py-2 text-sm text-(--color-text) outline-none focus:border-(--color-accent)"
+        />
+      </ConfirmDelete>
     </div>
   );
 };

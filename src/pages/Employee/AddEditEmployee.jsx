@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { InlineError } from '../../components/Feedback';
 import EmployeeAccountsSection from './components/EmployeeAccountsSection';
 import EmployeeDetailsSection from './components/EmployeeDetailsSection';
@@ -57,10 +57,10 @@ const AddEditEmployee = ({
   const [stepError, setStepError] = useState('');
   const { validateEmployeeForm, clearFieldError, getFirstErrorSection } = useEmployeeValidation();
 
-  const clearFieldErrors = (field) => {
+  const clearFieldErrors = useCallback((field) => {
     clearFieldError(field, setClientErrors);
     setClearedServerFields((current) => new Set(current).add(field));
-  };
+  }, [clearFieldError]);
 
   const {
     form,
@@ -76,27 +76,29 @@ const AddEditEmployee = ({
   );
 
   const employeeId = form.id ?? employee?.id;
-  const visibleServerErrors = Object.fromEntries(
-    Object.entries(serverErrors)
-      .filter(([field]) => !clearedServerFields.has(field))
-      .map(([field, message]) => [field, Array.isArray(message) ? message[0] : message]),
-  );
-  const fieldErrors = { ...visibleServerErrors, ...clientErrors };
-  const selectOptions = {
+  const visibleServerErrors = useMemo(() =>
+    Object.fromEntries(
+      Object.entries(serverErrors)
+        .filter(([field]) => !clearedServerFields.has(field))
+        .map(([field, message]) => [field, Array.isArray(message) ? message[0] : message]),
+    ),
+  [serverErrors, clearedServerFields]);
+  const fieldErrors = useMemo(() => ({ ...visibleServerErrors, ...clientErrors }), [visibleServerErrors, clientErrors]);
+  const selectOptions = useMemo(() => ({
     plants: buildSelectOptions(plants, (item) => item.name),
     departments: buildSelectOptions(departments, (item) => item.name),
     designations: buildSelectOptions(designations, (item) => item.name),
     shifts: buildSelectOptions(shifts, (item) => item.name),
     charges: buildSelectOptions(charges, (item) => item.name ?? item.deduction),
-  };
-  const steps = EMPLOYEE_STEPS.map((step) => ({
+  }), [plants, departments, designations, shifts, charges]);
+  const steps = useMemo(() => EMPLOYEE_STEPS.map((step) => ({
     ...step,
     complete: step.id === 'details'
       ? Boolean(employeeId)
       : step.id === 'kyc'
         ? documents.length > 0
         : accounts.length > 0,
-  }));
+  })), [employeeId, documents.length, accounts.length]);
 
   const scrollToFirstError = (validationErrors) => {
     const firstSection = getFirstErrorSection(validationErrors, DETAIL_SECTIONS);

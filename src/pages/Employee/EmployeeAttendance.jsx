@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useGetEmployeeAttendanceQuery } from '../../store/api';
 import AttendanceCalender from '../components/AttendanceCalender';
 
@@ -14,55 +14,64 @@ const EmployeeAttendance = ({ employeeId, joiningDate }) => {
 		const today = new Date();
 		return new Date(today.getFullYear(), today.getMonth(), 1);
 	});
-	const today = new Date();
-	today.setHours(0, 0, 0, 0);
-	const joinedOn = parseDate(joiningDate);
-	const monthStart = new Date(month.getFullYear(), month.getMonth(), 1);
-	const monthEnd = new Date(month.getFullYear(), month.getMonth() + 1, 0);
-	const gridStart = new Date(monthStart);
-	gridStart.setDate(1 - gridStart.getDay());
-	const gridEnd = new Date(gridStart);
-	gridEnd.setDate(gridStart.getDate() + 41);
-	const dateFrom = joinedOn && joinedOn > gridStart ? joinedOn : gridStart;
-	const dateTo = gridEnd > today ? today : gridEnd;
-	const validDateRange = dateFrom <= dateTo;
-	const query = useGetEmployeeAttendanceQuery({ employeeId, date_from: formatDate(dateFrom), date_to: formatDate(dateTo), per_page: 100 }, { skip: !employeeId || !validDateRange });
+
+	// Memoize today so it doesn't recreate on every render
+	const today = useMemo(() => {
+		const d = new Date();
+		d.setHours(0, 0, 0, 0);
+		return d;
+	}, []);
+
+	const joinedOn = useMemo(() => parseDate(joiningDate), [joiningDate]);
+
+	const { dateFrom, dateTo, validDateRange } = useMemo(() => {
+		const monthStart = new Date(month.getFullYear(), month.getMonth(), 1);
+		const monthEnd = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+		const gridStart = new Date(monthStart);
+		gridStart.setDate(1 - gridStart.getDay());
+		const gridEnd = new Date(gridStart);
+		gridEnd.setDate(gridStart.getDate() + 41);
+		const from = joinedOn && joinedOn > gridStart ? joinedOn : gridStart;
+		const to = gridEnd > today ? today : gridEnd;
+		return { dateFrom: from, dateTo: to, validDateRange: from <= to };
+	}, [month, joinedOn, today]);
+
+	const query = useGetEmployeeAttendanceQuery(
+		{ employeeId, date_from: formatDate(dateFrom), date_to: formatDate(dateTo), per_page: 100 },
+		{ skip: !employeeId || !validDateRange },
+	);
 	const records = useMemo(() => Array.isArray(query.data?.data) ? query.data.data : [], [query.data]);
 
-	const changeMonth = (offset) => {
+	// Shared bounds calculation — eliminates duplication between changeMonth and changeYear
+	const getMonthBounds = useCallback(() => {
 		const now = new Date();
 		const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-		const joined = parseDate(joiningDate);
-		const earliestMonth = joined
-			? new Date(joined.getFullYear(), joined.getMonth(), 1)
+		const earliestMonth = joinedOn
+			? new Date(joinedOn.getFullYear(), joinedOn.getMonth(), 1)
 			: new Date(now.getFullYear() - 50, 0, 1);
 		const minimumMonth = earliestMonth > currentMonth ? currentMonth : earliestMonth;
+		return { currentMonth, minimumMonth };
+	}, [joinedOn]);
+
+	const clampMonth = useCallback((target) => {
+		const { currentMonth, minimumMonth } = getMonthBounds();
+		if (target < minimumMonth) return minimumMonth;
+		if (target > currentMonth) return currentMonth;
+		return target;
+	}, [getMonthBounds]);
+
+	const changeMonth = useCallback((offset) => {
 		if (offset === 0) {
+			const { currentMonth } = getMonthBounds();
 			setMonth(currentMonth);
 			return;
 		}
-		setMonth((current) => {
-			const target = new Date(current.getFullYear(), current.getMonth() + offset, 1);
-			if (target < minimumMonth) return minimumMonth;
-			if (target > currentMonth) return currentMonth;
-			return target;
-		});
-	};
-	const changeYear = (year) => {
-		const now = new Date();
-		const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-		const joined = parseDate(joiningDate);
-		const earliestMonth = joined
-			? new Date(joined.getFullYear(), joined.getMonth(), 1)
-			: new Date(now.getFullYear() - 50, 0, 1);
-		const minimumMonth = earliestMonth > currentMonth ? currentMonth : earliestMonth;
-		setMonth((current) => {
-			const target = new Date(year, current.getMonth(), 1);
-			if (target < minimumMonth) return minimumMonth;
-			if (target > currentMonth) return currentMonth;
-			return target;
-		});
-	};
+		setMonth((current) => clampMonth(new Date(current.getFullYear(), current.getMonth() + offset, 1)));
+	}, [getMonthBounds, clampMonth]);
+
+	const changeYear = useCallback((year) => {
+		setMonth((current) => clampMonth(new Date(year, current.getMonth(), 1)));
+	}, [clampMonth]);
 
 	return (
 		<div className="flex h-full min-h-0 flex-col overflow-hidden p-4 sm:p-6">

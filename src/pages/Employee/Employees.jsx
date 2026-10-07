@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, memo } from 'react';
 import { CalendarDays, LoaderCircle, MoreVertical, Pencil, Plus, Search, UserRound, IdCard, WalletCards } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -36,6 +36,7 @@ import { selectRole } from '../../store/authSlice';
 
 const unwrap = (value) => Array.isArray(value) ? value : value?.data ?? [];
 const initials = (name) => String(name ?? '?').split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
+const isSafeUrl = (url) => /^https?:\/\//i.test(String(url ?? ''));
 const matchesEmployeeSearch = (employee, query) => {
   const normalizedQuery = query.toLocaleLowerCase();
   return [
@@ -69,8 +70,9 @@ const Employees = () => {
   const { id } = useParams();
   const { canCreate, canEdit, isReadOnly } = usePermission('/employees');
   const role = useSelector(selectRole);
-  const [loadedEmployees, setLoadedEmployees] = useState([]);
-  const [cachedEmployees, setCachedEmployees] = useState([]);
+  // Single Map-based store replaces dual loadedEmployees + cachedEmployees arrays
+  const [employeeMap, setEmployeeMap] = useState(() => new Map());
+  const [cachedIds, setCachedIds] = useState(() => new Set());
   const [totalEmployees, setTotalEmployees] = useState(0);
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [fetchEmployees, { isLoading, isFetching }] = useLazyGetEmployeesQuery();
@@ -96,7 +98,8 @@ const Employees = () => {
   const [search, setSearch] = useState('');
   const [plantFilter, setPlantFilter] = useState('');
   const [menuEmployeeId, setMenuEmployeeId] = useState(null);
-  const [menuPosition, setMenuPosition] = useState(null);
+  const [menuPosition, setMenuPosition] = useState(null); // { x, y, fromButton: bool }
+  const menuRef = useRef(null);
   const [savingStatusIds, setSavingStatusIds] = useState({});
   const [errors, setErrors] = useState({});
   const [hasLoadError, setHasLoadError] = useState(false);
@@ -108,6 +111,11 @@ const Employees = () => {
   const charges      = unwrap(chargesData).length      ? unwrap(chargesData)      : unwrap(attendanceFilters?.charges);
   const isSinglePlantRole = Array.isArray(role?.plant_ids) && role.plant_ids.length === 1;
   const searchQuery = search.trim();
+
+  // Derive flat arrays from the single Map source of truth
+  const loadedEmployees = useMemo(() => [...employeeMap.values()], [employeeMap]);
+  const cachedEmployees = useMemo(() => loadedEmployees.filter((e) => cachedIds.has(e.id)), [loadedEmployees, cachedIds]);
+
   const localEmployees = useMemo(() => cachedEmployees.filter((employee) => {
     const matchesPlant = !plantFilter || String(employee.plant_id ?? employee.plant?.id) === String(plantFilter);
     return matchesPlant && (!searchQuery || matchesEmployeeSearch(employee, searchQuery));
@@ -120,14 +128,18 @@ const Employees = () => {
       : loadedEmployees;
   const displayedEmployeeCount = hasLocalSearchResults ? localEmployees.length : totalEmployees || employeesData.length;
   const refreshedEmployee = selectedEmployeeData?.data ?? selectedEmployeeData;
-  const selectedEmployee = refreshedEmployee?.id
-    ? refreshedEmployee
-    : employeesData.find((employee) => String(employee.id) === String(id));
-  const displayEmployeesData = employeesData.map((employee) => (
-    String(employee.id) === String(refreshedEmployee?.id)
-      ? { ...employee, ...refreshedEmployee }
-      : employee
-  ));
+  const selectedEmployee = useMemo(() =>
+    refreshedEmployee?.id
+      ? refreshedEmployee
+      : employeesData.find((employee) => String(employee.id) === String(id)),
+  [refreshedEmployee, employeesData, id]);
+  const displayEmployeesData = useMemo(() =>
+    employeesData.map((employee) =>
+      String(employee.id) === String(refreshedEmployee?.id)
+        ? { ...employee, ...refreshedEmployee }
+        : employee
+    ),
+  [employeesData, refreshedEmployee]);
   const workflowEmployee = selectedEmployee ?? createdEmployee;
   const workflowEmployeeId = workflowEmployee?.id ?? (location.pathname.endsWith('/edit') ? id : null);
   const { data: employeeDocumentsData, isLoading: employeeDocumentsLoading } = useGetEmployeeDocumentsQuery(workflowEmployeeId, { skip: !workflowEmployeeId });
@@ -144,12 +156,30 @@ const Employees = () => {
 
   useRenderPerformance('getEmployees', loadedEmployees);
 
+  // Merge employees into the single Map — O(1) per employee, no duplicate scans
+  const mergeEmployees = useCallback((pageEmployees, replace, isUnfiltered) => {
+    setEmployeeMap((prev) => {
+      const next = replace ? new Map() : new Map(prev);
+      pageEmployees.forEach((e) => next.set(e.id, e));
+      return next;
+    });
+    if (isUnfiltered) {
+      setCachedIds((prev) => {
+        if (replace) return new Set(pageEmployees.map((e) => e.id));
+        const next = new Set(prev);
+        pageEmployees.forEach((e) => next.add(e.id));
+        return next;
+      });
+    }
+  }, []);
+
   const loadEmployeePages = useCallback(async (startPage, query, plantId, replace = false, version = requestVersion.current) => {
     if (loadingEmployees.current) return;
 
     loadingEmployees.current = true;
     let page = startPage;
     let replacePage = replace;
+    const isUnfiltered = !query && !plantId;
 
     try {
       while (version === requestVersion.current) {
@@ -157,20 +187,7 @@ const Employees = () => {
         if (version !== requestVersion.current) break;
 
         const pageEmployees = unwrap(response);
-        setLoadedEmployees((current) => {
-          if (replacePage) return pageEmployees;
-
-          const existingIds = new Set(current.map((employee) => employee.id));
-          return [...current, ...pageEmployees.filter((employee) => !existingIds.has(employee.id))];
-        });
-        if (!query && !plantId) {
-          setCachedEmployees((current) => {
-            if (replacePage) return pageEmployees;
-
-            const existingIds = new Set(current.map((employee) => employee.id));
-            return [...current, ...pageEmployees.filter((employee) => !existingIds.has(employee.id))];
-          });
-        }
+        mergeEmployees(pageEmployees, replacePage, isUnfiltered);
         setTotalEmployees(Number(response.meta?.total ?? pageEmployees.length));
         const currentPage = Number(response.meta?.current_page ?? page);
         const lastPage = Number(response.meta?.last_page ?? currentPage);
@@ -185,7 +202,7 @@ const Employees = () => {
     } finally {
       if (version === requestVersion.current) loadingEmployees.current = false;
     }
-  }, [fetchEmployees]);
+  }, [fetchEmployees, mergeEmployees]);
 
   useEffect(() => {
     loadEmployeePages(1, '', '', true);
@@ -244,34 +261,29 @@ const Employees = () => {
     navigate(view === 'profile' ? `/employees/${employee.id}` : `/employees/${employee.id}/${view}`);
   };
 
+  // Optimistic status toggle — single Map update instead of two array maps
+  const patchEmployee = useCallback((employeeId, patch) => {
+    setEmployeeMap((prev) => {
+      const existing = prev.get(employeeId);
+      if (!existing) return prev;
+      const next = new Map(prev);
+      next.set(employeeId, { ...existing, ...patch });
+      return next;
+    });
+  }, []);
+
   const toggleEmployeeStatus = async (employee) => {
     const previousStatus = Boolean(employee.status);
     const nextStatus = !previousStatus;
     setSavingStatusIds((current) => ({ ...current, [employee.id]: true }));
-    setLoadedEmployees((current) => current.map((item) => (
-      String(item.id) === String(employee.id) ? { ...item, status: nextStatus } : item
-    )));
-    setCachedEmployees((current) => current.map((item) => (
-      String(item.id) === String(employee.id) ? { ...item, status: nextStatus } : item
-    )));
+    patchEmployee(employee.id, { status: nextStatus });
 
     try {
       const response = await updateEmployee({ id: employee.id, status: nextStatus }).unwrap();
-      const updatedEmployee = response?.data ?? response;
-      setLoadedEmployees((current) => current.map((item) => (
-        String(item.id) === String(employee.id) ? { ...item, ...updatedEmployee } : item
-      )));
-      setCachedEmployees((current) => current.map((item) => (
-        String(item.id) === String(employee.id) ? { ...item, ...updatedEmployee } : item
-      )));
+      patchEmployee(employee.id, response?.data ?? response);
       toast(`${employee.name} marked ${nextStatus ? 'active' : 'inactive'}.`, 'success');
     } catch (error) {
-      setLoadedEmployees((current) => current.map((item) => (
-        String(item.id) === String(employee.id) ? { ...item, status: previousStatus } : item
-      )));
-      setCachedEmployees((current) => current.map((item) => (
-        String(item.id) === String(employee.id) ? { ...item, status: previousStatus } : item
-      )));
+      patchEmployee(employee.id, { status: previousStatus });
       toast(getApiErrorMessage(error, `Unable to update ${employee.name}'s status.`), 'error');
     } finally {
       setSavingStatusIds((current) => {
@@ -282,14 +294,43 @@ const Employees = () => {
     }
   };
 
+  // Use a ref to avoid stale closure over menuEmployeeId
+  const menuEmployeeIdRef = useRef(null);
+  useEffect(() => { menuEmployeeIdRef.current = menuEmployeeId; }, [menuEmployeeId]);
+
+  // Clamp menu into viewport after it renders — handles both right-click and three-dot button
+  useEffect(() => {
+    if (!menuPosition || !menuRef.current) return;
+    const menu = menuRef.current;
+    const { width, height } = menu.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const MARGIN = 6;
+
+    let left = menuPosition.fromButton ? menuPosition.x - width : menuPosition.x + 4;
+    let top  = menuPosition.fromButton ? menuPosition.y : menuPosition.y + 4;
+
+    // Flip left if overflows right edge
+    if (left + width + MARGIN > vw) left = menuPosition.x - width;
+    // Clamp to left edge
+    if (left < MARGIN) left = MARGIN;
+    // Flip up if overflows bottom edge
+    if (top + height + MARGIN > vh) top = menuPosition.y - height;
+    // Clamp to top edge
+    if (top < MARGIN) top = MARGIN;
+
+    menu.style.left = `${left}px`;
+    menu.style.top  = `${top}px`;
+    menu.style.visibility = 'visible';
+  }, [menuPosition, menuEmployeeId]);
+
   useEffect(() => {
     const closeMenuWhenClickingOutside = (event) => {
-      if (!event.target.closest('[data-employee-menu]')) {
+      if (menuEmployeeIdRef.current && !event.target.closest('[data-employee-menu]')) {
         setMenuEmployeeId(null);
         setMenuPosition(null);
       }
     };
-
     document.addEventListener('mousedown', closeMenuWhenClickingOutside);
     return () => document.removeEventListener('mousedown', closeMenuWhenClickingOutside);
   }, []);
@@ -302,16 +343,7 @@ const Employees = () => {
       const employeeRecord = savedEmployee?.data ?? savedEmployee;
       setCreatedEmployee(employeeRecord);
       if (payload.id) {
-        setLoadedEmployees((current) => current.map((employee) => (
-          String(employee.id) === String(employeeRecord.id)
-            ? { ...employee, ...employeeRecord }
-            : employee
-        )));
-        setCachedEmployees((current) => current.map((employee) => (
-          String(employee.id) === String(employeeRecord.id)
-            ? { ...employee, ...employeeRecord }
-            : employee
-        )));
+        patchEmployee(employeeRecord.id, employeeRecord);
       }
       const createdStatus = employeeRecord?.approval_status_label ?? 'Pending';
       toast(
@@ -406,7 +438,7 @@ const Employees = () => {
                 event.preventDefault();
                 event.stopPropagation();
                 setMenuEmployeeId(employee.id);
-                setMenuPosition({ x: event.clientX, y: event.clientY });
+                setMenuPosition({ x: event.clientX, y: event.clientY, fromButton: false });
               }}
               className={`group flex w-full items-center gap-3 rounded-lg border px-3 py-3 text-left transition ${String(id) === String(employee.id) ? 'border-(--color-accent) bg-(--color-accent-soft)' : 'border-transparent hover:border-(--color-border) hover:bg-(--color-accent-soft)'}`}
             >
@@ -427,9 +459,30 @@ const Employees = () => {
                   }`}
               />
               <div className="relative shrink-0">
-                <button type="button" aria-label={`Actions for ${employee.name}`} onClick={(event) => { event.stopPropagation(); setMenuPosition(null); setMenuEmployeeId((current) => current === employee.id ? null : employee.id); }} className="rounded p-1 text-(--color-text-muted) hover:bg-(--color-border) hover:text-(--color-text)"><MoreVertical size={17} /></button>
-                {menuEmployeeId === employee.id && 
-                <div data-employee-menu className={`${menuPosition ? 'fixed' : 'absolute right-0 top-8'} z-20 w-48 rounded-lg border border-(--color-border) bg-(--color-surface-strong) shadow-lg`} style={menuPosition ? { left: menuPosition.x, top: menuPosition.y } : undefined} onClick={(event) => event.stopPropagation()}>
+                <button
+                  type="button"
+                  aria-label={`Actions for ${employee.name}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (menuEmployeeId === employee.id) {
+                      setMenuEmployeeId(null);
+                      setMenuPosition(null);
+                    } else {
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      setMenuPosition({ x: rect.right, y: rect.bottom - 2, fromButton: true });
+                      setMenuEmployeeId(employee.id);
+                    }
+                  }}
+                  className="rounded p-1 text-(--color-text-muted) hover:bg-(--color-border) hover:text-(--color-text)"
+                ><MoreVertical size={17} /></button>
+                {menuEmployeeId === employee.id &&
+                <div
+                  ref={menuRef}
+                  data-employee-menu
+                  className="fixed z-20 w-48 rounded-lg border border-(--color-border) bg-(--color-surface-strong) shadow-lg"
+                  style={menuPosition ? { left: menuPosition.x, top: menuPosition.y, visibility: 'hidden' } : undefined}
+                  onClick={(event) => event.stopPropagation()}
+                >
                   <button type="button" onClick={() => openEmployeeView(employee)} className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-(--color-accent-soft)"><IdCard size={18} /> Profile</button>
                   <button type="button" onClick={() => openEmployeeView(employee, 'attendance')} className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-(--color-accent-soft)"><CalendarDays size={15} /> Attendance</button>
                   <button type="button" onClick={() => openEmployeeView(employee, 'salary')} className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-(--color-accent-soft)"><WalletCards size={15} /> Salary</button>

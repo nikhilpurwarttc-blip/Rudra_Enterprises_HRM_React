@@ -44,3 +44,6 @@ export const buildSelectOptions = (items, getLabel) => items.map((item) => ({
   value: String(item.id),
   label: getLabel(item),
 }));
+
+export const displayDate = (value) =>
+  value ? new Date(`${String(value).slice(0, 10)}T00:00:00`).toLocaleDateString() : '\u2014';

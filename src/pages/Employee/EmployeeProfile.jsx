@@ -7,10 +7,10 @@ import GlassCard from '../../components/GlassCard';
 import usePermission from '../../hooks/usePermission';
 import { useRenderPerformance } from '../../utils/performance';
 import EmployeeApprovalActions from './components/EmployeeApprovalActions';
+import { displayDate } from './utils/employeeForm.utils';
 
 const unwrap = (value) => value?.data ?? value;
 const initials = (name) => String(name ?? '?').split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
-const displayDate = (value) => value ? new Date(`${String(value).slice(0, 10)}T00:00:00`).toLocaleDateString() : '—';
 
 const EmployeeProfile = ({ employeeId, embedded = false, onClose }) => {
   const navigate = useNavigate();

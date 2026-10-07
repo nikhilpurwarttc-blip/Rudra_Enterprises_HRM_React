@@ -249,6 +249,18 @@ export const api = createApi({
       query: (body) => ({ url: '/attendances/shutdown-present', method: 'POST', body }),
       invalidatesTags: ['Attendance'],
     }),
+    approveAllAttendance: builder.mutation({
+      query: (filters) => ({ url: '/attendances/approve-all', method: 'POST', body: filters }),
+      invalidatesTags: ['Attendance'],
+    }),
+    rejectAllAttendance: builder.mutation({
+      query: (filters) => ({ url: '/attendances/reject-all', method: 'POST', body: filters }),
+      invalidatesTags: ['Attendance'],
+    }),
+    markAttendanceAbsent: builder.mutation({
+      query: (body) => ({ url: '/attendances/mark-absent', method: 'POST', body }),
+      invalidatesTags: ['Attendance'],
+    }),
     deleteAttendance: builder.mutation({
       query: (id) => ({ url: `/attendances/${id}`, method: 'DELETE' }),
       invalidatesTags: ['Attendance'],
@@ -478,6 +490,9 @@ export const {
   useCheckInAttendanceMutation,
   useCheckOutAttendanceMutation,
   useMarkShutdownPresentMutation,
+  useApproveAllAttendanceMutation,
+  useRejectAllAttendanceMutation,
+  useMarkAttendanceAbsentMutation,
   useDeleteAttendanceMutation,
   useGetEmployeeAdvancesQuery,
   useCreateEmployeeAdvanceMutation,

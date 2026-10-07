@@ -1,5 +1,7 @@
 import { ExternalLink, FileCheck, Trash2 } from 'lucide-react';
 
+const isSafeUrl = (url) => /^https?:\/\//i.test(String(url ?? ''));
+
 const DocumentList = ({ documents, onDelete }) => {
   if (!documents.length) {
     return <p className="text-sm text-(--color-text-muted)">No KYC documents submitted yet.</p>;
@@ -17,7 +19,7 @@ const DocumentList = ({ documents, onDelete }) => {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-3">
-            {document.document_file && (
+            {document.document_file && isSafeUrl(document.document_file) && (
               <a href={document.document_file} target="_blank" rel="noreferrer" aria-label={`View ${document.document_type}`} className="rounded text-(--color-accent) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent)">
                 <ExternalLink size={16} />
               </a>

@@ -19,14 +19,14 @@ export const validateEmployeeForm = (form) => {
   return errors;
 };
 
+export const clearFieldError = (field, setClientErrors) => {
+  setClientErrors((current) => ({ ...current, [field]: undefined }));
+};
+
+export const getFirstErrorSection = (errors, sections) =>
+  sections.find((section) => section.fields.some((field) => errors[field]));
+
+// Kept for backward compatibility with any consumer using the hook form
 export default function useEmployeeValidation() {
-  const clearFieldError = (field, setClientErrors) => {
-     setClientErrors((current) => ({ ...current, [field]: undefined }));
-  };
-
-  const getFirstErrorSection = (errors, sections) => sections.find(
-    (section) => section.fields.some((field) => errors[field]),
-  );
-
   return { validateEmployeeForm, clearFieldError, getFirstErrorSection };
 }

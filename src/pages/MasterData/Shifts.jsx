@@ -1,6 +1,12 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Clock3, Pencil, Plus, Search, Trash2 } from 'lucide-react';
-import { useCreateShiftMutation, useDeleteShiftMutation, useGetShiftsQuery, useUpdateShiftMutation } from '../../store/api';
+
+import {
+  useCreateShiftMutation,
+  useDeleteShiftMutation,
+  useGetShiftsQuery,
+  useUpdateShiftMutation,
+} from '../../store/api';
 import usePermission from '../../hooks/usePermission';
 import { useToast } from '../../contexts/ToastContext';
 import SectionCard from '../../components/SectionCard';
@@ -13,9 +19,238 @@ import { Feedback } from '../../components/Feedback';
 import { getApiErrorMessage } from '../../components/feedbackUtils';
 import { useRenderPerformance } from '../../utils/performance';
 import AddEditShift from './AddEditShift';
-const unwrap = (value) => Array.isArray(value) ? value : value?.data ?? [];
-const Shifts = () => { const toast = useToast(); const { canCreate, canEdit, canDelete, isReadOnly } = usePermission('/shifts'); const { data, isLoading, isError } = useGetShiftsQuery(); const [createShift, { isLoading: creating }] = useCreateShiftMutation(); const [updateShift, { isLoading: updating }] = useUpdateShiftMutation(); const [deleteShift] = useDeleteShiftMutation(); const [search, setSearch] = useState(''); const [editor, setEditor] = useState({ open: false, shift: null }); const [deleteTarget, setDeleteTarget] = useState(null); const [errors, setErrors] = useState({}); const shifts = unwrap(data); useRenderPerformance('getShifts', data); const filtered = useMemo(() => { const query = search.trim().toLowerCase(); return shifts.filter((shift) => !query || String(shift.name ?? '').toLowerCase().includes(query)); }, [shifts, search]); const handleSave = async ({ id, ...payload }) => { const nextErrors = {}; if (!payload.name) nextErrors.name = 'Shift name is required.'; if (!payload.start_time) nextErrors.start_time = 'Start time is required.'; if (!payload.end_time) nextErrors.end_time = 'End time is required.'; if (payload.duration_hours != null && payload.duration_hours < 0) nextErrors.duration_hours = 'Duration cannot be negative.'; if (Object.keys(nextErrors).length) { setErrors(nextErrors); return; } try { if (id) await updateShift({ id, ...payload }).unwrap(); else await createShift(payload).unwrap(); toast(id ? 'Shift updated successfully.' : 'Shift created successfully.', 'success'); setEditor({ open: false, shift: null }); setErrors({}); } catch (error) { toast(getApiErrorMessage(error, 'Unable to save shift.'), 'error'); } }; const handleDelete = async () => { if (!deleteTarget) return; try { await deleteShift(deleteTarget.id).unwrap(); toast('Shift deleted successfully.', 'success'); setDeleteTarget(null); } catch (error) { toast(getApiErrorMessage(error, 'Unable to delete shift.'), 'error'); } };
-  const handleStatusChange = useCallback(async (shift) => { if (!canEdit || isReadOnly) return; try { await updateShift({ id: shift.id, status: !shift.status }).unwrap(); toast('Shift status updated.', 'success'); } catch (error) { toast(getApiErrorMessage(error, 'Unable to update shift status.'), 'error'); } }, [canEdit, isReadOnly, toast, updateShift]);
-  const columns = useMemo(() => [{ key: 'name', label: 'Shift', render: (shift) => <div className="flex items-center gap-2"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-(--color-accent) text-white"><Clock3 size={14} /></span><span className="font-medium">{shift.name}</span></div> }, { key: 'start_time', label: 'Start', render: (shift) => String(shift.start_time ?? '').slice(0, 5) }, { key: 'end_time', label: 'End', render: (shift) => String(shift.end_time ?? '').slice(0, 5) }, { key: 'duration_hours', label: 'Duration', render: (shift) => shift.duration_hours == null ? '—' : `${shift.duration_hours} hrs` }, { key: 'status', label: 'Active', render: (shift) => <Switch checked={Boolean(shift.status)} disabled={!canEdit || isReadOnly} onClick={() => handleStatusChange(shift)} ariaLabel={shift.status ? 'Active' : 'Inactive'} /> }, { key: 'actions', label: 'Actions', sortable: false, render: (shift) => <div className="flex items-center gap-3">{canEdit && !isReadOnly && <button type="button" aria-label="Edit shift" onClick={() => { setErrors({}); setEditor({ open: true, shift }); }} className="text-(--color-accent)"><Pencil size={16} /></button>}{canDelete && !isReadOnly && <button type="button" aria-label="Delete shift" onClick={() => setDeleteTarget(shift)} className="text-red-500"><Trash2 size={16} /></button>}</div> }], [canDelete, canEdit, handleStatusChange, isReadOnly]);
-  return <div className="space-y-4 p-4 sm:p-6"><SectionCard title="Shift Hours" action={canCreate && !isReadOnly && <Button onClick={() => { setErrors({}); setEditor({ open: true, shift: null }); }} className="flex items-center gap-1.5"><Plus size={15} /> Add Shift</Button>}><div className="mb-4"><InputField value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search shifts" leftIcon={<Search size={16} />} /></div>{isError ? <Feedback type="error" title="Unable to load shifts" message="Please refresh the page and try again." /> : <PageTable columns={columns} rows={filtered} total={filtered.length} label="shifts" isLoading={isLoading} />}</SectionCard><AddEditShift key={`${editor.open}-${editor.shift?.id ?? 'new'}`} isOpen={editor.open} shift={editor.shift} errors={errors} saving={creating || updating} onClose={() => setEditor({ open: false, shift: null })} onSubmit={handleSave} /><ConfirmDelete isOpen={Boolean(deleteTarget)} title="Delete Shift" message={`Delete shift "${deleteTarget?.name}"? This cannot be undone.`} onConfirm={handleDelete} onCancel={() => setDeleteTarget(null)} /></div>; };
+
+const unwrap = (value) => (Array.isArray(value) ? value : value?.data ?? []);
+
+const Shifts = () => {
+  const toast = useToast();
+  const { canCreate, canEdit, canDelete, isReadOnly } = usePermission('/shifts');
+
+  const { data, isLoading, isError } = useGetShiftsQuery({ all: true, per_page: 100 });
+  const [createShift, { isLoading: creating }] = useCreateShiftMutation();
+  const [updateShift, { isLoading: updating }] = useUpdateShiftMutation();
+  const [deleteShift] = useDeleteShiftMutation();
+
+  const [search, setSearch] = useState('');
+  const [editor, setEditor] = useState({ open: false, shift: null });
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [errors, setErrors] = useState({});
+
+  const shifts = unwrap(data);
+  useRenderPerformance('getShifts', data);
+
+  const filtered = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return shifts.filter(
+      (shift) => !query || String(shift.name ?? '').toLowerCase().includes(query)
+    );
+  }, [shifts, search]);
+
+  const handleSave = async ({ id, ...payload }) => {
+    const nextErrors = {};
+
+    if (!payload.name) nextErrors.name = 'Shift name is required.';
+    if (!payload.start_time) nextErrors.start_time = 'Start time is required.';
+    if (!payload.end_time) nextErrors.end_time = 'End time is required.';
+    if (payload.duration_hours != null && payload.duration_hours < 0) {
+      nextErrors.duration_hours = 'Duration cannot be negative.';
+    }
+
+    if (Object.keys(nextErrors).length) {
+      setErrors(nextErrors);
+      return;
+    }
+
+    try {
+      if (id) {
+        await updateShift({ id, ...payload }).unwrap();
+      } else {
+        await createShift(payload).unwrap();
+      }
+
+      toast(id ? 'Shift updated successfully.' : 'Shift created successfully.', 'success');
+      setEditor({ open: false, shift: null });
+      setErrors({});
+    } catch (error) {
+      toast(getApiErrorMessage(error, 'Unable to save shift.'), 'error');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+
+    try {
+      await deleteShift(deleteTarget.id).unwrap();
+      toast('Shift deleted successfully.', 'success');
+      setDeleteTarget(null);
+    } catch (error) {
+      toast(getApiErrorMessage(error, 'Unable to delete shift.'), 'error');
+    }
+  };
+
+  const handleStatusChange = useCallback(
+  async (shift) => {
+    if (!canEdit || isReadOnly) return;
+
+    // If currently 0 (active), send 1 (inactive). Otherwise send 0.
+    const newStatus = Number(shift.status) === 0 ? 1 : 0;
+
+    try {
+      await updateShift({ id: shift.id, status: newStatus }).unwrap();
+      toast('Shift status updated.', 'success');
+    } catch (error) {
+      toast(getApiErrorMessage(error, 'Unable to update shift status.'), 'error');
+    }
+  },
+  [canEdit, isReadOnly, toast, updateShift]
+);
+
+  const columns = useMemo(
+    () => [
+      {
+        key: 'name',
+        label: 'Shift',
+        render: (shift) => (
+          <div className="flex items-center gap-2">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-(--color-accent) text-white">
+              <Clock3 size={14} />
+            </span>
+            <span className="font-medium">{shift.name}</span>
+          </div>
+        ),
+      },
+      {
+        key: 'start_time',
+        label: 'Start',
+        render: (shift) => String(shift.start_time ?? '').slice(0, 5),
+      },
+      {
+        key: 'end_time',
+        label: 'End',
+        render: (shift) => String(shift.end_time ?? '').slice(0, 5),
+      },
+      {
+        key: 'duration_hours',
+        label: 'Duration',
+        render: (shift) => (shift.duration_hours == null ? '—' : `${shift.duration_hours} hrs`),
+      },
+      {
+  key: 'status',
+  label: 'Active',
+  render: (shift) => {
+    // 0 is active, 1 is inactive
+    const isActive = Number(shift.status) === 0;
+
+    return (
+      <Switch
+        checked={isActive}
+        disabled={!canEdit || isReadOnly}
+        onClick={() => handleStatusChange(shift)}
+        ariaLabel={isActive ? 'Active' : 'Inactive'}
+      />
+    );
+  },
+},
+      {
+        key: 'actions',
+        label: 'Actions',
+        sortable: false,
+        render: (shift) => (
+          <div className="flex items-center gap-3">
+            {canEdit && !isReadOnly && (
+              <button
+                type="button"
+                aria-label="Edit shift"
+                onClick={() => {
+                  setErrors({});
+                  setEditor({ open: true, shift });
+                }}
+                className="text-(--color-accent)"
+              >
+                <Pencil size={16} />
+              </button>
+            )}
+            {canDelete && !isReadOnly && (
+              <button
+                type="button"
+                aria-label="Delete shift"
+                onClick={() => setDeleteTarget(shift)}
+                className="text-red-500"
+              >
+                <Trash2 size={16} />
+              </button>
+            )}
+          </div>
+        ),
+      },
+    ],
+    [canDelete, canEdit, handleStatusChange, isReadOnly]
+  );
+
+  return (
+    <div className="space-y-4 p-4 sm:p-6">
+      <SectionCard
+        title="Shift Hours"
+        action={
+          canCreate &&
+          !isReadOnly && (
+            <Button
+              onClick={() => {
+                setErrors({});
+                setEditor({ open: true, shift: null });
+              }}
+              className="flex items-center gap-1.5"
+            >
+              <Plus size={15} /> Add Shift
+            </Button>
+          )
+        }
+      >
+        <div className="mb-4">
+          <InputField
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search shifts"
+            leftIcon={<Search size={16} />}
+          />
+        </div>
+
+        {isError ? (
+          <Feedback
+            type="error"
+            title="Unable to load shifts"
+            message="Please refresh the page and try again."
+          />
+        ) : (
+          <PageTable
+            columns={columns}
+            rows={filtered}
+            total={filtered.length}
+            label="shifts"
+            isLoading={isLoading}
+          />
+        )}
+      </SectionCard>
+
+      <AddEditShift
+        key={`${editor.open}-${editor.shift?.id ?? 'new'}`}
+        isOpen={editor.open}
+        shift={editor.shift}
+        errors={errors}
+        saving={creating || updating}
+        onClose={() => setEditor({ open: false, shift: null })}
+        onSubmit={handleSave}
+      />
+
+      <ConfirmDelete
+        isOpen={Boolean(deleteTarget)}
+        title="Delete Shift"
+        message={`Delete shift "${deleteTarget?.name}"? This cannot be undone.`}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
+    </div>
+  );
+};
+
 export default Shifts;

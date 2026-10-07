@@ -51,10 +51,8 @@ const getEmployeeOptionValue = (employee) => employee.id;
 const getEmployeeOptionLabel = (employee) => `${employee.name ?? ''} · ${employee.employee_code || 'No employee ID'} · ${employee.designation?.name || 'No designation'}`;
 const getRoleOptionValue = (role) => role.id;
 const getRoleOptionLabel = (role) => role.name;
-const isSystemSuperAdmin = (user) => (
-  String(user?.username ?? '').toLowerCase() === 'superadmin'
-  || String(user?.email ?? '').toLowerCase() === 'superadmin@gmail.com'
-);
+// Identify system superadmin by username only — never hardcode email as a credential check
+const isSystemSuperAdmin = (user) => String(user?.username ?? '').toLowerCase() === 'superadmin';
 
 const UserForm = ({ form, setForm, roles, employees, loadEmployees, loadRoles, errors }) => {
   const set = (field) => (event) => setForm((current) => ({ ...current, [field]: event.target.value }));
@@ -67,7 +65,7 @@ const UserForm = ({ form, setForm, roles, employees, loadEmployees, loadRoles, e
         name: employee.name ?? '',
         username: employee.name ?? '',
         email: employee.email ?? '',
-        password: current.id ? current.password : getDefaultPassword(employee.name),
+        password: current.id ? current.password : getDefaultPassword(),
       } : {}),
     }));
   };
@@ -155,7 +153,8 @@ const Users = () => {
     () => (rolesData?.data ?? rolesData ?? []).filter((role) => role.name?.toLowerCase().replace(/[\s_-]+/g, '') !== 'superadmin'),
     [rolesData],
   );
-  const employees = [];
+  // Stable empty array — avoids new reference on every render causing child re-renders
+  const employees = useMemo(() => [], []);
   useRenderPerformance('getUsers', loadedUsers);
   useRenderPerformance('getRoles', rolesData);
   const [search, setSearch] = useState('');
@@ -296,13 +295,13 @@ const Users = () => {
     fetchRoleOptions({ search: query, page, per_page: perPage }).unwrap()
   ), [fetchRoleOptions]);
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     const { id, name, username, email, password, role_id, employee_id, status } = modal.form;
     const nextErrors = {};
     if (!name.trim()) nextErrors.name = 'Name is required.';
     if (!username.trim()) nextErrors.username = 'Username is required.';
     if (email && !EMAIL_REGEX.test(email.trim())) nextErrors.email = 'Please enter a valid email address.';
-    if (!employee_id) nextErrors.employee_id = 'Employee is required.';
+    // if (!employee_id) nextErrors.employee_id = 'Employee is required.';
     if (!role_id) nextErrors.role_id = 'Role is required.';
     if (!id && !password) nextErrors.password = 'Password is required for new users.';
     if (password && password.length < 8) nextErrors.password = 'Password must be at least 8 characters.';
@@ -345,7 +344,7 @@ const Users = () => {
         : getApiErrorMessage(error, 'Unable to save user.');
       toast(message, 'error');
     }
-  };
+  }, [canCreate, canEdit, isReadOnly, modal.form, refreshUsers, closeModal, createUser, updateUser, toast]);
 
   const handleStatusChange = useCallback(async (user) => {
     if (!canEdit || isReadOnly) return;
@@ -363,20 +362,20 @@ const Users = () => {
     }
   }, [canEdit, isReadOnly, isSuperAdmin, refreshUsers, toast, updateUser]);
 
-  const handleDelete = async () => {
+  const handleDelete = useCallback(async () => {
     if (!canDelete || isReadOnly) {
       toast('You do not have permission to delete users.', 'error');
       return;
     }
     try {
-      await deleteUser(deleteTarget.id).unwrap();
+      await deleteUser(deleteTarget?.id).unwrap();
       await refreshUsers();
       toast('User deleted.', 'success');
       setDeleteTarget(null);
     } catch (error) {
       toast(error?.data?.message ?? 'Unable to delete user.', 'error');
     }
-  };
+  }, [canDelete, isReadOnly, deleteTarget, deleteUser, refreshUsers, toast]);
 
   const columns = useMemo(() => [
     {
