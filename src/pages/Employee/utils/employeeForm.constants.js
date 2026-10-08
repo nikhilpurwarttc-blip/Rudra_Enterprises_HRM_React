@@ -35,6 +35,7 @@ export const EMPLOYEE_STEPS = [
   { id: 'details', label: 'Employee Details', statusLabel: 'Employee record' },
   { id: 'kyc', label: 'KYC / Documents', statusLabel: 'Documents submitted' },
   { id: 'accounts', label: 'Bank Accounts', statusLabel: 'Accounts submitted' },
+  { id: 'salary', label: 'Salary', statusLabel: 'Salary history submitted' },
 ];
 
 export const DETAIL_SECTIONS = [

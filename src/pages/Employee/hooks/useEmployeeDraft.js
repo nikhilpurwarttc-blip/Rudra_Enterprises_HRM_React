@@ -20,7 +20,9 @@ export default function useEmployeeDraft(draftKey, baseForm) {
 
   const restoreDraft = () => {
     const storedDraft = getStoredDraft(draftKey);
-    return storedDraft ? { ...baseForm, ...storedDraft, image: null } : baseForm;
+    return storedDraft
+      ? { ...baseForm, ...storedDraft, image: storedDraft.image ?? baseForm.image ?? null }
+      : baseForm;
   };
 
   const saveDraft = (form) => {

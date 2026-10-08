@@ -2,24 +2,9 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { clearCredentials, selectToken } from './authSlice';
 import { API_CONFIG } from '../config/config';
 import { recordApiResponse } from '../utils/performance';
+import { toEmployeeRequestBody } from './employeeRequestBody';
 
 const fetchTimings = new Map();
-
-const toEmployeeRequestBody = (body, method = 'POST') => {
-  if (!body?.image || !(body.image instanceof File)) return body;
-
-  const formData = new FormData();
-  if (method !== 'POST') formData.append('_method', method);
-  Object.entries(body).forEach(([key, value]) => {
-    if (value === null || value === undefined || value === '') return;
-    if (key === 'charge_ids' && Array.isArray(value)) {
-      value.forEach((chargeId) => formData.append('charge_ids[]', chargeId));
-      return;
-    }
-    formData.append(key, value);
-  });
-  return formData;
-};
 
 const toEmployeeDocumentRequestBody = (body) => {
   const formData = new FormData();
@@ -108,7 +93,7 @@ const timedBaseQuery = async (args, api, extraOptions) => {
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: timedBaseQuery,
-  tagTypes: ['User', 'Users', 'Employee', 'EmployeeDocument', 'EmployeeBankAccount', 'EmployeeAdvance', 'Attendance', 'PlantShutdown', 'Role', 'Permission', 'Shift', 'Charge', 'Plant', 'Department', 'Holiday', 'Designation'],
+  tagTypes: ['User', 'Users', 'Employee', 'EmployeeDocument', 'EmployeeBankAccount', 'EmployeeAdvance', 'EmployeeSalary', 'Attendance', 'PlantShutdown', 'Role', 'Permission', 'Shift', 'Charge', 'Plant', 'Department', 'Holiday', 'Designation'],
   endpoints: (builder) => ({
     login: builder.mutation({
       query: (credentials) => ({ url: '/login', method: 'POST', body: credentials }),
@@ -186,6 +171,18 @@ export const api = createApi({
     deleteEmployee: builder.mutation({
       query: (id) => ({ url: `/employees/${id}`, method: 'DELETE' }),
       invalidatesTags: ['Employee'],
+    }),
+    getEmployeeSalaryHistory: builder.query({
+      query: (employeeId) => `/employees/${employeeId}/salaries`,
+      providesTags: (_result, _error, employeeId) => [{ type: 'EmployeeSalary', id: employeeId }],
+    }),
+    createEmployeeSalary: builder.mutation({
+      query: (body) => ({ url: '/employee-salaries', method: 'POST', body }),
+      invalidatesTags: (_result, _error, body) => [{ type: 'EmployeeSalary', id: body.employee_id }],
+    }),
+    updateEmployeeSalary: builder.mutation({
+      query: ({ id, ...body }) => ({ url: `/employee-salaries/${id}`, method: 'PUT', body }),
+      invalidatesTags: ['EmployeeSalary'],
     }),
     getAttendanceFilters: builder.query({
       query: () => '/attendances/filters',
@@ -478,6 +475,9 @@ export const {
   useApproveEmployeeMutation,
   useRejectEmployeeMutation,
   useDeleteEmployeeMutation,
+  useGetEmployeeSalaryHistoryQuery,
+  useCreateEmployeeSalaryMutation,
+  useUpdateEmployeeSalaryMutation,
   useGetAttendanceFiltersQuery,
   useGetPlantShutdownsQuery,
   useCreatePlantShutdownMutation,

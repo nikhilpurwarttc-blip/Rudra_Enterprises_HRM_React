@@ -1,10 +1,13 @@
 import { useCallback, useMemo, useState } from 'react';
 import { InlineError } from '../../components/Feedback';
+import usePermission from '../../hooks/usePermission';
+import { useCreateEmployeeSalaryMutation, useGetEmployeeSalaryHistoryQuery, useUpdateEmployeeSalaryMutation } from '../../store/api';
 import EmployeeAccountsSection from './components/EmployeeAccountsSection';
 import EmployeeDetailsSection from './components/EmployeeDetailsSection';
 import EmployeeFormHeader from './components/EmployeeFormHeader';
 import EmployeeKycSection from './components/EmployeeKycSection';
 import EmployeeProgress from './components/EmployeeProgress';
+import EmployeeSalarySection from './components/EmployeeSalarySection';
 import useEmployeeDraft from './hooks/useEmployeeDraft';
 import useEmployeeForm from './hooks/useEmployeeForm';
 import useEmployeeValidation from './hooks/useEmployeeValidation';
@@ -55,6 +58,7 @@ const AddEditEmployee = ({
   const [documentDraft, setDocumentDraft] = useState(EMPTY_DOCUMENT);
   const [accountDraft, setAccountDraft] = useState(EMPTY_ACCOUNT);
   const [stepError, setStepError] = useState('');
+  const { can } = usePermission('/employees');
   const { validateEmployeeForm, clearFieldError, getFirstErrorSection } = useEmployeeValidation();
 
   const clearFieldErrors = useCallback((field) => {
@@ -76,6 +80,15 @@ const AddEditEmployee = ({
   );
 
   const employeeId = form.id ?? employee?.id;
+  const canManageSalary = can('approve') || can('reject');
+  const requiredProgressStepIds = canManageSalary
+    ? ['details', 'accounts', 'salary']
+    : ['details', 'accounts'];
+  const showSalaryStep = Boolean(employeeId && Number(employee?.approval_status) === 1 && canManageSalary);
+  const { data: salaryHistoryResponse, isLoading: salaryHistoryLoading, isError: salaryHistoryError, refetch: refetchSalaryHistory } = useGetEmployeeSalaryHistoryQuery(employeeId, { skip: !showSalaryStep });
+  const [createEmployeeSalary, { isLoading: savingSalary }] = useCreateEmployeeSalaryMutation();
+  const [updateEmployeeSalary, { isLoading: updatingSalary }] = useUpdateEmployeeSalaryMutation();
+  const salaryHistory = salaryHistoryResponse?.data ?? [];
   const visibleServerErrors = useMemo(() =>
     Object.fromEntries(
       Object.entries(serverErrors)
@@ -91,14 +104,18 @@ const AddEditEmployee = ({
     shifts: buildSelectOptions(shifts, (item) => item.name),
     charges: buildSelectOptions(charges, (item) => item.name ?? item.deduction),
   }), [plants, departments, designations, shifts, charges]);
-  const steps = useMemo(() => EMPLOYEE_STEPS.map((step) => ({
+  const steps = useMemo(() => EMPLOYEE_STEPS
+    .filter((step) => step.id !== 'salary' || showSalaryStep)
+    .map((step) => ({
     ...step,
     complete: step.id === 'details'
       ? Boolean(employeeId)
       : step.id === 'kyc'
         ? documents.length > 0
-        : accounts.length > 0,
-  })), [employeeId, documents.length, accounts.length]);
+        : step.id === 'accounts'
+          ? accounts.length > 0
+          : salaryHistory.length > 0,
+  })), [employeeId, documents.length, accounts.length, salaryHistory.length, showSalaryStep]);
 
   const scrollToFirstError = (validationErrors) => {
     const firstSection = getFirstErrorSection(validationErrors, DETAIL_SECTIONS);
@@ -173,6 +190,7 @@ const AddEditEmployee = ({
   };
 
   const handleStepChange = (stepId) => {
+    if (!steps.some((step) => step.id === stepId)) return;
     setActiveStep(stepId);
     setStepError('');
   };
@@ -196,7 +214,12 @@ const AddEditEmployee = ({
           onSaveDraft={handleSaveDraft}
           onClose={onClose}
         />
-        <EmployeeProgress steps={steps} activeStep={activeStep} onStepChange={handleStepChange} />
+        <EmployeeProgress
+          steps={steps}
+          activeStep={activeStep}
+          onStepChange={handleStepChange}
+          requiredStepIds={requiredProgressStepIds}
+        />
       </header>
 
       <main className="min-h-0 flex-1 overflow-y-auto p-5">
@@ -242,6 +265,19 @@ const AddEditEmployee = ({
               onSave={handleSaveAccount}
               onDelete={onDeleteAccount}
               onGoToDetails={() => handleStepChange('details')}
+            />
+          )}
+          {activeStep === 'salary' && showSalaryStep && (
+            <EmployeeSalarySection
+              employeeId={employeeId}
+              salaries={salaryHistory}
+              isLoading={salaryHistoryLoading}
+              isError={salaryHistoryError}
+              saving={savingSalary}
+              updating={updatingSalary}
+              onRefresh={refetchSalaryHistory}
+              onSave={(body) => createEmployeeSalary(body).unwrap()}
+              onUpdate={(body) => updateEmployeeSalary(body).unwrap()}
             />
           )}
           {stepError && <InlineError message={stepError} className="rounded-md border border-red-500/30 bg-red-500/10 p-3" />}

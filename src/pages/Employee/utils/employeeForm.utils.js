@@ -1,4 +1,5 @@
 import { EMPTY_EMPLOYEE_FORM } from './employeeForm.constants';
+import { resolveApiAssetUrl } from '../../../config/config';
 
 export const normalizeEmployee = (employee) => ({
   ...EMPTY_EMPLOYEE_FORM,
@@ -17,28 +18,37 @@ export const normalizeEmployee = (employee) => ({
   address: String(employee?.address ?? ''),
   gender: String(employee?.gender ?? ''),
   marital_status: String(employee?.marital_status ?? ''),
-  image: null,
+  image: employee?.image
+    ? { name: 'Current employee photo', type: 'image/jpeg', url: resolveApiAssetUrl(employee.image) }
+    : null,
   status: employee?.status == null ? 1 : Number(employee.status),
 });
 
-export const createEmployeePayload = (form, employeeId) => ({
-  id: employeeId ?? form.id,
-  name: String(form.name ?? '').trim(),
-  dob: form.dob || null,
-  joining_date: form.joining_date || null,
-  plant_id: form.plant_id || null,
-  department_id: form.department_id || null,
-  designation_id: form.designation_id || null,
-  shift_id: form.shift_id || null,
-  charge_ids: form.charge_ids.map(Number),
-  mobile_number: String(form.mobile_number ?? '').trim() || null,
-  email: String(form.email ?? '').trim() || null,
-  address: String(form.address ?? '').trim() || null,
-  gender: form.gender || null,
-  marital_status: form.marital_status || null,
-  status: form.status,
-  image: form.image,
-});
+export const createEmployeePayload = (form, employeeId) => {
+  const payload = {
+    id: employeeId ?? form.id,
+    name: String(form.name ?? '').trim(),
+    dob: form.dob || null,
+    joining_date: form.joining_date || null,
+    plant_id: form.plant_id || null,
+    department_id: form.department_id || null,
+    designation_id: form.designation_id || null,
+    shift_id: form.shift_id || null,
+    charge_ids: form.charge_ids.map(Number),
+    mobile_number: String(form.mobile_number ?? '').trim() || null,
+    email: String(form.email ?? '').trim() || null,
+    address: String(form.address ?? '').trim() || null,
+    gender: form.gender || null,
+    marital_status: form.marital_status || null,
+    status: form.status,
+  };
+
+  if (typeof File !== 'undefined' && form.image instanceof File) {
+    payload.image = form.image;
+  }
+
+  return payload;
+};
 
 export const buildSelectOptions = (items, getLabel) => items.map((item) => ({
   value: String(item.id),

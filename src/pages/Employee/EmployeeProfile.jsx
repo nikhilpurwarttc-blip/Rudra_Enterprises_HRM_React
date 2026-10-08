@@ -7,10 +7,10 @@ import GlassCard from '../../components/GlassCard';
 import usePermission from '../../hooks/usePermission';
 import { useRenderPerformance } from '../../utils/performance';
 import EmployeeApprovalActions from './components/EmployeeApprovalActions';
+import EmployeeAvatar from './components/EmployeeAvatar';
 import { displayDate } from './utils/employeeForm.utils';
 
 const unwrap = (value) => value?.data ?? value;
-const initials = (name) => String(name ?? '?').split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
 
 const EmployeeProfile = ({ employeeId, initialEmployee, embedded = false, onClose }) => {
   const navigate = useNavigate();
@@ -48,9 +48,7 @@ const EmployeeProfile = ({ employeeId, initialEmployee, embedded = false, onClos
       <GlassCard className="mx-auto max-w-4xl overflow-hidden">
         <div className="flex flex-wrap items-start justify-between gap-3 bg-(--color-accent-soft) p-6 sm:p-8">
           <div className="flex min-w-0 flex-wrap items-center gap-4">
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-(--color-accent) text-2xl font-semibold text-white">
-              {initials(employee.name)}
-            </div>
+            <EmployeeAvatar employee={employee} className="h-20 w-20 text-2xl" />
             <div>
               <p className="text-sm text-(--color-text-muted)">Employee profile</p>
               <h1 className="text-2xl font-semibold text-(--color-text)">{employee.name}</h1>

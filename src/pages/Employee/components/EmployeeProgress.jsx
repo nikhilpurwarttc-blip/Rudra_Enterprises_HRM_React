@@ -1,17 +1,17 @@
-import { Check, Circle, FileCheck, Landmark, UserRound } from 'lucide-react';
+import { Banknote, Check, Circle, FileCheck, Landmark, UserRound } from 'lucide-react';
 
 const STEP_ICONS = {
   details: UserRound,
   kyc: FileCheck,
   accounts: Landmark,
+  salary: Banknote,
 };
 
-const EmployeeProgress = ({ steps, activeStep, onStepChange }) => {
-  const completedCount = steps.filter((step) => step.complete).length;
-  const completionPercent = Math.round((completedCount / steps.length) * 100);
-  const firstPendingIndex = steps.findIndex((step) => !step.complete);
-  const contiguousCompletedCount = firstPendingIndex === -1 ? steps.length : firstPendingIndex;
-  const trackPercent = Math.min(100, (contiguousCompletedCount / (steps.length - 1)) * 100);
+const EmployeeProgress = ({ steps, activeStep, onStepChange, requiredStepIds = steps.map((step) => step.id) }) => {
+  const requiredSteps = steps.filter((step) => requiredStepIds.includes(step.id));
+  const completedCount = requiredSteps.filter((step) => step.complete).length;
+  const completionPercent = Math.round((completedCount / requiredStepIds.length) * 100);
+  const trackPercent = completionPercent;
 
   const handleKeyDown = (event, currentIndex) => {
     let targetIndex = currentIndex;
@@ -27,17 +27,18 @@ const EmployeeProgress = ({ steps, activeStep, onStepChange }) => {
   return (
     <section aria-label="Employee onboarding progress" className="mt-5">
       <div className="mb-2 flex items-center justify-between gap-3 text-xs text-(--color-text-muted)">
-        <span>{completedCount} of {steps.length} milestones submitted</span>
+        <span>{completedCount} of {requiredStepIds.length} required milestones submitted</span>
         <span>{completionPercent}% complete</span>
       </div>
-      <nav aria-label="Employee submission steps" className="relative mt-4 grid grid-cols-3">
+      <nav aria-label="Employee submission steps" className="relative mt-4 grid" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}>
         <div
           role="progressbar"
-          aria-label="Sequential onboarding progress"
+          aria-label="Completed onboarding milestones"
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={Math.round(trackPercent)}
-          className="absolute left-[16.67%] right-[16.67%] top-3 h-1 rounded-full bg-(--color-border)"
+          className="absolute top-3 h-1 rounded-full bg-(--color-border)"
+          style={{ left: `${50 / steps.length}%`, right: `${50 / steps.length}%` }}
         >
           <div
             className="h-full rounded-full bg-(--color-accent) transition-all duration-300 ease-out"

@@ -32,12 +32,12 @@ import { Feedback } from '../../components/Feedback';
 import AddEditEmployee from './AddEditEmployee';
 import EmployeeProfile from './EmployeeProfile';
 import EmployeeAttendance from './EmployeeAttendance';
+import EmployeeAvatar from './components/EmployeeAvatar';
 import { getApiErrorMessage } from '../../components/feedbackUtils';
 import { useRenderPerformance } from '../../utils/performance';
 import { selectRole } from '../../store/authSlice';
 
 const unwrap = (value) => Array.isArray(value) ? value : value?.data ?? [];
-const initials = (name) => String(name ?? '?').split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
 const isSafeUrl = (url) => /^https?:\/\//i.test(String(url ?? ''));
 const matchesEmployeeSearch = (employee, query) => {
   const normalizedQuery = query.toLocaleLowerCase();
@@ -81,7 +81,11 @@ const Employees = () => {
   const requestVersion = useRef(0);
   const loadingEmployees = useRef(false);
   const searchTimeout = useRef(null);
-  const { data: selectedEmployeeData } = useGetEmployeeByIdQuery(id, { skip: !id });
+  const {
+    data: selectedEmployeeData,
+    isLoading: selectedEmployeeLoading,
+    isError: selectedEmployeeError,
+  } = useGetEmployeeByIdQuery(id, { skip: !id });
   const { data: plantsData, isLoading: plantsLoading } = useGetPlantsQuery();
   const { data: departmentsData } = useGetDepartmentsQuery();
   const { data: designationsData } = useGetDesignationsQuery();
@@ -506,7 +510,7 @@ const Employees = () => {
               }}
               className={`group flex w-full items-center gap-3 rounded-lg border px-3 py-3 text-left transition ${String(id) === String(employee.id) ? 'border-(--color-accent) bg-(--color-accent-soft)' : 'border-transparent hover:border-(--color-border) hover:bg-(--color-accent-soft)'}`}
             >
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-(--color-accent) text-sm font-semibold text-white">{initials(employee.name)}</span>
+              <EmployeeAvatar employee={employee} className="h-11 w-11 text-sm" />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-semibold text-(--color-text)">{employee.name}</span>
                 <span className="mt-0.5 block truncate text-xs text-(--color-text-muted)">{employee.employee_code} · {employee.plant?.name}</span>
@@ -583,7 +587,9 @@ const Employees = () => {
 
       <main className="min-w-0 flex-1 overflow-hidden bg-(--color-bg)">
         <div key={`${id ?? 'none'}-${activeView}`} className="h-full page-enter">
-        {(isAddRoute || isEditRoute) && <AddEditEmployee key={isAddRoute ? `add-${addSessionKey}` : `edit-${selectedEmployee?.id ?? id}`} employee={isEditRoute ? selectedEmployee : createdEmployee ?? undefined} plants={plants} departments={departments} designations={designations} shifts={shifts} charges={charges} documents={employeeDocuments} accounts={employeeAccounts} documentsLoading={employeeDocumentsLoading} accountsLoading={employeeAccountsLoading} errors={errors} saving={creating || updating} savingDocument={savingDocument} savingAccount={savingAccount} onClose={() => { setCreatedEmployee(null); navigate('/employees'); }} onSubmit={handleSave} onSaveDocument={handleSaveDocument} onDeleteDocument={handleDeleteDocument} onSaveAccount={handleSaveAccount} onDeleteAccount={handleDeleteAccount} />}
+        {isEditRoute && !selectedEmployee && selectedEmployeeLoading && <p className="p-6 text-sm text-(--color-text-muted)">Loading employee details...</p>}
+        {isEditRoute && !selectedEmployee && selectedEmployeeError && <Feedback type="error" title="Unable to load employee" message="The employee details could not be loaded. Please return to the employee list and try again." />}
+        {(isAddRoute || (isEditRoute && selectedEmployee)) && <AddEditEmployee key={isAddRoute ? `add-${addSessionKey}` : `edit-${selectedEmployee.id}`} employee={isEditRoute ? selectedEmployee : createdEmployee ?? undefined} plants={plants} departments={departments} designations={designations} shifts={shifts} charges={charges} documents={employeeDocuments} accounts={employeeAccounts} documentsLoading={employeeDocumentsLoading} accountsLoading={employeeAccountsLoading} errors={errors} saving={creating || updating} savingDocument={savingDocument} savingAccount={savingAccount} onClose={() => { setCreatedEmployee(null); navigate('/employees'); }} onSubmit={handleSave} onSaveDocument={handleSaveDocument} onDeleteDocument={handleDeleteDocument} onSaveAccount={handleSaveAccount} onDeleteAccount={handleDeleteAccount} />}
         {!isAddRoute && !isEditRoute && selectedEmployee && activeView === 'profile' && <EmployeeProfile key={selectedEmployee.id} employeeId={selectedEmployee.id} initialEmployee={selectedEmployee} embedded onClose={() => navigate('/employees')} />}
         {!isAddRoute && !isEditRoute && selectedEmployee && activeView === 'attendance' && <EmployeeAttendance key={selectedEmployee.id} employeeId={selectedEmployee.id} joiningDate={selectedEmployee.joining_date} />}
         {!isAddRoute && !isEditRoute && selectedEmployee && activeView === 'salary' && <EmployeePlaceholder key={selectedEmployee.id} employee={selectedEmployee} type="salary" />}

@@ -11,6 +11,7 @@ const EmployeeAdditionalDetails = ({ form, charges, updateForm, setField }) => (
         onChange={(image) => updateForm((current) => ({ ...current, image }))}
         accept="image/jpeg,image/png,image/jpg"
         maxSize={2 * 1024 * 1024}
+        previewOnSelect
       />
       <SearchableSelect
         label="Charges & allowances"
