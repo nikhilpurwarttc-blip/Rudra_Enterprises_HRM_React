@@ -70,7 +70,7 @@ const PageTable = ({
   isLoading = false,
   pagination,
   rowClass,
-  tbodyClass = "max-h-[500px]",
+  tbodyClass = "max-h-[55vh]",
   footerRow,
 }) => {
   const [sort, setSort] = useState({ col: null, dir: 'asc' });

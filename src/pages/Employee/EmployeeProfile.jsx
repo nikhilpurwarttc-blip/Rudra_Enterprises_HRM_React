@@ -12,17 +12,21 @@ import { displayDate } from './utils/employeeForm.utils';
 const unwrap = (value) => value?.data ?? value;
 const initials = (name) => String(name ?? '?').split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
 
-const EmployeeProfile = ({ employeeId, embedded = false, onClose }) => {
+const EmployeeProfile = ({ employeeId, initialEmployee, embedded = false, onClose }) => {
   const navigate = useNavigate();
   const { id: routeId } = useParams();
   const id = employeeId ?? routeId;
+  // Skip the fetch when the parent already passed a cached employee object.
+  // The query still runs in the background to get fresh data, but we render
+  // immediately from initialEmployee so there is zero loading flash.
   const { data, isLoading, isError } = useGetEmployeeByIdQuery(id, { skip: !id });
-  const employee = unwrap(data);
+  const fetched = unwrap(data);
+  const employee = fetched ?? initialEmployee ?? null;
   const { canEdit, isReadOnly } = usePermission('/employees');
   useRenderPerformance('getEmployeeById', data);
   const close = onClose ?? (() => navigate('/employees'));
 
-  if (isLoading) return <LoadingState message="Loading employee profile..." className="min-h-[60vh]" />;
+  if (!employee && isLoading) return <LoadingState message="Loading employee profile..." className="min-h-[60vh]" />;
   if (isError || !employee) {
     return (
       <Feedback

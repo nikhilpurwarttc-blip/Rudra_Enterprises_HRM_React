@@ -4,6 +4,7 @@ import {
 	useGetAttendanceReportFiltersQuery,
 	useGetEmployeeAttendanceQuery,
 	useGetEmployeesQuery,
+	useGetPlantsQuery,
 } from '../../store/api';
 import { Feedback } from '../../components/Feedback';
 import InputField from '../../components/InputField';
@@ -27,6 +28,7 @@ const StatCard = ({ icon: Icon, label, value, colorClass }) => (
 const AttendanceReport = () => {
 	const [selectedEmployee, setSelectedEmployee] = useState('');
 	const [selectedEmployeeInfo, setSelectedEmployeeInfo] = useState(null);
+	const [plantId, setPlantId] = useState('');
 	const [departmentId, setDepartmentId] = useState('');
 	const [shiftId, setShiftId] = useState('');
 	const [employeeSearch, setEmployeeSearch] = useState('');
@@ -42,11 +44,12 @@ const AttendanceReport = () => {
 	}, [employeeSearch]);
 
 	const filtersQuery = useGetAttendanceReportFiltersQuery();
-	const departments = unwrap(filtersQuery.data?.departments);
-	const shifts = unwrap(filtersQuery.data?.shifts);
+	const plantsQuery = useGetPlantsQuery();
+	const plants = unwrap(plantsQuery.data);
 
 	const employeesQuery = useGetEmployeesQuery({
 		per_page: 100,
+		...(plantId ? { plant_id: plantId } : {}),
 		...(departmentId ? { department_id: departmentId } : {}),
 		...(debouncedEmployeeSearch ? { search: debouncedEmployeeSearch } : {}),
 	});
@@ -130,8 +133,18 @@ const AttendanceReport = () => {
 							rightIcon={(employeeSearch.trim() !== debouncedEmployeeSearch || employeesQuery.isFetching) && <LoaderCircle size={15} className="animate-spin" />}
 						/>
 						<SearchableSelect
+							ariaLabel="Filter employees by plant"
+							options={[{ value: '', label: 'All Plants' }, ...plants.map((plant) => ({ value: String(plant.id), label: plant.name }))]}
+							value={plantId}
+							onChange={(value) => { setPlantId(value); setDepartmentId(''); setShiftId(''); setSelectedEmployee(''); setSelectedEmployeeInfo(null); }}
+							placeholder="All Plants"
+							isLoading={plantsQuery.isLoading}
+							showSearch={false}
+						/>
+						{/*
+						<SearchableSelect
 							ariaLabel="Filter by department"
-							options={[{ value: '', label: 'All departments' }, ...departments.map((department) => ({ value: String(department.id), label: department.name }))]}
+							options={[{ value: '', label: 'All departments' }, ...unwrap(filtersQuery.data?.departments).map((department) => ({ value: String(department.id), label: department.name }))]}
 							value={departmentId}
 							onChange={(value) => { setDepartmentId(value); setSelectedEmployee(''); setSelectedEmployeeInfo(null); }}
 							placeholder="All departments"
@@ -140,13 +153,14 @@ const AttendanceReport = () => {
 						/>
 						<SearchableSelect
 							ariaLabel="Filter by shift"
-							options={[{ value: '', label: 'All shifts' }, ...shifts.map((shift) => ({ value: String(shift.id), label: shift.name }))]}
+							options={[{ value: '', label: 'All shifts' }, ...unwrap(filtersQuery.data?.shifts).map((shift) => ({ value: String(shift.id), label: shift.name }))]}
 							value={shiftId}
 							onChange={(value) => { setShiftId(value); setSelectedEmployee(''); setSelectedEmployeeInfo(null); }}
 							placeholder="All shifts"
 							isLoading={filtersQuery.isLoading}
 							showSearch={false}
 						/>
+						*/}
 					</div>
 				</div>
 				<div className="min-h-0 flex-1 overflow-y-auto p-2">

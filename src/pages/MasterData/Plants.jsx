@@ -59,7 +59,7 @@ const Plants = () => {
   const { canCreate, canEdit, canDelete, isReadOnly } = usePermission('/plants');
   const { can } = usePermission();
   const user = useSelector(selectUser);
-  const { data, isLoading, isError } = useGetPlantsQuery({ per_page: 100 });
+  const { data, isLoading, isError } = useGetPlantsQuery({ all: true, per_page: 100 });
   const [createPlant, { isLoading: creating }] = useCreatePlantMutation();
   const [updatePlant, { isLoading: updating }] = useUpdatePlantMutation();
   const [deletePlant] = useDeletePlantMutation();

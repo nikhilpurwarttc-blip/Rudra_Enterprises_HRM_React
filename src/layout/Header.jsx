@@ -163,7 +163,7 @@ const Header = ({ onToggleSidebar }) => {
           type="button"
           onClick={() => setIsProfileOpen(true)}
           aria-label="Open user profile"
-          className="flex items-center gap-2 rounded-md border-l border-[var(--color-border)] pl-2 text-left hover:bg-[var(--color-accent-soft)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
+          className="flex items-center gap-2 border-l border-[var(--color-border)] pl-2 text-left hover:animate-pulse focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
         >
           <div className="w-8 h-8 bg-[var(--color-accent)] rounded-full flex items-center justify-center text-white shrink-0">
             <User size={15} />

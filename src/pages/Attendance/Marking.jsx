@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BadgeCheck, CalendarDays, CheckCheck, Clock3, LoaderCircle, LogIn, LogOut, Power, RefreshCw, RotateCcw, Search, UserRoundX, Users, XCircle } from 'lucide-react';
 import {
   useApproveAllAttendanceMutation,
@@ -21,7 +21,6 @@ import InputField from '../../components/InputField';
 import PageTable from '../../components/PageTable';
 import Pagination from '../../components/Pagination';
 import SearchableSelect from '../../components/SearchableSelect';
-import SectionCard from '../../components/SectionCard';
 import { getApiErrorMessage } from '../../components/feedbackUtils';
 import usePermission from '../../hooks/usePermission';
 
@@ -383,6 +382,11 @@ const Marking = () => {
     }
   };
 
+  // Stable badge helper — defined outside useMemo so column defs never rebuild
+  // when only busyEmployeeActions changes. The render fn closes over the ref below.
+  const busyRef = useRef(busyEmployeeActions);
+  useEffect(() => { busyRef.current = busyEmployeeActions; }, [busyEmployeeActions]);
+
   const columns = useMemo(() => [
     {
       key: 'name',
@@ -481,7 +485,7 @@ const Marking = () => {
             <UserRoundX size={15} /> Mark absent
           </button>
         ) : null;
-        const busyAction = busyEmployeeActions[employee.id];
+        const busyAction = busyRef.current[employee.id];
         if (busyAction) {
           const busyLabel = busyAction === 'absent' ? 'Marking absent...' : busyAction === 'present' ? 'Marking present...' : busyAction === 'undo' ? 'Undoing...' : busyAction === 'in' ? 'Punching in...' : 'Punching out...';
           return (
@@ -555,96 +559,103 @@ const Marking = () => {
         );
       },
     },
-  ], [busyEmployeeActions, canRejectAttendance, departmentMap, hasPendingShutdown, plantMap, recordPunch, shiftMap, shutdownQuery.isError, shutdownQuery.isFetching, undoShutdownPresence]);
+  ], [canRejectAttendance, departmentMap, hasPendingShutdown, plantMap, recordPunch, shiftMap, shutdownQuery.isError, shutdownQuery.isFetching, undoShutdownPresence]);
 
   return (
-    <div className="space-y-4 p-4 sm:p-6">
-      <SectionCard
-        title="Mark Daily Attendance"
-        action={<div className="flex flex-wrap items-center gap-2">
-          <span className="ml-2 hidden items-center gap-1.5 text-sm text-(--color-text-muted) sm:inline-flex"><CalendarDays size={15} />{todayLabel}</span>
+    <div className="flex h-full flex-col gap-4 p-4 sm:p-6 overflow-y-auto">
+      {/* ── Page header ── */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-bold text-(--color-text)">Daily Attendance</h1>
+          <p className="flex items-center gap-1.5 text-sm text-(--color-text-muted) mt-0.5">
+            <CalendarDays size={14} />{todayLabel}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
           {canApproveAttendance && (
-            <button
-              type="button"
-              onClick={handleApproveAll}
-              disabled={isBulkActionDisabled}
+            <button type="button" onClick={handleApproveAll} disabled={isBulkActionDisabled}
               title="Approve all pending attendance matching the current filters"
-              className="inline-flex min-h-9 items-center gap-2 rounded-md bg-emerald-700 px-3 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <CheckCheck size={15} /> Approve all{pendingApprovalCount > 0 ? ` (${pendingApprovalCount})` : ''}
+              className="inline-flex h-9 items-center gap-2 rounded-lg bg-emerald-700 px-3 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50 transition-colors">
+              <CheckCheck size={14} /> Approve all{pendingApprovalCount > 0 ? ` (${pendingApprovalCount})` : ''}
             </button>
           )}
           {canRejectAttendance && (
-            <button
-              type="button"
-              onClick={() => setRejectAllOpen(true)}
-              disabled={isBulkActionDisabled}
+            <button type="button" onClick={() => setRejectAllOpen(true)} disabled={isBulkActionDisabled}
               title="Reject all pending attendance matching the current filters"
-              className="inline-flex min-h-9 items-center gap-2 rounded-md bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <XCircle size={15} /> Reject all · mark absent{pendingApprovalCount > 0 ? ` (${pendingApprovalCount})` : ''}
+              className="inline-flex h-9 items-center gap-2 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 transition-colors">
+              <XCircle size={14} /> Reject all{pendingApprovalCount > 0 ? ` (${pendingApprovalCount})` : ''}
             </button>
           )}
-          {canRequestShutdown && (pendingShutdown
-            ? <span className="inline-flex min-h-9 items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 text-sm font-medium text-amber-800 dark:text-amber-200"><Power size={15} /> Shutdown pending approval</span>
-            : activeShutdown
-            ? <span className="inline-flex min-h-9 items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 text-sm font-medium text-amber-800 dark:text-amber-200"><Power size={15} /> Shutdown declared</span>
-          : <div className="flex flex-wrap items-center gap-2">
-            {rejectedShutdown && (
-              <span
-                title={`Rejected ${getShutdownDateRange(rejectedShutdown)}. Reason: ${rejectedShutdown.remarks || 'No reason provided.'}`}
-                aria-label={`Shutdown request rejected. ${getShutdownDateRange(rejectedShutdown)}. Reason: ${rejectedShutdown.remarks || 'No reason provided.'}`}
-                className="inline-flex min-h-9 cursor-help items-center gap-2 rounded-md border border-red-500/40 bg-red-500/10 px-3 text-sm font-medium text-red-800 dark:text-red-200"
-              >
-                <Power size={15} /> Shutdown rejected
-              </span>
-            )}
-            {rejectedShutdownQuery.isError && <span role="status" className="text-xs text-red-700 dark:text-red-300">Could not load rejection details. Refresh to retry.</span>}
-            <button type="button" onClick={() => { setShutdownForm(getShutdownDefaults()); setShutdownDialogOpen(true); }} disabled={!effectivePlant || shutdownQuery.isFetching || rejectedShutdownQuery.isFetching} className="inline-flex min-h-9 items-center gap-2 rounded-md bg-amber-700 px-3 text-sm font-semibold text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50"><Power size={15} /> Request shutdown</button>
-          </div>)}
-        </div>}
-      >
-        <div className="mb-5 grid grid-cols-2 overflow-hidden rounded-lg border border-(--color-border) sm:grid-cols-5">
-          <div className="border-b border-r border-(--color-border) p-3 sm:border-b-0">
-            <p className="text-xs font-medium text-(--color-text-muted)">Roster</p>
-            <p className="mt-1 flex items-center gap-2 text-xl font-semibold"><Users size={17} className="text-(--color-accent)" />{counts.roster}</p>
-          </div>
-          <div className="border-b border-(--color-border) p-3 sm:border-b-0 sm:border-r">
-            <p className="text-xs font-medium text-(--color-text-muted)">Not started</p>
-            <p className="mt-1 text-xl font-semibold">{counts.notStarted}</p>
-          </div>
-          <div className="border-r border-(--color-border) p-3">
-            <p className="text-xs font-medium text-(--color-text-muted)">Punched in</p>
-            <p className="mt-1 text-xl font-semibold text-green-700 dark:text-green-300">{counts.punchedIn}</p>
-          </div>
-          <div className="p-3">
-            <p className="text-xs font-medium text-(--color-text-muted)">Completed</p>
-            <p className="mt-1 text-xl font-semibold text-sky-700 dark:text-sky-300">{counts.completed}</p>
-          </div>
-          <div className="border-t border-(--color-border) p-3 sm:border-l sm:border-t-0">
-            <p className="text-xs font-medium text-(--color-text-muted)">Shutdown present</p>
-            <p className="mt-1 text-xl font-semibold text-amber-800 dark:text-amber-200">{counts.shutdown_present ?? counts.shutdownPresent ?? 0}</p>
-          </div>
+          {canRequestShutdown && (
+            pendingShutdown
+              ? <span className="inline-flex h-9 items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 text-sm font-medium text-amber-800 dark:text-amber-200"><Power size={14} /> Shutdown pending</span>
+              : activeShutdown
+              ? <span className="inline-flex h-9 items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 text-sm font-medium text-amber-800 dark:text-amber-200"><Power size={14} /> Shutdown active</span>
+              : (
+                <>
+                  {rejectedShutdown && (
+                    <span title={`Rejected ${getShutdownDateRange(rejectedShutdown)}. Reason: ${rejectedShutdown.remarks || 'No reason provided.'}`}
+                      className="inline-flex h-9 cursor-help items-center gap-2 rounded-lg border border-red-500/40 bg-red-500/10 px-3 text-sm font-medium text-red-800 dark:text-red-200">
+                      <Power size={14} /> Shutdown rejected
+                    </span>
+                  )}
+                  <button type="button"
+                    onClick={() => { setShutdownForm(getShutdownDefaults()); setShutdownDialogOpen(true); }}
+                    disabled={!effectivePlant || shutdownQuery.isFetching || rejectedShutdownQuery.isFetching}
+                    className="inline-flex h-9 items-center gap-2 rounded-lg bg-amber-700 px-3 text-sm font-semibold text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50 transition-colors">
+                    <Power size={14} /> Request shutdown
+                  </button>
+                </>
+              )
+          )}
         </div>
+      </div>
 
-        <div className={`mb-4 grid grid-cols-1 items-center gap-3 sm:grid-cols-2 ${singleAssignedPlant ? 'xl:grid-cols-[minmax(14rem,1.5fr)_repeat(2,minmax(10rem,1fr))_auto_auto]' : 'xl:grid-cols-[minmax(14rem,1.5fr)_repeat(3,minmax(10rem,1fr))_auto_auto]'}`}>
-          <InputField
-            aria-label="Search employees"
-            value={search}
-            onChange={(event) => { setSearch(event.target.value); setPage(1); }}
-            placeholder="Search name or employee code"
-            leftIcon={<Search size={16} />}
-            rightIcon={(isSearchPending || employeeQuery.isFetching) && <LoaderCircle size={15} className="animate-spin" />}
-          />
-          {!singleAssignedPlant && <SearchableSelect ariaLabel="Filter by plant" options={plantOptions} value={filters.plant} onChange={(value) => updateFilter('plant', value)} placeholder="All plants" isLoading={filtersQuery.isLoading} showSearch={false} />}
-          <SearchableSelect ariaLabel="Filter by department" options={departmentOptions} value={filters.department} onChange={(value) => updateFilter('department', value)} placeholder="All departments" isLoading={filtersQuery.isLoading} showSearch={false} />
-          <SearchableSelect ariaLabel="Filter by shift" options={shiftOptions} value={filters.shift} onChange={(value) => updateFilter('shift', value)} placeholder="All shifts" isLoading={filtersQuery.isLoading} showSearch={false} />
+      {/* ── Stats bar ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 overflow-hidden rounded-xl border border-(--color-border) divide-x divide-(--color-border) bg-(--color-surface)">
+          {[
+            { label: 'Roster',           value: counts.roster,                                    color: 'text-(--color-accent)',              icon: <Users size={15} /> },
+            { label: 'Not started',      value: counts.notStarted,                                color: 'text-(--color-text)',                icon: null },
+            { label: 'Punched in',       value: counts.punchedIn,                                 color: 'text-emerald-600 dark:text-emerald-400', icon: null },
+            { label: 'Completed',        value: counts.completed,                                 color: 'text-sky-600 dark:text-sky-400',     icon: null },
+            { label: 'Shutdown present', value: counts.shutdown_present ?? counts.shutdownPresent ?? 0, color: 'text-amber-700 dark:text-amber-300', icon: null },
+          ].map(({ label, value, color, icon }) => (
+            <div key={label} className="flex flex-col gap-1 p-3 col-span-1 first:col-span-2 first:sm:col-span-1">
+              <p className="text-xs font-medium text-(--color-text-muted) truncate">{label}</p>
+              <p className={`text-xl font-bold tabular-nums flex items-center gap-1.5 ${color}`}>{icon}{value}</p>
+            </div>
+          ))}
+      </div>
+
+      {/* ── Filters ── */}
+      <div className="flex flex-wrap items-center gap-2">
+          <div className="min-w-52 flex-[2]">
+            <InputField
+              aria-label="Search employees"
+              value={search}
+              onChange={(event) => { setSearch(event.target.value); setPage(1); }}
+              placeholder="Search name or employee code"
+              leftIcon={<Search size={16} />}
+              rightIcon={(isSearchPending || employeeQuery.isFetching) ? <LoaderCircle size={15} className="animate-spin" /> : null}
+            />
+          </div>
+          {!singleAssignedPlant && (
+            <div className="min-w-36 flex-1">
+              <SearchableSelect ariaLabel="Filter by plant" options={plantOptions} value={filters.plant} onChange={(value) => updateFilter('plant', value)} placeholder="All plants" isLoading={filtersQuery.isLoading} showSearch={false} />
+            </div>
+          )}
+          <div className="min-w-36 flex-1">
+            <SearchableSelect ariaLabel="Filter by department" options={departmentOptions} value={filters.department} onChange={(value) => updateFilter('department', value)} placeholder="All departments" isLoading={filtersQuery.isLoading} showSearch={false} />
+          </div>
+          <div className="min-w-32 flex-1">
+            <SearchableSelect ariaLabel="Filter by shift" options={shiftOptions} value={filters.shift} onChange={(value) => updateFilter('shift', value)} placeholder="All shifts" isLoading={filtersQuery.isLoading} showSearch={false} />
+          </div>
           <button
             type="button"
             onClick={() => { setSearch(''); setDebouncedSearch(''); setFilters({ plant: '', department: '', shift: '' }); setPage(1); }}
-            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md border border-(--color-border-strong) px-3 text-sm font-medium text-(--color-text-muted) hover:bg-(--color-accent-soft) hover:text-(--color-text)"
+            className="inline-flex h-12 items-center justify-center gap-1.5 rounded-md border border-(--color-border-strong) px-3 text-sm font-medium text-(--color-text-muted) hover:bg-(--color-accent-soft) hover:text-(--color-text) transition-colors"
           >
-            <RotateCcw size={15} /> Reset
+            <RotateCcw size={14} /> Reset
           </button>
           <button
             type="button"
@@ -652,24 +663,26 @@ const Marking = () => {
             title="Refresh attendance roster"
             onClick={() => { employeeQuery.refetch(); filtersQuery.refetch(); shutdownQuery.refetch(); if (effectivePlant) rejectedShutdownQuery.refetch(); }}
             disabled={isRefreshing}
-            className="inline-flex min-h-12 items-center justify-center rounded-md border border-(--color-border-strong) px-3 text-(--color-text-muted) hover:bg-(--color-accent-soft) hover:text-(--color-text) disabled:cursor-wait disabled:opacity-60"
+            className="inline-flex h-12 w-12 items-center justify-center rounded-md border border-(--color-border-strong) text-(--color-text-muted) hover:bg-(--color-accent-soft) hover:text-(--color-text) disabled:cursor-wait disabled:opacity-60 transition-colors"
           >
-            <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
+            <RefreshCw size={15} className={isRefreshing ? 'animate-spin' : ''} />
           </button>
         </div>
 
+      {/* ── Table card ── */}
+      <div className="glass-card rounded-xl p-4">
         {(filtersQuery.isError || (employeeQuery.isError && displayedEmployees.length === 0))
           ? <Feedback type="error" title="Unable to load attendance roster" message="Please refresh the page and try again." />
           : <PageTable
-            columns={columns}
-            rows={displayedEmployees}
-            total={useCachedSearchResults ? displayedEmployees.length : Number(meta.total ?? displayedEmployees.length)}
-            label="employees"
-            isLoading={employeeQuery.isLoading || (Boolean(searchQuery) && (isSearchPending || employeeQuery.isFetching) && displayedEmployees.length === 0)}
-            pagination={useCachedSearchResults ? null : <Pagination page={currentPage} lastPage={lastPage} onPageChange={setPage} />}
-            emptyText="No employees match these filters"
-          />}
-      </SectionCard>
+              columns={columns}
+              rows={displayedEmployees}
+              total={useCachedSearchResults ? displayedEmployees.length : Number(meta.total ?? displayedEmployees.length)}
+              label="employees"
+              isLoading={employeeQuery.isLoading || (Boolean(searchQuery) && (isSearchPending || employeeQuery.isFetching) && displayedEmployees.length === 0)}
+              pagination={useCachedSearchResults ? null : <Pagination page={currentPage} lastPage={lastPage} onPageChange={setPage} />}
+              emptyText="No employees match these filters"
+            />}
+      </div>
 
       {shutdownDialogOpen && (
         <PlantShutdownForm

@@ -1,8 +1,22 @@
-import { BriefcaseBusiness, Mail, ShieldCheck, UserRound, UserRoundCog } from 'lucide-react';
+import { BriefcaseBusiness, Factory, Mail, ShieldCheck, UserRound, UserRoundCog } from 'lucide-react';
 import RightModal from '../pages/components/RightModal';
 import Button from '../components/Button';
+import { useGetPlantsQuery } from '../store/api';
 
 const UserProfilePanel = ({ user, roleName, isOpen, onClose, onNavigate, onLogout }) => {
+  const { data: plantsData, isLoading: plantsLoading, isError: plantsError } = useGetPlantsQuery({ all: true, per_page: 100 });
+  const rolePlantIds = user?.role?.plant_ids ?? user?.role?.plants?.map((plant) => plant.id);
+  const userPlantIds = user?.assigned_plants?.map((plant) => (typeof plant === 'object' ? plant.id : plant));
+  const allowedPlantIds = rolePlantIds?.length ? rolePlantIds : userPlantIds ?? rolePlantIds ?? [];
+  const plants = Array.isArray(plantsData) ? plantsData : plantsData?.data ?? [];
+  const allowedPlantNames = allowedPlantIds.map((plantId) => {
+    const plant = plants.find((item) => String(item.id) === String(plantId));
+    const assignedPlant = user?.assigned_plants?.find((item) => String(typeof item === 'object' ? item.id : item) === String(plantId));
+    const rolePlant = user?.role?.plants?.find((item) => String(item.id) === String(plantId));
+    return plant?.name ?? assignedPlant?.name ?? rolePlant?.name ?? `Plant #${plantId}`;
+  });
+  const hasUnresolvedPlantNames = allowedPlantNames.some((name, index) => name === `Plant #${allowedPlantIds[index]}`);
+
   if (!user) return null;
 
   const employee = user.employee;
@@ -44,6 +58,29 @@ const UserProfilePanel = ({ user, roleName, isOpen, onClose, onNavigate, onLogou
               <p className="truncate text-sm capitalize text-(--color-text)">{displayRole}</p>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-(--color-text-muted)">Allowed plants</p>
+        <div className="flex items-start gap-3 rounded-lg border border-(--color-border) px-3 py-3">
+          {/* <Factory size={17} className="mt-0.5 shrink-0 text-(--color-accent)" /> */}
+          {!allowedPlantIds.length ? (
+            <p className="text-sm text-(--color-text)">All plants</p>
+          ) : plantsLoading && hasUnresolvedPlantNames ? (
+            <p className="text-sm text-(--color-text-muted)">Loading allowed plants…</p>
+          ) : plantsError && hasUnresolvedPlantNames ? (
+            <p className="text-sm text-(--color-text-muted)">Unable to load allowed plant names</p>
+          ) : (
+            <ul className="space-y-1 text-sm text-(--color-text)">
+              {allowedPlantNames.map((name, index) => (
+                <li key={`${allowedPlantIds[index]}-${index}`} className="flex items-center gap-2">
+                  <Factory size={17} className="shrink-0 text-(--color-accent)" />
+                  <span>{name}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
 

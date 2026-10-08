@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from 'react';
-import { CalendarDays, LoaderCircle, MoreVertical, Pencil, Plus, Search, UserRound, IdCard, WalletCards } from 'lucide-react';
+import { CalendarDays, LoaderCircle, MoreVertical, Pencil, Plus, RefreshCw, Search, UserRound, IdCard, WalletCards, Trash2 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
@@ -8,6 +8,7 @@ import {
   useCreateEmployeeDocumentMutation,
   useDeleteEmployeeBankAccountMutation,
   useDeleteEmployeeDocumentMutation,
+  useDeleteEmployeeMutation,
   useGetChargesQuery,
   useGetDepartmentsQuery,
   useGetDesignationsQuery,
@@ -23,6 +24,7 @@ import {
 import usePermission from '../../hooks/usePermission';
 import { useToast } from '../../contexts/ToastContext';
 import Button from '../../components/Button';
+import ConfirmDelete from '../../components/ConfirmDelete';
 import InputField from '../../components/InputField';
 import SearchableSelect from '../../components/SearchableSelect';
 import Switch from '../../components/Switch';
@@ -68,7 +70,7 @@ const Employees = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams();
-  const { canCreate, canEdit, isReadOnly } = usePermission('/employees');
+  const { canCreate, canEdit, canDelete, isReadOnly } = usePermission('/employees');
   const role = useSelector(selectRole);
   // Single Map-based store replaces dual loadedEmployees + cachedEmployees arrays
   const [employeeMap, setEmployeeMap] = useState(() => new Map());
@@ -94,11 +96,14 @@ const Employees = () => {
   const [deleteEmployeeDocument] = useDeleteEmployeeDocumentMutation();
   const [createEmployeeBankAccount, { isLoading: savingAccount }] = useCreateEmployeeBankAccountMutation();
   const [deleteEmployeeBankAccount] = useDeleteEmployeeBankAccountMutation();
+  const [deleteEmployee] = useDeleteEmployeeMutation();
   const [createdEmployee, setCreatedEmployee] = useState(null);
+  const [addSessionKey, setAddSessionKey] = useState(0);
   const [search, setSearch] = useState('');
   const [plantFilter, setPlantFilter] = useState('');
   const [menuEmployeeId, setMenuEmployeeId] = useState(null);
   const [menuPosition, setMenuPosition] = useState(null); // { x, y, fromButton: bool }
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const menuRef = useRef(null);
   const [savingStatusIds, setSavingStatusIds] = useState({});
   const [errors, setErrors] = useState({});
@@ -140,12 +145,6 @@ const Employees = () => {
         : employee
     ),
   [employeesData, refreshedEmployee]);
-  const workflowEmployee = selectedEmployee ?? createdEmployee;
-  const workflowEmployeeId = workflowEmployee?.id ?? (location.pathname.endsWith('/edit') ? id : null);
-  const { data: employeeDocumentsData, isLoading: employeeDocumentsLoading } = useGetEmployeeDocumentsQuery(workflowEmployeeId, { skip: !workflowEmployeeId });
-  const { data: employeeAccountsData, isLoading: employeeAccountsLoading } = useGetEmployeeBankAccountsQuery(workflowEmployeeId, { skip: !workflowEmployeeId });
-  const employeeDocuments = unwrap(employeeDocumentsData);
-  const employeeAccounts = unwrap(employeeAccountsData);
   const isAddRoute = location.pathname === '/employees/add';
   const isEditRoute = location.pathname.endsWith('/edit');
   const activeView = location.pathname.endsWith('/attendance')
@@ -153,6 +152,21 @@ const Employees = () => {
     : location.pathname.endsWith('/salary')
       ? 'salary'
       : 'profile';
+
+  // For add-route: only use createdEmployee (the just-saved new record).
+  // For edit-route: use the selected employee from the list/params.
+  // Never fall back to a previously selected employee when adding a new one.
+  const workflowEmployee = isAddRoute ? createdEmployee : (isEditRoute ? selectedEmployee : null);
+  const workflowEmployeeId = workflowEmployee?.id ?? null;
+  const { data: employeeDocumentsData, isLoading: employeeDocumentsLoading } = useGetEmployeeDocumentsQuery(workflowEmployeeId, { skip: !workflowEmployeeId });
+  const { data: employeeAccountsData, isLoading: employeeAccountsLoading } = useGetEmployeeBankAccountsQuery(workflowEmployeeId, { skip: !workflowEmployeeId });
+  const employeeDocuments = unwrap(employeeDocumentsData);
+  const employeeAccounts = unwrap(employeeAccountsData);
+  // const removedActiveView = location.pathname.endsWith('/attendance')
+  //   ? 'attendance'
+  //   : location.pathname.endsWith('/salary')
+  //     ? 'salary'
+  //     : 'profile';
 
   useRenderPerformance('getEmployees', loadedEmployees);
 
@@ -252,6 +266,16 @@ const Employees = () => {
     loadEmployeePages(1, query, plantId, true, version);
   };
 
+  const handleRefreshEmployees = () => {
+    const query = search.trim();
+    const version = ++requestVersion.current;
+    loadingEmployees.current = false;
+    window.clearTimeout(searchTimeout.current);
+    setDebouncedSearch(query);
+    setHasLoadError(false);
+    loadEmployeePages(1, query, plantFilter, true, version);
+  };
+
   const isSearchPending = debouncedSearch !== search.trim();
   const isEmployeeLoading = isSearchPending || isLoading || isFetching;
 
@@ -291,6 +315,33 @@ const Employees = () => {
         delete next[employee.id];
         return next;
       });
+    }
+  };
+
+  const handleDeleteEmployee = async () => {
+    if (!canDelete || isReadOnly || !deleteTarget?.id) {
+      toast('You do not have permission to delete employees.', 'error');
+      return;
+    }
+
+    try {
+      await deleteEmployee(deleteTarget.id).unwrap();
+      setEmployeeMap((current) => {
+        const next = new Map(current);
+        next.delete(deleteTarget.id);
+        return next;
+      });
+      setCachedIds((current) => {
+        const next = new Set(current);
+        next.delete(deleteTarget.id);
+        return next;
+      });
+      setTotalEmployees((current) => Math.max(0, current - 1));
+      setDeleteTarget(null);
+      toast(`${deleteTarget.name} deleted successfully.`, 'success');
+      if (String(id) === String(deleteTarget.id)) navigate('/employees');
+    } catch (error) {
+      toast(getApiErrorMessage(error, `Unable to delete ${deleteTarget.name}.`), 'error');
     }
   };
 
@@ -415,7 +466,20 @@ const Employees = () => {
                 <h1 className="text-lg font-semibold text-(--color-text)">Employees <span className="ml-1 text-xs font-normal text-(--color-text-muted)">{displayedEmployeeCount}</span></h1>
               </div>
             </div>
-            {canCreate && !isReadOnly && <Button type="button" onClick={() => { setCreatedEmployee(null); navigate('/employees/add'); }} className="flex items-center gap-1.5 "><Plus size={18} /></Button>}
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                aria-label="Refresh employees"
+                title="Refresh employees"
+                onClick={handleRefreshEmployees}
+                disabled={isEmployeeLoading}
+                className="flex items-center justify-center disabled:cursor-wait disabled:opacity-60"
+              >
+                <RefreshCw size={16} className={isEmployeeLoading ? 'animate-spin' : ''} />
+              </Button>
+              {canCreate && !isReadOnly && <Button type="button" onClick={() => { setCreatedEmployee(null); setAddSessionKey((k) => k + 1); navigate('/employees/add'); }} className="flex items-center gap-1.5 "><Plus size={18} /></Button>}
+            </div>
           </div>
           <div className="mt-4 flex items-center gap-2">
             <InputField className="min-w-0 max-w-52 flex-1" value={search} onChange={handleSearchChange} placeholder="Search employees" leftIcon={<Search size={16} />} rightIcon={isEmployeeLoading && <LoaderCircle size={15} className="animate-spin" />} />
@@ -455,8 +519,7 @@ const Employees = () => {
                 )}
               </span>
               <span
-                className={`h-2 w-2 shrink-0 rounded-full animate-pulse ${employee.status ? 'bg-emerald-500' : 'bg-red-500'
-                  }`}
+                className={`h-2 w-2 shrink-0 rounded-full ${employee.status ? 'bg-emerald-500' : 'bg-red-400'}`}
               />
               <div className="relative shrink-0">
                 <button
@@ -487,6 +550,19 @@ const Employees = () => {
                   <button type="button" onClick={() => openEmployeeView(employee, 'attendance')} className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-(--color-accent-soft)"><CalendarDays size={15} /> Attendance</button>
                   <button type="button" onClick={() => openEmployeeView(employee, 'salary')} className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-(--color-accent-soft)"><WalletCards size={15} /> Salary</button>
                     {canEdit && !isReadOnly && <button type="button" onClick={() => { setMenuEmployeeId(null); navigate(`/employees/${employee.id}/edit`); }} className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-(--color-accent-soft)"><Pencil size={15} /> Edit {employee.name}</button>}
+                    {canDelete && !isReadOnly && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMenuEmployeeId(null);
+                          setMenuPosition(null);
+                          setDeleteTarget(employee);
+                        }}
+                        className="flex w-full items-center gap-2 border-t border-(--color-border) px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
+                      >
+                        <Trash2 size={15} /> Delete {employee.name}
+                      </button>
+                    )}
                   <div className="flex items-center justify-between gap-2 border-t border-(--color-border) px-3 py-2" onClick={(event) => event.stopPropagation()}>
                     <span className="text-sm text-(--color-text)">{employee.status ? 'Active' : 'Inactive'}</span>
                     <Switch
@@ -506,12 +582,22 @@ const Employees = () => {
       </aside>
 
       <main className="min-w-0 flex-1 overflow-hidden bg-(--color-bg)">
-        {(isAddRoute || isEditRoute) && <AddEditEmployee key={`edit-${id ?? 'new'}-${isEditRoute ? selectedEmployee?.id ?? '' : ''}`} employee={isEditRoute ? selectedEmployee : createdEmployee ?? undefined} plants={plants} departments={departments} designations={designations} shifts={shifts} charges={charges} documents={employeeDocuments} accounts={employeeAccounts} documentsLoading={employeeDocumentsLoading} accountsLoading={employeeAccountsLoading} errors={errors} saving={creating || updating} savingDocument={savingDocument} savingAccount={savingAccount} onClose={() => { setCreatedEmployee(null); navigate('/employees'); }} onSubmit={handleSave} onSaveDocument={handleSaveDocument} onDeleteDocument={handleDeleteDocument} onSaveAccount={handleSaveAccount} onDeleteAccount={handleDeleteAccount} />}
-        {!isAddRoute && !isEditRoute && selectedEmployee && activeView === 'profile' && <EmployeeProfile employeeId={selectedEmployee.id} embedded onClose={() => navigate('/employees')} />}
+        <div key={`${id ?? 'none'}-${activeView}`} className="h-full page-enter">
+        {(isAddRoute || isEditRoute) && <AddEditEmployee key={isAddRoute ? `add-${addSessionKey}` : `edit-${selectedEmployee?.id ?? id}`} employee={isEditRoute ? selectedEmployee : createdEmployee ?? undefined} plants={plants} departments={departments} designations={designations} shifts={shifts} charges={charges} documents={employeeDocuments} accounts={employeeAccounts} documentsLoading={employeeDocumentsLoading} accountsLoading={employeeAccountsLoading} errors={errors} saving={creating || updating} savingDocument={savingDocument} savingAccount={savingAccount} onClose={() => { setCreatedEmployee(null); navigate('/employees'); }} onSubmit={handleSave} onSaveDocument={handleSaveDocument} onDeleteDocument={handleDeleteDocument} onSaveAccount={handleSaveAccount} onDeleteAccount={handleDeleteAccount} />}
+        {!isAddRoute && !isEditRoute && selectedEmployee && activeView === 'profile' && <EmployeeProfile key={selectedEmployee.id} employeeId={selectedEmployee.id} initialEmployee={selectedEmployee} embedded onClose={() => navigate('/employees')} />}
         {!isAddRoute && !isEditRoute && selectedEmployee && activeView === 'attendance' && <EmployeeAttendance key={selectedEmployee.id} employeeId={selectedEmployee.id} joiningDate={selectedEmployee.joining_date} />}
-        {!isAddRoute && !isEditRoute && selectedEmployee && activeView === 'salary' && <EmployeePlaceholder employee={selectedEmployee} type="salary" />}
+        {!isAddRoute && !isEditRoute && selectedEmployee && activeView === 'salary' && <EmployeePlaceholder key={selectedEmployee.id} employee={selectedEmployee} type="salary" />}
         {!isAddRoute && !isEditRoute && !selectedEmployee && <div className="flex h-full items-center justify-center p-8"><div className="max-w-sm text-center text-(--color-text-muted)"><UserRound size={28} className="mx-auto mb-4 text-(--color-accent)" /><h2 className="text-base font-semibold text-(--color-text)">Select an employee</h2><p className="mt-1 text-sm">Choose an employee from the list to view their profile.</p></div></div>}
+        </div>
       </main>
+
+      <ConfirmDelete
+        isOpen={Boolean(deleteTarget)}
+        title="Delete Employee"
+        message={`Delete employee "${deleteTarget?.name}"? This cannot be undone.`}
+        onConfirm={handleDeleteEmployee}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 };
