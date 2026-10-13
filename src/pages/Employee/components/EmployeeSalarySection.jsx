@@ -90,6 +90,11 @@ const EmployeeSalarySection = ({
     setError('');
     setSuccess('');
     try {
+      for (const activeSalary of salaries) {
+        if (String(activeSalary.id) !== String(salary.id) && Number(activeSalary.status) === 1) {
+          await onUpdate({ id: activeSalary.id, status: 0 });
+        }
+      }
       await onUpdate({ id: salary.id, status: checked ? 1 : 0 });
       setSuccess('Payroll inclusion updated.');
     } catch (updateError) {
@@ -163,7 +168,7 @@ const EmployeeSalarySection = ({
         </p>
       </SectionCard>
 
-      <SectionCard title="Add salary / increment">
+      <SectionCard title="Add salary / increment" >
         <form onSubmit={handleSave} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block text-sm font-medium text-(--color-text)">

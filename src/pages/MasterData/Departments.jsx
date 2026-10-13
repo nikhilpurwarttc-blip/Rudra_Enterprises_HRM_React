@@ -194,7 +194,7 @@ const Departments = () => {
 
   return (
     <div className="space-y-4 p-4 sm:p-6">
-      <SectionCard
+      {/* <SectionCard
         title="Departments"
         action={
           canCreate &&
@@ -207,14 +207,23 @@ const Departments = () => {
             </Button>
           )
         }
-      >
-        <div className="mb-4">
+      > */}
+        <div className="flex justify-between mb-4">
           <InputField
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search departments"
             leftIcon={<Search size={16} />}
           />
+          {canCreate &&
+          !isReadOnly && (
+            <Button
+              onClick={() => setEditor({ open: true, department: null })}
+              className="flex items-center gap-1.5"
+            >
+              <Plus size={15} /> Add Department
+            </Button>
+          )}
         </div>
 
         {isError ? (
@@ -232,7 +241,7 @@ const Departments = () => {
             isLoading={isLoading}
           />
         )}
-      </SectionCard>
+      {/* </SectionCard> */}
 
       <AddEditDepartment
         key={`${editor.open}-${editor.department?.id ?? 'new'}`}

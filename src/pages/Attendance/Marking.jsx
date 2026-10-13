@@ -433,7 +433,7 @@ const Marking = () => {
           return <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-800 dark:text-amber-200"><Power size={13} /> Shutdown present</span>;
         }
         if (Number(employee.attendance?.status) === 0) {
-          return <span title={employee.attendance?.rejection_reason || undefined} className="inline-flex items-center gap-1.5 rounded-full bg-red-500/10 px-2.5 py-1 text-xs font-medium text-red-700 dark:text-red-300"><UserRoundX size={14} /> Absent · rejected</span>;
+          return <span title={employee.attendance?.rejection_reason || undefined} className="inline-flex items-center gap-1.5 rounded-full bg-red-500/10 px-2.5 py-1 text-xs font-medium text-red-700 dark:text-red-300"><UserRoundX size={14} /> Marked Absent</span>;
         }
         if (Number(employee.attendance?.workflow_status) === 1) {
           return <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-800 dark:text-amber-200"><Clock3 size={13} /> Pending review</span>;
@@ -583,7 +583,7 @@ const Marking = () => {
             <button type="button" onClick={() => setRejectAllOpen(true)} disabled={isBulkActionDisabled}
               title="Reject all pending attendance matching the current filters"
               className="inline-flex h-9 items-center gap-2 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 transition-colors">
-              <XCircle size={14} /> Reject all{pendingApprovalCount > 0 ? ` (${pendingApprovalCount})` : ''}
+              <XCircle size={14} /> Mark Absent{pendingApprovalCount > 0 ? ` (${pendingApprovalCount})` : ''}
             </button>
           )}
           {canRequestShutdown && (
@@ -670,7 +670,7 @@ const Marking = () => {
         </div>
 
       {/* ── Table card ── */}
-      <div className="glass-card rounded-xl p-4">
+      <div className="">
         {(filtersQuery.isError || (employeeQuery.isError && displayedEmployees.length === 0))
           ? <Feedback type="error" title="Unable to load attendance roster" message="Please refresh the page and try again." />
           : <PageTable

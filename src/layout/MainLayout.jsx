@@ -26,7 +26,7 @@ const PageTransition = ({ children }) => {
   }, [pageKey]);
 
   return (
-    <div ref={ref} className="page-enter h-full">
+    <div ref={ref} className="page-enter h-full min-w-0">
       {children}
     </div>
   );
@@ -81,7 +81,7 @@ const MainLayout = ({ children }) => {
               <main
                 id="main-content-area"
                 className={[
-                  'overflow-x-auto overflow-y-auto flex-1',
+                  'min-w-0 overflow-x-auto overflow-y-auto flex-1',
                   'bg-[var(--color-bg-elevated)]',
                   'md:rounded-2xl border border-[var(--color-border)]',
                   'shadow-[inset_0_10px_20px_rgba(0,0,0,0.08)]',

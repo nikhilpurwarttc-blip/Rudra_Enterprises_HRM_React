@@ -8,6 +8,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import { cn } from "../utils/cn";
 
 const DEFAULT_MAX_SIZE = 10 * 1024 * 1024; // 10 MB
 
@@ -226,7 +227,7 @@ const UploadField = ({
 
   return (
     <>
-      <div className={`w-full ${className}`}>
+      <div className={cn("w-full", className)}>
         {/* Label */}
         {label && (
           <label

@@ -1,4 +1,4 @@
-import { twMerge } from 'tailwind-merge';
+import { cn } from '../utils/cn';
 
 const Chip = ({
   children,
@@ -16,7 +16,7 @@ const Chip = ({
       aria-pressed={isInteractive ? selected : undefined}
       disabled={disabled}
       onClick={onClick}
-      className={twMerge(
+      className={cn(
         `inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
           selected
             ? 'border-(--color-accent) bg-(--color-accent) text-white'

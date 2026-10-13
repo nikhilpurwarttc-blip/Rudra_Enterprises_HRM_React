@@ -93,7 +93,7 @@ const timedBaseQuery = async (args, api, extraOptions) => {
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: timedBaseQuery,
-  tagTypes: ['User', 'Users', 'Employee', 'EmployeeDocument', 'EmployeeBankAccount', 'EmployeeAdvance', 'EmployeeSalary', 'Attendance', 'PlantShutdown', 'Role', 'Permission', 'Shift', 'Charge', 'Plant', 'Department', 'Holiday', 'Designation'],
+  tagTypes: ['User', 'Users', 'Employee', 'EmployeeDocument', 'EmployeeBankAccount', 'EmployeeAdvance', 'EmployeeSalary', 'Attendance', 'PlantShutdown', 'MaintenanceRecord', 'SalaryReport', 'Role', 'Permission', 'Shift', 'Charge', 'Plant', 'Department', 'Holiday', 'Designation', 'Dashboard'],
   endpoints: (builder) => ({
     login: builder.mutation({
       query: (credentials) => ({ url: '/login', method: 'POST', body: credentials }),
@@ -112,6 +112,23 @@ export const api = createApi({
           if (error?.error?.status === 401) dispatch(clearCredentials());
         }
       },
+    }),
+    getDashboard: builder.query({
+      query: (params = {}) => {
+        const searchParams = new URLSearchParams();
+        Object.entries(params).forEach(([key, value]) => {
+          if (value === undefined || value === null || value === '') return;
+          if (key === 'plant_ids' && Array.isArray(value)) {
+            value.forEach((plantId) => searchParams.append('plant_ids[]', String(plantId)));
+            return;
+          }
+          searchParams.set(key, String(value));
+        });
+
+        const queryString = searchParams.toString();
+        return { url: queryString ? `/dashboard?${queryString}` : '/dashboard' };
+      },
+      providesTags: ['Dashboard', 'Employee', 'Attendance', 'SalaryReport', 'EmployeeAdvance', 'PlantShutdown', 'MaintenanceRecord'],
     }),
 
     // Users
@@ -191,6 +208,21 @@ export const api = createApi({
       query: (filters = {}) => ({ url: '/plant-shutdowns', params: filters }),
       providesTags: ['PlantShutdown'],
     }),
+    getMaintenanceRecords: builder.query({
+      query: (filters = {}) => ({ url: '/maintenance-records', params: filters }),
+      providesTags: ['MaintenanceRecord'],
+    }),
+    createMaintenanceRecord: builder.mutation({
+      query: (body) => ({ url: '/maintenance-records', method: 'POST', body }),
+      invalidatesTags: ['MaintenanceRecord'],
+    }),
+    exportMaintenanceRecords: builder.query({
+      query: (params = {}) => ({
+        url: '/maintenance-records/export',
+        params,
+        responseHandler: (response) => response.blob(),
+      }),
+    }),
     createPlantShutdown: builder.mutation({
       query: (body) => ({ url: '/plant-shutdowns', method: 'POST', body }),
       invalidatesTags: ['PlantShutdown'],
@@ -220,6 +252,43 @@ export const api = createApi({
       },
       providesTags: ['Attendance'],
     }),
+    getMonthlySalaryReport: builder.query({
+      query: (params) => ({ url: '/salary-reports/monthly', params }),
+      providesTags: ['SalaryReport'],
+    }),
+    getYearlySalaryReport: builder.query({
+      query: (params) => ({ url: '/salary-reports/yearly', params }),
+      providesTags: ['SalaryReport'],
+    }),
+    getStatutorySalaryReport: builder.query({
+      query: (params) => ({ url: '/salary-reports/statutory', params }),
+      providesTags: ['SalaryReport'],
+    }),
+    createPayroll: builder.mutation({
+      query: (body) => ({ url: '/payrolls', method: 'POST', body }),
+      invalidatesTags: ['SalaryReport'],
+    }),
+    lockPayrollEmployee: builder.mutation({
+      query: ({ payrollId, employeeId }) => ({
+        url: `/payrolls/${payrollId}/employees/${employeeId}/lock`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['SalaryReport'],
+    }),
+    exportMonthlySalaryReport: builder.query({
+      query: (params) => ({
+        url: '/salary-reports/monthly/export',
+        params,
+        responseHandler: (response) => response.blob(),
+      }),
+    }),
+    exportYearlySalaryReport: builder.query({
+      query: (params) => ({
+        url: '/salary-reports/yearly/export',
+        params,
+        responseHandler: (response) => response.blob(),
+      }),
+    }),
     getAttendanceRoster: builder.query({
       query: (filters = {}) => {
         const params = {
@@ -236,31 +305,31 @@ export const api = createApi({
     }),
     checkInAttendance: builder.mutation({
       query: (body) => ({ url: '/attendances/check-in', method: 'POST', body }),
-      invalidatesTags: ['Attendance'],
+      invalidatesTags: ['Attendance', 'SalaryReport'],
     }),
     checkOutAttendance: builder.mutation({
       query: (body) => ({ url: '/attendances/check-out', method: 'POST', body }),
-      invalidatesTags: ['Attendance'],
+      invalidatesTags: ['Attendance', 'SalaryReport'],
     }),
     markShutdownPresent: builder.mutation({
       query: (body) => ({ url: '/attendances/shutdown-present', method: 'POST', body }),
-      invalidatesTags: ['Attendance'],
+      invalidatesTags: ['Attendance', 'SalaryReport'],
     }),
     approveAllAttendance: builder.mutation({
       query: (filters) => ({ url: '/attendances/approve-all', method: 'POST', body: filters }),
-      invalidatesTags: ['Attendance'],
+      invalidatesTags: ['Attendance', 'SalaryReport'],
     }),
     rejectAllAttendance: builder.mutation({
       query: (filters) => ({ url: '/attendances/reject-all', method: 'POST', body: filters }),
-      invalidatesTags: ['Attendance'],
+      invalidatesTags: ['Attendance', 'SalaryReport'],
     }),
     markAttendanceAbsent: builder.mutation({
       query: (body) => ({ url: '/attendances/mark-absent', method: 'POST', body }),
-      invalidatesTags: ['Attendance'],
+      invalidatesTags: ['Attendance', 'SalaryReport'],
     }),
     deleteAttendance: builder.mutation({
       query: (id) => ({ url: `/attendances/${id}`, method: 'DELETE' }),
-      invalidatesTags: ['Attendance'],
+      invalidatesTags: ['Attendance', 'SalaryReport'],
     }),
     getEmployeeAdvances: builder.query({
       query: (filters = {}) => ({ url: '/employee-advances', params: filters }),
@@ -421,15 +490,15 @@ export const api = createApi({
     }),
     createRole: builder.mutation({
       query: (body) => ({ url: '/roles', method: 'POST', body }),
-      invalidatesTags: ['Role', 'User'],
+      invalidatesTags: ['Role', 'User', 'Dashboard'],
     }),
     updateRole: builder.mutation({
       query: ({ id, ...body }) => ({ url: `/roles/${id}`, method: 'PUT', body }),
-      invalidatesTags: ['Role', 'User'],
+      invalidatesTags: ['Role', 'User', 'Dashboard'],
     }),
     deleteRole: builder.mutation({
       query: (id) => ({ url: `/roles/${id}`, method: 'DELETE' }),
-      invalidatesTags: ['Role', 'User'],
+      invalidatesTags: ['Role', 'User', 'Dashboard'],
     }),
 
     // Permissions
@@ -460,6 +529,7 @@ export const {
   useLoginMutation,
   useLogoutMutation,
   useGetUserQuery,
+  useGetDashboardQuery,
   useGetUsersQuery,
   useLazyGetUsersQuery,
   useGetUserByIdQuery,
@@ -480,12 +550,22 @@ export const {
   useUpdateEmployeeSalaryMutation,
   useGetAttendanceFiltersQuery,
   useGetPlantShutdownsQuery,
+  useGetMaintenanceRecordsQuery,
+  useCreateMaintenanceRecordMutation,
+  useLazyExportMaintenanceRecordsQuery,
   useCreatePlantShutdownMutation,
   useUpdatePlantShutdownMutation,
   useApprovePlantShutdownMutation,
   useRejectPlantShutdownMutation,
   useGetAttendanceReportFiltersQuery,
   useGetAttendanceReportQuery,
+  useGetMonthlySalaryReportQuery,
+  useGetYearlySalaryReportQuery,
+  useGetStatutorySalaryReportQuery,
+  useCreatePayrollMutation,
+  useLockPayrollEmployeeMutation,
+  useLazyExportMonthlySalaryReportQuery,
+  useLazyExportYearlySalaryReportQuery,
   useGetAttendanceRosterQuery,
   useCheckInAttendanceMutation,
   useCheckOutAttendanceMutation,

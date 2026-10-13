@@ -8,206 +8,245 @@ const ThemeToggle = () => {
   const nextTheme = isDark ? 'light' : 'dark';
 
   return (
-    <button
-      type="button"
-      onClick={toggleTheme}
-      aria-label={`Switch to ${nextTheme} mode`}
-      title={`Switch to ${nextTheme} mode`}
-      className={`
-        group relative
-        flex h-9 w-16
-        items-center
-        overflow-hidden
-        rounded-full
-        border
-        transition-all duration-700
-        focus:outline-none
-        ${
-          isDark
-            ? 'border-slate-700 bg-slate-950'
-            : 'border-sky-200 bg-sky-100'
-        }
-      `}
-    >
-      {/* ------------------------------------------------
-          Background
-      ------------------------------------------------ */}
+    // <button
+    //   type="button"
+    //   onClick={toggleTheme}
+    //   aria-label={`Switch to ${nextTheme} mode`}
+    //   title={`Switch to ${nextTheme} mode`}
+    //   className={`
+    //     group relative
+    //     flex h-9 w-16
+    //     items-center
+    //     overflow-hidden
+    //     rounded-full
+    //     border
+    //     transition-all duration-700
+    //     focus:outline-none
+    //     ${
+    //       isDark
+    //         ? 'border-slate-700 bg-slate-950'
+    //         : 'border-sky-200 bg-sky-100'
+    //     }
+    //   `}
+    // >
+    //   {/* ------------------------------------------------
+    //       Background
+    //   ------------------------------------------------ */}
 
-      <div
-        className={`
-          absolute inset-0
-          transition-all duration-1000
-          ${
-            isDark
-              ? 'bg-linear-to-r from-slate-950 via-slate-900 to-indigo-950'
-              : 'bg-linear-to-r from-sky-100 via-sky-200 to-amber-100'
-          }
-        `}
-      />
+    //   <div
+    //     className={`
+    //       absolute inset-0
+    //       transition-all duration-1000
+    //       ${
+    //         isDark
+    //           ? 'bg-linear-to-r from-slate-950 via-slate-900 to-indigo-950'
+    //           : 'bg-linear-to-r from-sky-100 via-sky-200 to-amber-100'
+    //       }
+    //     `}
+    //   />
 
-      {/* ------------------------------------------------
-          Stars - Dark Mode
-      ------------------------------------------------ */}
+    //   {/* ------------------------------------------------
+    //       Stars - Dark Mode
+    //   ------------------------------------------------ */}
 
-      <div
-        className={`
-          pointer-events-none absolute inset-0
-          transition-all duration-700
-          ${
-            isDark
-              ? 'opacity-100'
-              : 'opacity-0'
-          }
-        `}
-      >
-        <Star
-          size={7}
-          fill="currentColor"
-          className="
-            absolute left-2 top-2
-            text-white
-            animate-pulse
-          "
-        />
+    //   <div
+    //     className={`
+    //       pointer-events-none absolute inset-0
+    //       transition-all duration-700
+    //       ${
+    //         isDark
+    //           ? 'opacity-100'
+    //           : 'opacity-0'
+    //       }
+    //     `}
+    //   >
+    //     <Star
+    //       size={7}
+    //       fill="currentColor"
+    //       className="
+    //         absolute left-2 top-2
+    //         text-white
+    //         animate-pulse
+    //       "
+    //     />
 
-        <Star
-          size={5}
-          fill="currentColor"
-          className="
-            absolute left-6 top-1
-            text-white/70
-            animate-pulse
-          "
-          style={{
-            animationDelay: '300ms',
-          }}
-        />
+    //     <Star
+    //       size={5}
+    //       fill="currentColor"
+    //       className="
+    //         absolute left-6 top-1
+    //         text-white/70
+    //         animate-pulse
+    //       "
+    //       style={{
+    //         animationDelay: '300ms',
+    //       }}
+    //     />
 
-        <Star
-          size={6}
-          fill="currentColor"
-          className="
-            absolute right-3 bottom-2
-            text-white/70
-            animate-pulse
-          "
-          style={{
-            animationDelay: '600ms',
-          }}
-        />
-      </div>
+    //     <Star
+    //       size={6}
+    //       fill="currentColor"
+    //       className="
+    //         absolute right-3 bottom-2
+    //         text-white/70
+    //         animate-pulse
+    //       "
+    //       style={{
+    //         animationDelay: '600ms',
+    //       }}
+    //     />
+    //   </div>
 
-      {/* ------------------------------------------------
-          Sun Rays
-      ------------------------------------------------ */}
+    //   {/* ------------------------------------------------
+    //       Sun Rays
+    //   ------------------------------------------------ */}
 
-      <div
-        className={`
-          absolute left-1/2 top-1/2
-          -translate-x-1/2
-          -translate-y-1/2
-          transition-all duration-700
-          ${
-            isDark
-              ? 'scale-0 rotate-180 opacity-0'
-              : 'scale-100 rotate-0 opacity-100'
-          }
-        `}
-      >
-        <div
-          className="
-            h-8 w-8
-            rounded-full
-            border border-amber-300/50
-            animate-[spin_8s_linear_infinite]
-          "
-        />
-      </div>
+    //   <div
+    //     className={`
+    //       absolute left-1/2 top-1/2
+    //       -translate-x-1/2
+    //       -translate-y-1/2
+    //       transition-all duration-700
+    //       ${
+    //         isDark
+    //           ? 'scale-0 rotate-180 opacity-0'
+    //           : 'scale-100 rotate-0 opacity-100'
+    //       }
+    //     `}
+    //   >
+    //     <div
+    //       className="
+    //         h-8 w-8
+    //         rounded-full
+    //         border border-amber-300/50
+    //         animate-[spin_8s_linear_infinite]
+    //       "
+    //     />
+    //   </div>
 
-      {/* ------------------------------------------------
-          Toggle Circle
-      ------------------------------------------------ */}
+    //   {/* ------------------------------------------------
+    //       Toggle Circle
+    //   ------------------------------------------------ */}
 
-      <div
-        className={`
-          relative z-10
-          flex h-7 w-7
-          items-center justify-center
-          rounded-full
-          shadow-lg
-          transition-all duration-700
-          ease-in-out
-          ${
-            isDark
-              ? `
-                translate-x-8
-                rotate-[-20deg]
-                bg-slate-800
-                shadow-black/40
-              `
-              : `
-                translate-x-1
-                rotate-0
-                bg-white
-                shadow-amber-300/50
-              `
-          }
-        `}
-      >
+    //   <div
+    //     className={`
+    //       relative z-10
+    //       flex h-7 w-7
+    //       items-center justify-center
+    //       rounded-full
+    //       shadow-lg
+    //       transition-all duration-700
+    //       ease-in-out
+    //       ${
+    //         isDark
+    //           ? `
+    //             translate-x-8
+    //             rotate-[-20deg]
+    //             bg-slate-800
+    //             shadow-black/40
+    //           `
+    //           : `
+    //             translate-x-1
+    //             rotate-0
+    //             bg-white
+    //             shadow-amber-300/50
+    //           `
+    //       }
+    //     `}
+    //   >
 
-        {/* Sun */}
-        <Sun
-          size={16}
-          strokeWidth={2.2}
-          className={`
-            absolute
-            text-amber-500
-            transition-all duration-500
-            ${
-              isDark
-                ? 'scale-0 rotate-90 opacity-0'
-                : 'scale-100 rotate-0 opacity-100'
-            }
-          `}
-        />
+    //     {/* Sun */}
+    //     <Sun
+    //       size={16}
+    //       strokeWidth={2.2}
+    //       className={`
+    //         absolute
+    //         text-amber-500
+    //         transition-all duration-500
+    //         ${
+    //           isDark
+    //             ? 'scale-0 rotate-90 opacity-0'
+    //             : 'scale-100 rotate-0 opacity-100'
+    //         }
+    //       `}
+    //     />
 
-        {/* Moon */}
-        <Moon
-          size={16}
-          strokeWidth={2.2}
-          className={`
-            absolute
-            text-blue-200
-            transition-all duration-500
-            ${
-              isDark
-                ? 'scale-100 rotate-0 opacity-100'
-                : 'scale-0 -rotate-90 opacity-0'
-            }
-          `}
-        />
+    //     {/* Moon */}
+    //     <Moon
+    //       size={16}
+    //       strokeWidth={2.2}
+    //       className={`
+    //         absolute
+    //         text-blue-200
+    //         transition-all duration-500
+    //         ${
+    //           isDark
+    //             ? 'scale-100 rotate-0 opacity-100'
+    //             : 'scale-0 -rotate-90 opacity-0'
+    //         }
+    //       `}
+    //     />
 
-      </div>
+    //   </div>
 
-      {/* ------------------------------------------------
-          Day / Night Glow
-      ------------------------------------------------ */}
+    //   {/* ------------------------------------------------
+    //       Day / Night Glow
+    //   ------------------------------------------------ */}
 
-      <div
-        className={`
-          pointer-events-none absolute
-          h-10 w-10
-          rounded-full
-          blur-xl
-          transition-all duration-700
-          ${
-            isDark
-              ? 'right-1 bg-indigo-500/20'
-              : 'left-0 bg-amber-300/40'
-          }
-        `}
-      />
-    </button>
+    //   <div
+    //     className={`
+    //       pointer-events-none absolute
+    //       h-10 w-10
+    //       rounded-full
+    //       blur-xl
+    //       transition-all duration-700
+    //       ${
+    //         isDark
+    //           ? 'right-1 bg-indigo-500/20'
+    //           : 'left-0 bg-amber-300/40'
+    //       }
+    //     `}
+    //   />
+    // </button>
+     <button
+                        onClick={toggleTheme}
+                        className="relative inline-flex p-2 rounded-md transition-colors group"
+                        aria-label="Toggle theme"
+                      >
+                        {theme === "dark" ? (
+                          <>
+                            <Sun
+                              size={16}
+                              className="text-yellow-400 transition-all duration-300 
+                      group-hover:drop-shadow-[0_0_8px_rgba(253,199,0,0.8)]
+                      group-hover:drop-shadow-[0_0_16px_rgba(253,199,0,0.6)]
+                      group-hover:drop-shadow-[0_0_24px_rgba(253,199,0,0.4)]
+                      group-hover:scale-140"
+                            />
+                            {/* Sun rays glow effect */}
+                            <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 
+                    w-140 h-140 rounded-full opacity-0 group-hover:opacity-70 group-hover:animate-pulse
+                    bg-[radial-gradient(circle,rgba(253,199,0,0.4)_0%,transparent_70%)]
+                    transition-opacity duration-300 pointer-events-none"></span>
+                          </>
+                        ) : (
+                          <>
+                            <Moon
+                              size={16}
+                              className="text-gray-600 transition-all duration-300
+                      group-hover:drop-shadow-[0_0_8px_rgba(147,197,253,0.8)]
+                      group-hover:drop-shadow-[0_0_16px_rgba(147,197,253,0.6)]
+                      group-hover:drop-shadow-[0_0_24px_rgba(147,197,253,0.4)]
+                      group-hover:scale-140"
+                            />
+                            {/* Moon glow effect */}
+                            <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 
+                    w-8 h-8 rounded-full opacity-0 group-hover:opacity-100
+                    bg-[radial-gradient(circle,rgba(147,197,253,0.4)_0%,transparent_70%)]
+                    transition-opacity duration-300 pointer-events-none"></span>
+                          </>
+                        )}
+                      </button>
   );
 };
 

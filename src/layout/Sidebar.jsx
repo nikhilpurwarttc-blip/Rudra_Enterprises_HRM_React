@@ -89,13 +89,20 @@ const MENU = [
     paths: ["/reports/maintenance"],
   },
   {
+    type: "item",
+    icon: Factory,
+    label: "Plant Management",
+    to: "/plants",
+    paths: ["/plants"],
+  },
+  {
     type: "sub",
     icon: Cog,
     label: "Settings & Master Data",
     menuKey: "master-data",
-    paths: ["/plants", "/departments", "/designations", "/shifts", "/festivals", "/charges"],
+    paths: ["/departments", "/designations", "/shifts", "/festivals", "/charges"],
     submenu: [
-      { icon: Factory, label: "Plants", to: "/plants", paths: ["/plants"] },
+      // { icon: Factory, label: "Plants", to: "/plants", paths: ["/plants"] },
       { icon: Building2, label: "Departments", to: "/departments", paths: ["/departments"] },
       { icon: Clock, label: "Shift Hours", to: "/shifts", paths: ["/shifts"] },
       { icon: PartyPopper, label: "Festivals & Holidays", to: "/festivals", paths: ["/festivals"] },

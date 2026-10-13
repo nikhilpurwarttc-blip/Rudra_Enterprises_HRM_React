@@ -9,7 +9,8 @@
 
 import { useState, useMemo } from 'react';
 import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
-import { Feedback, LoadingState } from './Feedback';
+import { Feedback } from './Feedback';
+import { cn } from '../utils/cn';
 
 const isSortableCol = (col) => {
   if (col.sortable === false) return false;
@@ -21,7 +22,7 @@ const isSortableCol = (col) => {
 const Th = ({ children, className = "", sortable, active, dir, onClick }) => (
   <th
     onClick={sortable ? onClick : undefined}
-    className={`bg-(--color-accent-soft) px-4 py-3.5 text-left text-sm font-semibold uppercase text-[var(--color-text)] ${sortable ? 'group cursor-pointer select-none' : ''} ${className}`}
+    className={cn('bg-(--color-accent-soft) px-4 py-3.5 text-left text-sm font-semibold uppercase text-[var(--color-text)]', sortable && 'group cursor-pointer select-none', className)}
   >
     <span className="flex items-center gap-1.5 overflow-hidden text-ellipsis whitespace-nowrap">
       {children}
@@ -39,7 +40,7 @@ const Th = ({ children, className = "", sortable, active, dir, onClick }) => (
 const Td = ({ children, className = "", colSpan }) => (
   <td
     colSpan={colSpan}
-    className={`border-r border-(--color-border) px-4 py-3 text-sm text-(--color-text) last:border-r-0 print:text-black overflow-hidden text-ellipsis ${className}`}
+    className={cn('border-r border-(--color-border) px-4 py-3 text-sm text-(--color-text) last:border-r-0 print:text-black overflow-hidden text-ellipsis', className)}
   >
     {children}
   </td>
@@ -93,7 +94,7 @@ const PageTable = ({
 
   return (
     <div className="box-border space-y-3">
-      <div className={`${className} glass-card rounded-xl border-(--color-border) bg-(--color-surface) shadow-none print:bg-transparent overflow-hidden`}>
+      <div className={cn('glass-card rounded-xl border-(--color-border) bg-(--color-surface) shadow-none print:bg-transparent overflow-hidden', className)}>
         <table className="w-full flex flex-col">
           {/* Header */}
           <thead className="block border-b-2 border-(--color-border-strong) print:bg-(--color-bg-elevated) ">
@@ -101,7 +102,7 @@ const PageTable = ({
               {columns.map((col) => (
                 <Th
                   key={col.key}
-                  className={`flex-1 min-w-0 w-0 last:pr-[31px] ${col.className ?? ''}`}
+                  className={cn('flex-1 min-w-0 w-0 last:pr-[31px]', col.className)}
                   sortable={isSortableCol(col)}
                   active={sort.col === col.key}
                   dir={sort.dir}
@@ -116,7 +117,7 @@ const PageTable = ({
           {/* Scrollable Body */}
           <tbody 
             onScroll={onScroll} 
-            className={`${tbodyClass} block overflow-y-auto divide-y divide-(--color-border)`}
+            className={cn('block overflow-y-auto divide-y divide-(--color-border)', tbodyClass)}
           >
             {isLoading ? (
               Array.from({ length: 6 }).map((_, i) => (
@@ -133,18 +134,18 @@ const PageTable = ({
                 <tr
                   key={row._id ?? row.id ?? idx}
                   onClick={() => onRowClick?.(row)}
-                  className={`flex w-full cursor-pointer hover:bg-(--color-accent-soft) ${
-                    typeof rowClass === 'function' ? rowClass(row, idx) : (rowClass ?? '')
-                  }`}
+                  className={cn(
+                    'flex w-full cursor-pointer hover:bg-(--color-accent-soft)',
+                    typeof rowClass === 'function' ? rowClass(row, idx) : rowClass,
+                  )}
                 >
                   {columns.map((col) => (
                     <Td
                       key={col.key}
-                      className={`flex-1 min-w-0 w-0 ${
-                        typeof col.tdClass === "function"
-                          ? col.tdClass(row, idx)
-                          : (col.tdClass ?? '')
-                      }`}
+                      className={cn(
+                        'flex-1 min-w-0 w-0',
+                        typeof col.tdClass === 'function' ? col.tdClass(row, idx) : col.tdClass,
+                      )}
                     >
                       {col.render ? col.render(row, idx) : row[col.key]}
                     </Td>
@@ -158,7 +159,7 @@ const PageTable = ({
         </table>
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mx-5">
         <p className="text-sm text-(--color-text-muted)">
           Showing {sortedRows.length}
           {total !== undefined && total !== sortedRows.length

@@ -1,3 +1,5 @@
+import { cn } from '../utils/cn';
+
 const COLORS = {
   primary: 'border border-(--color-accent) bg-(--color-accent-soft) text-(--color-accent)',
   blue: 'border border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-300',
@@ -16,7 +18,7 @@ const COLORS = {
 const Badge = ({ title, children, text, color = 'blue', className }) => (
   <span
     title={title}
-    className={`inline-flex items-center w-auto whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-medium capitalize ${COLORS[color] ?? COLORS.primary} ${className || ''}`}
+    className={cn('inline-flex w-auto items-center whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-medium capitalize', COLORS[color] ?? COLORS.primary, className)}
   >
     {children}
     {text}

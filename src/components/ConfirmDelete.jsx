@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Trash2, X } from 'lucide-react';
+import { cn } from '../utils/cn';
 
 const ConfirmDelete = ({
   isOpen,
@@ -61,12 +62,12 @@ const ConfirmDelete = ({
           </button>
           {onReject && (
             <button onClick={onReject} disabled={loading}
-              className={`flex min-w-22.5 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60 ${rejectClass}`}>
+              className={cn('flex min-w-22.5 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60', rejectClass)}>
               {rejectLabel ?? 'Reject'}
             </button>
           )}
           <button onClick={handleConfirm} disabled={loading || confirmDisabled}
-            className={`flex min-w-22.5 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60 ${btnClass}`}>
+            className={cn('flex min-w-22.5 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60', btnClass)}>
             {loading
               ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> {loadingLabel}</>
               : <><BtnIcon size={14} /> {label}</>

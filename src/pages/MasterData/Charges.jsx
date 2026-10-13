@@ -227,23 +227,23 @@ const Charges = () => {
             leftIcon={<Search size={16} />}
           />
         </div>
-
-        {isError ? (
-          <Feedback
-            type="error"
-            title="Unable to load charges"
-            message="Please refresh the page and try again."
-          />
-        ) : (
-          <PageTable
-            columns={columns}
-            rows={filtered}
-            total={filtered.length}
-            label="charges"
-            isLoading={isLoading}
-          />
-        )}
       </SectionCard>
+      
+      {isError ? (
+        <Feedback
+          type="error"
+          title="Unable to load charges"
+          message="Please refresh the page and try again."
+        />
+      ) : (
+        <PageTable
+          columns={columns}
+          rows={filtered}
+          total={filtered.length}
+          label="charges"
+          isLoading={isLoading}
+        />
+      )}
 
       <AddEditCharge
         key={`${editor.open}-${editor.charge?.id ?? 'new'}`}

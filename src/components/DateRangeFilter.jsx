@@ -105,8 +105,8 @@ const inputCls = 'w-full min-h-14 rounded-md border border-(--color-border-stron
 // Props:
 //   onChange({ dateFrom, dateTo }) — called whenever a preset or custom range is selected
 //   defaultPreset — initial preset value (default: 'today')
-export default function DateRangeFilter({ onChange, defaultPreset = 'today' }) {
-  const initRange = rangeFromValue(defaultPreset) ?? today();
+export default function DateRangeFilter({ onChange, defaultPreset = 'today', initialRange }) {
+  const initRange = initialRange ?? rangeFromValue(defaultPreset) ?? today();
 
   const [preset,    setPreset]    = useState(defaultPreset);
   const [month,     setMonth]     = useState('');
@@ -142,13 +142,15 @@ export default function DateRangeFilter({ onChange, defaultPreset = 'today' }) {
   };
 
   const handleCustomFrom = (val) => {
-    setDateFrom(val); setPreset(''); setMonth(''); setQuarter(''); setFY('');
-    emit({ dateFrom: val, dateTo });
+    const nextDateTo = val && dateTo && val > dateTo ? val : dateTo;
+    setDateFrom(val); setDateTo(nextDateTo); setPreset(''); setMonth(''); setQuarter(''); setFY('');
+    emit({ dateFrom: val, dateTo: nextDateTo });
   };
 
   const handleCustomTo = (val) => {
-    setDateTo(val); setPreset(''); setMonth(''); setQuarter(''); setFY('');
-    emit({ dateFrom, dateTo: val });
+    const nextDateFrom = val && dateFrom && val < dateFrom ? val : dateFrom;
+    setDateFrom(nextDateFrom); setDateTo(val); setPreset(''); setMonth(''); setQuarter(''); setFY('');
+    emit({ dateFrom: nextDateFrom, dateTo: val });
   };
 
   return (
@@ -200,11 +202,11 @@ export default function DateRangeFilter({ onChange, defaultPreset = 'today' }) {
       {/* Custom date range */}
       <div className="min-w-32 flex-1">
         <label className="mb-1 block text-sm font-medium text-(--color-text-muted)">From</label>
-        <input type="date" value={dateFrom} onChange={e => handleCustomFrom(e.target.value)} className={inputCls} />
+        <input type="date" value={dateFrom} max={dateTo || undefined} onChange={e => handleCustomFrom(e.target.value)} className={inputCls} />
       </div>
       <div className="min-w-32 flex-1">
         <label className="mb-1 block text-sm font-medium text-(--color-text-muted)">To</label>
-        <input type="date" value={dateTo} onChange={e => handleCustomTo(e.target.value)} className={inputCls} />
+        <input type="date" value={dateTo} min={dateFrom || undefined} onChange={e => handleCustomTo(e.target.value)} className={inputCls} />
       </div>
     </div>
   );

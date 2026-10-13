@@ -21,12 +21,20 @@ import { useRenderPerformance } from '../../utils/performance';
 import AddEditFestival from './AddEditFestival';
 
 const unwrap = (value) => Array.isArray(value) ? value : value?.data ?? [];
-const formatDate = (value) => value ? new Date(`${value}T00:00:00`).toLocaleDateString() : '—';
+const formatDate = (value) => {
+  const datePart = typeof value === 'string' ? value.slice(0, 10) : '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return '—';
+
+  const [year, month, day] = datePart.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return '—';
+  return date.toLocaleDateString();
+};
 
 const Festivals = () => {
   const toast = useToast();
   const { canCreate, canEdit, canDelete, isReadOnly } = usePermission('/festivals');
-  const { data, isLoading, isError } = useGetHolidaysQuery();
+  const { data, isLoading, isError, refetch } = useGetHolidaysQuery();
   const { data: plantsData, isLoading: plantsLoading } = useGetPlantsQuery();
   const [createHoliday, { isLoading: creating }] = useCreateHolidayMutation();
   const [updateHoliday, { isLoading: updating }] = useUpdateHolidayMutation();
@@ -40,6 +48,14 @@ const Festivals = () => {
 
   useRenderPerformance('getHolidays', data);
   useRenderPerformance('getPlants', plantsData);
+
+  const handleRefresh = useCallback(async () => {
+    try {
+      await refetch().unwrap();
+    } catch (error) {
+      toast(getApiErrorMessage(error, 'Unable to refresh holidays.'), 'error');
+    }
+  }, [refetch, toast]);
 
   const plantMap = useMemo(() => Object.fromEntries(plants.map((plant) => [plant.id, plant])), [plants]);
   const filtered = useMemo(() => {
@@ -108,7 +124,7 @@ const Festivals = () => {
 
   return (
     <div className="space-y-4 p-4 sm:p-6">
-      <SectionCard title="Festivals & Holidays" action={canCreate && !isReadOnly && <Button onClick={() => setEditor({ open: true, festival: null })} className="flex items-center gap-1.5"><Plus size={15} /> Add Holiday</Button>}>
+      <SectionCard title="Festivals & Holidays" onRefresh={handleRefresh} action={canCreate && !isReadOnly && <Button onClick={() => setEditor({ open: true, festival: null })} className="flex items-center gap-1.5"><Plus size={15} /> Add Holiday</Button>}>
         <div className="mb-4"><InputField value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search holidays" leftIcon={<Search size={16} />} /></div>
         {isError ? <Feedback type="error" title="Unable to load holidays" message="Please refresh the page and try again." /> : <PageTable columns={columns} rows={filtered} total={filtered.length} label="holidays" isLoading={isLoading} />}
       </SectionCard>

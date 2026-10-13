@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Loader2, Search, X } from 'lucide-react';
+import { cn } from '../utils/cn';
 
 const normalizePagedResponse = (payload) => {
   const collection = Array.isArray(payload)
@@ -297,7 +298,7 @@ const AsyncSearchableSelect = ({
   };
 
   return (
-    <div className={`relative ${className}`}>
+    <div className={cn('relative', className)}>
       {label && (
         <label htmlFor={inputId} className="pointer-events-none absolute -top-2 left-3 z-10 bg-[var(--color-bg-elevated)] px-1 text-xs leading-none text-[var(--color-text-muted)]">
           {label}
@@ -317,7 +318,14 @@ const AsyncSearchableSelect = ({
         aria-invalid={Boolean(error)}
         aria-required={required}
         aria-describedby={helperText || error ? `${inputId}-description` : undefined}
-        className={`flex min-h-12 w-full items-center justify-between rounded-md border bg-transparent px-3 text-sm text-[var(--color-text)] transition-colors focus:outline-none focus:ring-1 ${error ? 'border-[var(--color-danger)] focus:border-[var(--color-danger)] focus:ring-[var(--color-danger)]' : 'border-[var(--color-border-strong)] focus:border-[var(--color-accent)] focus:ring-[var(--color-accent)]'} ${disabled ? 'cursor-not-allowed opacity-60' : 'hover:border-[var(--color-accent)]'} ${buttonClassName}`}
+        className={cn(
+          'flex min-h-12 w-full items-center justify-between rounded-md border bg-transparent px-3 text-sm text-[var(--color-text)] transition-colors focus:outline-none focus:ring-1',
+          error
+            ? 'border-[var(--color-danger)] focus:border-[var(--color-danger)] focus:ring-[var(--color-danger)]'
+            : 'border-[var(--color-border-strong)] focus:border-[var(--color-accent)] focus:ring-[var(--color-accent)]',
+          disabled ? 'cursor-not-allowed opacity-60' : 'hover:border-[var(--color-accent)]',
+          buttonClassName,
+        )}
       >
         <span className={selectedValues.length || multiple ? 'text-[var(--color-text)]' : 'text-[var(--color-text-muted)]'}>{labelSummary}</span>
         <span className="flex items-center gap-2">
@@ -339,7 +347,7 @@ const AsyncSearchableSelect = ({
       </button>
 
       {(helperText || error) && (
-        <p id={`${inputId}-description`} role={error ? 'alert' : undefined} className={`mt-1 text-xs ${error ? 'text-[var(--color-danger)]' : 'text-[var(--color-text-muted)]'}`}>
+        <p id={`${inputId}-description`} role={error ? 'alert' : undefined} className={cn('mt-1 text-xs', error ? 'text-[var(--color-danger)]' : 'text-[var(--color-text-muted)]')}>
           {error || helperText}
         </p>
       )}

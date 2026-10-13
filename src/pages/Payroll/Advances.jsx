@@ -52,7 +52,7 @@ const Advances = () => {
   const toast = useToast();
   const { canCreate, canEdit, canDelete, isReadOnly } = usePermission('/advances');
   const [filters, setFilters] = useState({ page: 1, per_page: 15, employee_id: '', payment_mode: '', status: '', start_date: '', end_date: '' });
-  const { data, isLoading, isError } = useGetEmployeeAdvancesQuery(filters);
+  const { data, isLoading, isError, refetch } = useGetEmployeeAdvancesQuery(filters);
   const { data: employeesData, isLoading: employeesLoading } = useGetEmployeesQuery({ per_page: 100 });
   const [createAdvance, { isLoading: creating }] = useCreateEmployeeAdvanceMutation();
   const [updateAdvance, { isLoading: updating }] = useUpdateEmployeeAdvanceMutation();
@@ -179,6 +179,7 @@ const Advances = () => {
     <div className="space-y-4 p-4 sm:p-6">
       <SectionCard
         title="Cash & Bank Advances"
+        onRefresh={refetch}
         action={canCreate && !isReadOnly && <Button type="button" onClick={() => { setFormErrors({}); setEditor({ open: true, advance: null }); }} className="flex items-center gap-1.5"><Plus size={15} /> Add Advance</Button>}
       >
         <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">

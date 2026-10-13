@@ -26,7 +26,6 @@ const EmployeeAttendance = ({ employeeId, joiningDate }) => {
 
 	const { dateFrom, dateTo, validDateRange } = useMemo(() => {
 		const monthStart = new Date(month.getFullYear(), month.getMonth(), 1);
-		const monthEnd = new Date(month.getFullYear(), month.getMonth() + 1, 0);
 		const gridStart = new Date(monthStart);
 		gridStart.setDate(1 - gridStart.getDay());
 		const gridEnd = new Date(gridStart);

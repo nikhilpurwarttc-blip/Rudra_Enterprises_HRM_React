@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Search, X, Loader2, Plus } from 'lucide-react';
+import { cn } from '../utils/cn';
 
 const SearchableSelect = ({ 
   options = [], 
@@ -110,7 +111,7 @@ const SearchableSelect = ({
   }, [isOpen]);
 
   return (
-    <div className={`relative ${className}`}>
+    <div className={cn('relative', className)}>
       {label && (
         <label className="pointer-events-none absolute -top-2 left-3 z-10 bg-(--color-bg-elevated) px-1 text-xs leading-none text-(--color-text-muted)">
           {label}{required && <span className="ml-1 text-(--color-danger)">*</span>}
@@ -124,7 +125,14 @@ const SearchableSelect = ({
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-label={ariaLabel}
-        className={`flex min-h-12.5 w-full items-center justify-between rounded-md border bg-transparent px-3 text-sm text-(--color-text) transition-colors focus:outline-none focus:ring-1 ${error ? 'border-(--color-danger) focus:border-(--color-danger) focus:ring-(--color-danger)' : 'border-(--color-border-strong) focus:border-(--color-accent) focus:ring-(--color-accent)'} ${disabled ? 'cursor-not-allowed opacity-60' : 'hover:border-(--color-accent)'} ${btnClass}`}
+        className={cn(
+          'flex w-full min-h-12.5 rounded-md items-center justify-between border bg-transparent px-3 text-sm text-(--color-text) transition-colors focus:outline-none focus:ring-1',
+          error
+            ? 'border-(--color-danger) focus:border-(--color-danger) focus:ring-(--color-danger)'
+            : 'border-(--color-border-strong) focus:border-(--color-accent) focus:ring-(--color-accent)',
+          disabled ? 'cursor-not-allowed opacity-60' : 'hover:border-(--color-accent)',
+          btnClass,
+        )}
       >
         <span className={selected || selectedOptions.length > 0 ? 'text-(--color-text) truncate' : 'text-(--color-text-muted) truncate'}>
           {isLoading

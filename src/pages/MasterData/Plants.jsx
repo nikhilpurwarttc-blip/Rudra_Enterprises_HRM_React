@@ -1,11 +1,13 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
-import { Building2, CalendarDays, Check, ChevronLeft, ChevronRight, LoaderCircle, Pencil, Plus, Power, Search, Trash2, XCircle } from 'lucide-react';
+import { Building2, CalendarDays, Check, ChevronLeft, ChevronRight, Hammer, LoaderCircle, Pencil, Plus, Power, Search, Trash2, XCircle } from 'lucide-react';
 import {
   useApprovePlantShutdownMutation,
+  useCreateMaintenanceRecordMutation,
   useCreatePlantMutation,
   useCreatePlantShutdownMutation,
   useDeletePlantMutation,
+  useGetMaintenanceRecordsQuery,
   useGetPlantShutdownsQuery,
   useGetPlantsQuery,
   useRejectPlantShutdownMutation,
@@ -22,6 +24,7 @@ import { getApiErrorMessage } from '../../components/feedbackUtils';
 import { useRenderPerformance } from '../../utils/performance';
 import { selectUser } from '../../store/authSlice';
 import PlantShutdownForm from '../components/PlantShutdownForm';
+import PlantMaintenanceForm from '../components/PlantMaintenanceForm';
 import AddEditPlant from './AddEditPlant';
 
 const unwrap = (value) => Array.isArray(value) ? value : value?.data ?? [];
@@ -43,15 +46,23 @@ const getLocalDate = () => {
   const offset = date.getTimezoneOffset() * 60_000;
   return new Date(date.getTime() - offset).toISOString().slice(0, 10);
 };
-const getShutdownDefaults = () => {
+const getShutdownDefaults = (selectedDates = []) => {
   const now = new Date();
+  const dates = [...new Set(selectedDates)].sort();
+  const startDate = dates[0] ?? getLocalDate();
   return {
     reason: 'Power cut / Maintenance',
-    shutdown_start_date: getLocalDate(),
-    start_time: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
-    shutdown_end_date: getLocalDate(),
+    shutdown_start_date: startDate,
+    start_time: dates.length ? '00:00' : `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
+    shutdown_end_date: dates[dates.length - 1] ?? startDate,
     end_time: '23:59',
   };
+};
+const hasDateGaps = (dates) => {
+  if (dates.length < 2) return false;
+  const start = new Date(`${dates[0]}T00:00:00Z`);
+  const end = new Date(`${dates[dates.length - 1]}T00:00:00Z`);
+  return (end - start) / 86_400_000 + 1 > dates.length;
 };
 
 const Plants = () => {
@@ -64,6 +75,7 @@ const Plants = () => {
   const [updatePlant, { isLoading: updating }] = useUpdatePlantMutation();
   const [deletePlant] = useDeletePlantMutation();
   const [createPlantShutdown, { isLoading: submittingShutdown }] = useCreatePlantShutdownMutation();
+  const [createMaintenanceRecord, { isLoading: submittingMaintenance }] = useCreateMaintenanceRecordMutation();
   const [approvePlantShutdown, { isLoading: approvingShutdown }] = useApprovePlantShutdownMutation();
   const [rejectPlantShutdown, { isLoading: rejectingShutdown }] = useRejectPlantShutdownMutation();
   const [search, setSearch] = useState('');
@@ -78,6 +90,11 @@ const Plants = () => {
   const [shutdownToApprove, setShutdownToApprove] = useState(null);
   const [shutdownToReject, setShutdownToReject] = useState(null);
   const [shutdownRequestOpen, setShutdownRequestOpen] = useState(false);
+  const [shutdownRequestDates, setShutdownRequestDates] = useState([]);
+  const [maintenanceRequestOpen, setMaintenanceRequestOpen] = useState(false);
+  const [maintenanceDates, setMaintenanceDates] = useState([]);
+  const [selectedCalendarDates, setSelectedCalendarDates] = useState([]);
+  const [calendarContextMenu, setCalendarContextMenu] = useState(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const plants = unwrap(data);
   useRenderPerformance('getPlants', data);
@@ -115,10 +132,25 @@ const Plants = () => {
     } : undefined,
     { skip: !selectedPlant },
   );
+  const canViewMaintenanceCalendar = can('maintenance', 'view')
+    || can('maintenance-records', 'view')
+    || can('maintenance-report', 'view');
+  const maintenanceQuery = useGetMaintenanceRecordsQuery(
+    selectedPlant ? {
+      plant_id: selectedPlant.id,
+      from_date: dateKey(calendarDays[0]),
+      to_date: dateKey(calendarDays[41]),
+      per_page: 100,
+    } : undefined,
+    { skip: !selectedPlant || !canViewMaintenanceCalendar },
+  );
   const shutdowns = unwrap(shutdownQuery.currentData).filter((shutdown) => [1, 2, 3].includes(Number(shutdown.status)));
+  const maintenanceRecords = unwrap(maintenanceQuery.currentData);
   const canApproveShutdown = can('plant-shutdowns', 'approve');
   const canRejectShutdown = can('plant-shutdowns', 'reject');
   const canRequestShutdown = can('plant-shutdowns', 'shutdown');
+  const canScheduleShutdown = !isReadOnly && canRequestShutdown;
+  const canScheduleMaintenance = !isReadOnly && can('maintenance-report', 'create');
   const shutdownsByDate = useMemo(() => {
     const dates = new Map();
     shutdowns.forEach((shutdown) => {
@@ -135,13 +167,96 @@ const Plants = () => {
     });
     return dates;
   }, [calendarDays, shutdowns]);
+  const maintenanceByDate = useMemo(() => {
+    const dates = new Map();
+    maintenanceRecords.forEach((record) => {
+      const key = String(record.maintenance_date ?? '').slice(0, 10);
+      if (!key) return;
+      const matches = dates.get(key) ?? [];
+      matches.push(record);
+      dates.set(key, matches);
+    });
+    return dates;
+  }, [maintenanceRecords]);
   const monthLabel = new Intl.DateTimeFormat('en', { month: 'long', year: 'numeric' }).format(month);
   const todayKey = dateKey(new Date());
 
   const changeMonth = (offset) => {
+    setSelectedCalendarDates([]);
+    setCalendarContextMenu(null);
     setMonth((current) => offset === 0
       ? new Date(new Date().getFullYear(), new Date().getMonth(), 1)
       : new Date(current.getFullYear(), current.getMonth() + offset, 1));
+  };
+
+  useEffect(() => {
+    if (!calendarContextMenu) return undefined;
+    const dismissMenu = (event) => {
+      if (!event.target.closest?.('[data-calendar-context-menu]')) setCalendarContextMenu(null);
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setCalendarContextMenu(null);
+    };
+    const dismissOnViewportChange = () => setCalendarContextMenu(null);
+    document.addEventListener('mousedown', dismissMenu);
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('resize', dismissOnViewportChange);
+    window.addEventListener('scroll', dismissOnViewportChange, true);
+    return () => {
+      document.removeEventListener('mousedown', dismissMenu);
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('resize', dismissOnViewportChange);
+      window.removeEventListener('scroll', dismissOnViewportChange, true);
+    };
+  }, [calendarContextMenu]);
+
+  const selectCalendarDate = (date, additive) => {
+    setSelectedCalendarDates((current) => {
+      if (!additive) return [date];
+      return current.includes(date)
+        ? current.filter((selectedDate) => selectedDate !== date)
+        : [...current, date].sort();
+    });
+  };
+
+  const handleCalendarCellClick = (event, date) => {
+    selectCalendarDate(date, event.ctrlKey || event.metaKey);
+  };
+
+  const handleCalendarCellContextMenu = (event, date) => {
+    const dates = selectedCalendarDates.includes(date)
+      ? selectedCalendarDates
+      : [date];
+    setSelectedCalendarDates(dates);
+    if (!canScheduleShutdown && !canScheduleMaintenance) {
+      setCalendarContextMenu(null);
+      return;
+    }
+    event.preventDefault();
+    const menuHeight = (canScheduleShutdown ? 1 : 0) * 44 + (canScheduleMaintenance ? 1 : 0) * 44 + 8;
+    setCalendarContextMenu({
+      dates,
+      left: Math.max(8, Math.min(event.clientX, window.innerWidth - 232)),
+      top: Math.max(8, Math.min(event.clientY, window.innerHeight - menuHeight - 8)),
+    });
+  };
+
+  const handleCalendarCellKeyDown = (event, date) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    selectCalendarDate(date, event.ctrlKey || event.metaKey);
+  };
+
+  const openShutdownRequest = (dates) => {
+    setShutdownRequestDates([...dates].sort());
+    setShutdownRequestOpen(true);
+    setCalendarContextMenu(null);
+  };
+
+  const openMaintenanceRequest = (dates) => {
+    setMaintenanceDates([...dates].sort());
+    setMaintenanceRequestOpen(true);
+    setCalendarContextMenu(null);
   };
 
   const handleApproveShutdown = async (form) => {
@@ -185,10 +300,50 @@ const Plants = () => {
         shutdown_type: 'Plant shutdown',
       }).unwrap();
       setShutdownRequestOpen(false);
+      setShutdownRequestDates([]);
+      setSelectedCalendarDates([]);
       toast('Plant shutdown request submitted for approval.', 'success');
     } catch (error) {
       toast(getApiErrorMessage(error, 'Unable to submit plant shutdown request.'), 'error');
     }
+  };
+
+  const handleScheduleMaintenance = async ({ employee_id, remarks }) => {
+    if (!selectedPlant || !maintenanceDates.length) return;
+    const failedDates = [];
+    let scheduledCount = 0;
+
+    for (const maintenanceDate of maintenanceDates) {
+      try {
+        await createMaintenanceRecord({
+          plant_id: Number(selectedPlant.id),
+          employee_id,
+          maintenance_date: maintenanceDate,
+          remarks,
+        }).unwrap();
+        scheduledCount += 1;
+      } catch (error) {
+        failedDates.push({ date: maintenanceDate, error });
+      }
+    }
+
+    if (failedDates.length > 0) {
+      setMaintenanceDates(failedDates.map(({ date }) => date));
+      if (scheduledCount > 0) {
+        toast(
+          `Scheduled maintenance for ${scheduledCount} of ${maintenanceDates.length} dates. Failed dates: ${failedDates.map(({ date }) => date).join(', ')}. ${getApiErrorMessage(failedDates[0].error, 'Please retry the remaining dates.')}`,
+          'error',
+        );
+      } else {
+        toast(getApiErrorMessage(failedDates[0].error, 'Unable to schedule maintenance.'), 'error');
+      }
+      return;
+    }
+
+    setMaintenanceRequestOpen(false);
+    setMaintenanceDates([]);
+    setSelectedCalendarDates([]);
+    toast(`Maintenance scheduled for ${scheduledCount} ${scheduledCount === 1 ? 'date' : 'dates'}.`, 'success');
   };
 
   const handleStatusChange = useCallback(
@@ -210,10 +365,24 @@ const Plants = () => {
 
   const handleSave = async ({ id, ...payload }) => {
     if (!payload.plant_code || !payload.name) return toast('Plant code and name are required.', 'error');
+
+    const maintenanceAmountValue = payload.maintenance_amount === null || payload.maintenance_amount === undefined || payload.maintenance_amount === ''
+      ? 0
+      : Number(payload.maintenance_amount);
+
+    if (!Number.isFinite(maintenanceAmountValue) || maintenanceAmountValue < 0) {
+      return toast('Maintenance amount must be a valid number greater than or equal to 0.', 'error');
+    }
+
+    const normalizedPayload = {
+      ...payload,
+      maintenance_amount: maintenanceAmountValue,
+    };
+
     try {
       const savedPlant = id
-        ? await updatePlant({ id, ...payload }).unwrap()
-        : await createPlant(payload).unwrap();
+        ? await updatePlant({ id, ...normalizedPayload }).unwrap()
+        : await createPlant(normalizedPayload).unwrap();
       const plant = savedPlant?.data ?? savedPlant;
       if (!id && plant?.id) setSelectedPlantId(String(plant.id));
       toast(id ? 'Plant updated successfully.' : 'Plant created successfully.', 'success');
@@ -259,7 +428,7 @@ const Plants = () => {
                   const isSelected = String(selectedPlantId) === String(plant.id);
                   return (
                     <div key={plant.id} className={`mb-1 flex items-center  rounded-lg border transition ${isSelected ? 'border-(--color-accent) bg-(--color-accent-soft)' : 'border-transparent hover:border-(--color-border) hover:bg-(--color-accent-soft)'}`}>
-                      <button type="button" onClick={() => setSelectedPlantId(String(plant.id))} aria-pressed={isSelected} className="flex min-w-0 flex-1 items-center gap-3 px-3 py-3 text-left">
+                      <button type="button" onClick={() => { setSelectedPlantId(String(plant.id)); setSelectedCalendarDates([]); setCalendarContextMenu(null); }} aria-pressed={isSelected} className="flex min-w-0 flex-1 items-center gap-3 px-3 py-3 text-left">
                         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-(--color-accent) text-white"><Building2 size={17} /></span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-semibold text-(--color-text)">{plant.name}</span>
@@ -298,7 +467,7 @@ const Plants = () => {
                 <span className="min-w-32 text-center text-sm font-semibold text-(--color-text)">{monthLabel}</span>
                 <button type="button" aria-label="Next month" onClick={() => changeMonth(1)} className="flex h-9 w-9 items-center justify-center rounded-md border border-(--color-border) text-(--color-text-muted) hover:bg-(--color-accent-soft)"><ChevronRight size={17} /></button>
                 <button type="button" onClick={() => changeMonth(0)} className="h-9 rounded-md border border-(--color-border) px-3 text-sm font-medium text-(--color-text) hover:bg-(--color-accent-soft)">Today</button>
-                {canRequestShutdown && <Button type="button" onClick={() => setShutdownRequestOpen(true)} disabled={submittingShutdown} className="inline-flex items-center gap-2 whitespace-nowrap bg-amber-700 hover:bg-amber-800"><Power size={15} />Request shutdown</Button>}
+                {canRequestShutdown && <Button type="button" onClick={() => openShutdownRequest([])} disabled={submittingShutdown} className="inline-flex items-center gap-2 whitespace-nowrap bg-amber-700 hover:bg-amber-800"><Power size={15} />Request shutdown</Button>}
               </div>
             </header>
 
@@ -310,23 +479,34 @@ const Plants = () => {
                     <span className="h-3 w-3 rounded-sm bg-red-500" /> Approved shutdown
                     <span className="ml-3 h-3 w-3 rounded-sm bg-amber-500" /> Pending approval
                     <span className="ml-3 h-3 w-3 rounded-sm bg-slate-500" /> Rejected
-                    {shutdownQuery.isFetching && <LoaderCircle size={14} className="ml-auto animate-spin" aria-label="Loading shutdowns" />}
+                    {canViewMaintenanceCalendar && <><span className="ml-3 h-3 w-3 rounded-sm bg-violet-600" /> Scheduled maintenance</>}
+                    <span className="ml-3">Click to select · Ctrl+click to toggle multiple days</span>
+                    {selectedCalendarDates.length > 0 && <span className="font-semibold text-(--color-accent)">{selectedCalendarDates.length} selected</span>}
+                    {(shutdownQuery.isFetching || maintenanceQuery.isFetching) && <LoaderCircle size={14} className="ml-auto animate-spin" aria-label="Loading calendar events" />}
                   </div>
+                  {maintenanceQuery.isError && <Feedback type="error" title="Unable to load maintenance" message="Shutdown calendar events are still available. Refresh the calendar to retry maintenance records." />}
                   <div className="grid grid-cols-7 ">
                     {WEEKDAYS.map((weekday) => <div key={weekday} className="border-b border-r border-(--color-border) bg-(--color-accent-soft) py-2 text-center text-xs font-semibold text-(--color-text-muted) rounded-t-xl">{weekday}</div>)}
                     {calendarDays.map((date) => {
                       const key = dateKey(date);
                       const dayShutdowns = shutdownsByDate.get(key) ?? [];
+                      const dayMaintenance = maintenanceByDate.get(key) ?? [];
                       const isCurrentMonth = date.getMonth() === month.getMonth();
+                      const isSelected = selectedCalendarDates.includes(key);
                       const hasApprovedShutdown = dayShutdowns.some((shutdown) => Number(shutdown.status) === 2);
                       const hasPendingShutdown = dayShutdowns.some((shutdown) => Number(shutdown.status) === 1);
                       const hasRejectedShutdown = dayShutdowns.some((shutdown) => Number(shutdown.status) === 3);
-                      return (
-                        <div key={key} title={dayShutdowns.map((shutdown) => {
+                      const hasMaintenance = dayMaintenance.length > 0;
+                      const eventTitle = [
+                        ...dayShutdowns.map((shutdown) => {
                           const status = getShutdownStatus(shutdown);
                           const rejection = Number(shutdown.status) === 3 && shutdown.remarks ? `\nRejection reason: ${shutdown.remarks}` : '';
                           return `${status.label}: ${shutdown.reason || shutdown.shutdown_type || 'Plant shutdown'}${rejection}`;
-                        }).join('\n')} className={`min-h-16 border-b border-r [&:nth-child(7n+1)]:border-l border-(--color-border) p-1.5 sm:min-h-24 sm:p-2 ${hasApprovedShutdown ? 'bg-red-500/10' : hasPendingShutdown ? 'bg-amber-500/10' : hasRejectedShutdown ? 'bg-slate-500/10' : ''} ${!isCurrentMonth ? 'opacity-40' : ''}`}>
+                        }),
+                        ...dayMaintenance.map((record) => `Scheduled maintenance${record.employee?.name ? ` · ${record.employee.name}` : ''}${record.status_label ? ` · ${record.status_label}` : ''}${record.remarks ? `: ${record.remarks}` : ''}`),
+                      ].join('\n');
+                      return (
+                        <div key={key} title={eventTitle} role="button" tabIndex={0} aria-pressed={isSelected} aria-label={`${date.toLocaleDateString()}${dayShutdowns.length ? `, ${dayShutdowns.length} shutdown${dayShutdowns.length === 1 ? '' : 's'}` : ''}${hasMaintenance ? `, ${dayMaintenance.length} maintenance record${dayMaintenance.length === 1 ? '' : 's'}` : ''}${isSelected ? ', selected' : ''}`} onClick={(event) => handleCalendarCellClick(event, key)} onContextMenu={(event) => handleCalendarCellContextMenu(event, key)} onKeyDown={(event) => handleCalendarCellKeyDown(event, key)} className={`min-h-16 cursor-pointer border-b border-r [&:nth-child(7n+1)]:border-l border-(--color-border) p-1.5 text-left transition-colors sm:min-h-24 sm:p-2 ${hasApprovedShutdown ? 'bg-red-500/10' : hasPendingShutdown ? 'bg-amber-500/10' : hasRejectedShutdown ? 'bg-slate-500/10' : hasMaintenance ? 'bg-violet-500/10' : ''} ${hasMaintenance ? 'border-t-4 border-t-violet-600' : ''} ${isSelected ? 'relative z-1 bg-(--color-accent-soft) ring-2 ring-inset ring-(--color-accent)' : 'hover:bg-(--color-accent-soft)/50'} ${!isCurrentMonth ? 'opacity-40' : ''}`}>
                           <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-sm ${key === todayKey ? 'bg-(--color-accent) font-semibold text-white' : hasApprovedShutdown ? 'font-semibold text-red-700 dark:text-red-300' : hasPendingShutdown ? 'font-semibold text-amber-800 dark:text-amber-200' : hasRejectedShutdown ? 'font-semibold text-slate-700 dark:text-slate-300' : 'text-(--color-text)'}`}>{date.getDate()}</span>
                           {dayShutdowns.map((shutdown, index) => {
                             const status = getShutdownStatus(shutdown);
@@ -343,12 +523,27 @@ const Plants = () => {
                               {eventLabel}
                             </p>;
                           })}
-                          {dayShutdowns.length > 0 && <span className={`mt-1 block h-1.5 w-1.5 rounded-full sm:hidden ${hasApprovedShutdown ? 'bg-red-600' : hasPendingShutdown ? 'bg-amber-600' : 'bg-slate-600'}`} />}
+                          {dayMaintenance.map((record, index) => (
+                            <p
+                              key={`maintenance-${record.id ?? index}`}
+                              title={`Scheduled maintenance${record.employee?.name ? ` · ${record.employee.name}` : ''}${record.status_label ? ` · ${record.status_label}` : ''}${record.remarks ? `: ${record.remarks}` : ''}`}
+                              className="mt-1 hidden items-center gap-1 truncate rounded bg-violet-700 px-1.5 py-0.5 text-left text-[10px] font-medium text-white sm:flex"
+                            >
+                              <Hammer size={11} className="shrink-0" />
+                              <span className="truncate">Maintenance{record.employee?.name ? ` · ${record.employee.name}` : ''}</span>
+                            </p>
+                          ))}
+                          {(dayShutdowns.length > 0 || hasMaintenance) && (
+                            <span className="mt-1 flex items-center gap-1.5 sm:hidden">
+                              {dayShutdowns.length > 0 && <span className={`block h-1.5 w-1.5 rounded-full ${hasApprovedShutdown ? 'bg-red-600' : hasPendingShutdown ? 'bg-amber-600' : 'bg-slate-600'}`} />}
+                              {hasMaintenance && <span className="block h-1.5 w-1.5 rounded-full bg-violet-700" />}
+                            </span>
+                          )}
                         </div>
                       );
                     })}
                   </div>
-                  {shutdowns.length === 0 && !shutdownQuery.isFetching && <p className="mt-3 text-center text-sm text-(--color-text-muted)">No shutdown requests for this month.</p>}
+                  {shutdowns.length === 0 && maintenanceRecords.length === 0 && !shutdownQuery.isFetching && !maintenanceQuery.isFetching && <p className="mt-3 text-center text-sm text-(--color-text-muted)">No shutdowns or scheduled maintenance for this month.</p>}
                 </>}
             </div>
 
@@ -401,6 +596,38 @@ const Plants = () => {
         )}
       </main>
 
+      {calendarContextMenu && (
+        <div
+          data-calendar-context-menu
+          role="menu"
+          aria-label="Calendar actions"
+          style={{ position: 'fixed', left: calendarContextMenu.left, top: calendarContextMenu.top, zIndex: 10000 }}
+          className="min-w-56 rounded-md border border-(--color-border-strong) bg-(--color-bg-elevated) p-1 text-(--color-text) shadow-xl"
+          onContextMenu={(event) => event.preventDefault()}
+        >
+          {canScheduleShutdown && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => openShutdownRequest(calendarContextMenu.dates)}
+              className="flex min-h-10 w-full items-center gap-3 rounded px-3 text-left text-sm hover:bg-(--color-accent-soft) focus:bg-(--color-accent-soft) focus:outline-none"
+            >
+              <Power size={16} /> Schedule Shutdown
+            </button>
+          )}
+          {canScheduleMaintenance && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => openMaintenanceRequest(calendarContextMenu.dates)}
+              className="flex min-h-10 w-full items-center gap-3 rounded px-3 text-left text-sm hover:bg-(--color-accent-soft) focus:bg-(--color-accent-soft) focus:outline-none"
+            >
+              <Hammer size={16} /> Schedule Maintenance
+            </button>
+          )}
+        </div>
+      )}
+
       <AddEditPlant key={`${editor.open}-${editor.plant?.id ?? 'new'}`} isOpen={editor.open} plant={editor.plant} saving={creating || updating} onClose={() => setEditor({ open: false, plant: null })} onSubmit={handleSave} />
       <ConfirmDelete isOpen={Boolean(deleteTarget)} title="Delete Plant" message={`Delete plant "${deleteTarget?.name}"? This cannot be undone.`} onConfirm={handleDelete} onCancel={() => setDeleteTarget(null)} />
       {shutdownRequestOpen && (
@@ -408,10 +635,22 @@ const Plants = () => {
           key={`request-shutdown-${selectedPlant?.id}`}
           isOpen={shutdownRequestOpen}
           mode="request"
-          initialValues={getShutdownDefaults()}
+          initialValues={getShutdownDefaults(shutdownRequestDates)}
+          hasSelectedDateGaps={hasDateGaps(shutdownRequestDates)}
           saving={submittingShutdown}
-          onClose={() => setShutdownRequestOpen(false)}
+          onClose={() => { setShutdownRequestOpen(false); setShutdownRequestDates([]); }}
           onSubmit={handleRequestShutdown}
+        />
+      )}
+      {maintenanceRequestOpen && (
+        <PlantMaintenanceForm
+          key={`schedule-maintenance-${selectedPlant?.id}`}
+          isOpen={maintenanceRequestOpen}
+          plant={selectedPlant}
+          dates={maintenanceDates}
+          saving={submittingMaintenance}
+          onClose={() => { setMaintenanceRequestOpen(false); setMaintenanceDates([]); }}
+          onSubmit={handleScheduleMaintenance}
         />
       )}
       {shutdownToApprove && (

@@ -40,6 +40,7 @@ const EmployeeDetailsSection = ({
         shifts={shifts}
         setField={setField}
         selectField={selectField}
+        updateForm={updateForm}
       />
     </div>
     <div data-employee-section="contact">

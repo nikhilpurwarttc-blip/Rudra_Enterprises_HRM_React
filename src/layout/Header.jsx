@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Menu, LogOut, User, Search, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Menu, LogOut, User, Search, X, ChevronLeft, ChevronRight, Bell } from "lucide-react";
 import { useSelector, useDispatch } from "react-redux";
 import { selectUser, selectRole, clearCredentials } from "../store/authSlice";
 import { api, useLogoutMutation } from "../store/api";
@@ -9,6 +9,7 @@ import ThemeToggle from "../components/ThemeToggle";
 import Breadcrumb from "../components/Breadcrumb";
 import { useSearch } from "../contexts/SearchContext";
 import UserProfilePanel from "./UserProfilePanel";
+import NotificationModal from "./NotifiModal";
 
 const Header = ({ onToggleSidebar }) => {
   const user = useSelector(selectUser);
@@ -20,6 +21,7 @@ const Header = ({ onToggleSidebar }) => {
   const { searchQuery, setSearchQuery, isSearchOpen, setIsSearchOpen, searchResults } = useSearch();
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const searchRef = useRef(null);
 
   const roleName = typeof role === 'string' ? role : role?.name ?? '';
@@ -156,7 +158,16 @@ const Header = ({ onToggleSidebar }) => {
             <ChevronRight size={15} className="text-[var(--color-text)]" />
           </button>
         </div>
+
         <ThemeToggle />
+
+        <button
+          onClick={() => setIsNotificationOpen(true)}
+          className="relative p-2 rounded-md hover:bg-gray-300 dark:hover:bg-white/10"
+        >
+          <Bell size={16} className="text-gray-600 dark:text-gray-200" />
+          <span className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-red-500" />
+        </button>
 
         {/* User Info */}
         <button
@@ -184,6 +195,11 @@ const Header = ({ onToggleSidebar }) => {
           <LogOut size={15} />
         </button>
       </div>
+
+      <NotificationModal
+        isOpen={isNotificationOpen}
+        onClose={() => setIsNotificationOpen(false)}
+      />
 
       <UserProfilePanel
         user={user}

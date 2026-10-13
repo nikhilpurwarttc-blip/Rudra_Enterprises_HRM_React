@@ -13,6 +13,11 @@ const MONTH_OPTIONS = Array.from({ length: 12 }, (_, monthIndex) => ({
 const STATUS = {
 	0: { label: 'Absent', cellClass: 'bg-rose-500/10', dotClass: 'bg-rose-500' },
 	1: { label: 'Present', cellClass: 'bg-emerald-500/10', dotClass: 'bg-emerald-500' },
+	2: { label: 'Half Day', cellClass: 'bg-amber-500/10', dotClass: 'bg-amber-500' },
+	3: { label: 'Leave', cellClass: 'bg-violet-500/10', dotClass: 'bg-violet-500' },
+	4: { label: 'Holiday', cellClass: 'bg-sky-500/10', dotClass: 'bg-sky-500' },
+	5: { label: 'Weekly Off', cellClass: 'bg-slate-500/10', dotClass: 'bg-slate-500' },
+	6: { label: 'Inactive', cellClass: 'bg-(--color-bg-elevated)', dotClass: 'bg-slate-400' },
 };
 
 const dateKey = (date) => [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
@@ -201,6 +206,13 @@ const AttendanceCalender = ({ month, joiningDate, onMonthChange, onYearChange, r
 
 										{day ? (
 											<div className="space-y-1.5">
+												{day.records.length === 1 && !day.records[0].check_in && STATUS[Number(day.records[0].status)]?.label !== 'Present' && (
+													<p className="rounded px-2 py-1 text-xs font-semibold text-(--color-text)">
+														{day.records[0].status_label ?? STATUS[Number(day.records[0].status)]?.label ?? 'Recorded'}
+													</p>
+												)}
+												{!(day.records.length === 1 && !day.records[0].check_in && STATUS[Number(day.records[0].status)]?.label !== 'Present') && (
+													<>
 												{/* Hours summary */}
 												<div className="grid grid-cols-3 gap-x-1 text-[10px] leading-4">
 													<span className="text-(--color-text-muted)">Reg</span>
@@ -234,6 +246,8 @@ const AttendanceCalender = ({ month, joiningDate, onMonthChange, onYearChange, r
 														</tbody>
 													</table>
 												</div>
+													</>
+												)}
 											</div>
 										) : inEmploymentRange ? (
 											<p className="text-[10px] text-(--color-text-muted)">No record</p>

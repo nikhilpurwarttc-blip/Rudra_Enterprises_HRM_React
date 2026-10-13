@@ -1,4 +1,4 @@
-import { twMerge } from 'tailwind-merge';
+import { cn } from '../utils/cn';
 
 const Button = ({
   children,
@@ -9,7 +9,7 @@ const Button = ({
 }) => (
   <button
     type={type}
-    className={twMerge(`button button-${variant}`, className)}
+    className={cn(`button button-${variant}`, className)}
     {...props}
   >
     {children}

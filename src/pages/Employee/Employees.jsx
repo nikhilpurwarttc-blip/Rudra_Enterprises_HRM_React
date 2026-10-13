@@ -108,6 +108,8 @@ const Employees = () => {
   const [menuEmployeeId, setMenuEmployeeId] = useState(null);
   const [menuPosition, setMenuPosition] = useState(null); // { x, y, fromButton: bool }
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [statusTarget, setStatusTarget] = useState(null);
+  const [relievingDate, setRelievingDate] = useState('');
   const menuRef = useRef(null);
   const [savingStatusIds, setSavingStatusIds] = useState({});
   const [errors, setErrors] = useState({});
@@ -300,25 +302,53 @@ const Employees = () => {
     });
   }, []);
 
-  const toggleEmployeeStatus = async (employee) => {
+  const updateEmployeeStatus = async (employee, nextStatus, nextRelievingDate = null) => {
     const previousStatus = Boolean(employee.status);
-    const nextStatus = !previousStatus;
+    const previousRelievingDate = employee.relieving_date ?? null;
     setSavingStatusIds((current) => ({ ...current, [employee.id]: true }));
-    patchEmployee(employee.id, { status: nextStatus });
+    patchEmployee(employee.id, {
+      status: nextStatus,
+      relieving_date: nextStatus ? null : nextRelievingDate,
+    });
 
     try {
-      const response = await updateEmployee({ id: employee.id, status: nextStatus }).unwrap();
+      const response = await updateEmployee({
+        id: employee.id,
+        status: nextStatus,
+        relieving_date: nextStatus ? null : nextRelievingDate || null,
+      }).unwrap();
       patchEmployee(employee.id, response?.data ?? response);
       toast(`${employee.name} marked ${nextStatus ? 'active' : 'inactive'}.`, 'success');
+      return true;
     } catch (error) {
-      patchEmployee(employee.id, { status: previousStatus });
+      patchEmployee(employee.id, { status: previousStatus, relieving_date: previousRelievingDate });
       toast(getApiErrorMessage(error, `Unable to update ${employee.name}'s status.`), 'error');
+      return false;
     } finally {
       setSavingStatusIds((current) => {
         const next = { ...current };
         delete next[employee.id];
         return next;
       });
+    }
+  };
+
+  const toggleEmployeeStatus = (employee) => {
+    if (Number(employee.status) === 1) {
+      setStatusTarget(employee);
+      setRelievingDate(String(employee.relieving_date ?? '').slice(0, 10));
+      return;
+    }
+
+    updateEmployeeStatus(employee, true);
+  };
+
+  const confirmEmployeeInactive = async () => {
+    if (!statusTarget) return;
+    const saved = await updateEmployeeStatus(statusTarget, false, relievingDate);
+    if (saved) {
+      setStatusTarget(null);
+      setRelievingDate('');
     }
   };
 
@@ -487,7 +517,7 @@ const Employees = () => {
           </div>
           <div className="mt-4 flex items-center gap-2">
             <InputField className="min-w-0 max-w-52 flex-1" value={search} onChange={handleSearchChange} placeholder="Search employees" leftIcon={<Search size={16} />} rightIcon={isEmployeeLoading && <LoaderCircle size={15} className="animate-spin" />} />
-            {!isSinglePlantRole && <SearchableSelect label="Plants" ariaLabel="Filter employees by plant" options={[{ value: '', label: 'All Plants' }, ...plants.map((plant) => ({ value: String(plant.id), label: plant.name }))]} value={plantFilter} onChange={handlePlantFilterChange} placeholder="All Plants" className="min-w-22 max-w-31 shrink-0" btnClass=" px-2 text-xs" isLoading={plantsLoading} showSearch={false} />}
+            {!isSinglePlantRole && <SearchableSelect label="Plants" ariaLabel="Filter employees by plant" options={[{ value: '', label: 'All Plants' }, ...plants.map((plant) => ({ value: String(plant.id), label: plant.name }))]} value={plantFilter} onChange={handlePlantFilterChange} placeholder="All Plants" className="min-w-22 max-w-31 shrink-0" btnClass=" px-2 text-xs" isLoading={plantsLoading} />}
           </div>
         </div>
 
@@ -604,6 +634,33 @@ const Employees = () => {
         onConfirm={handleDeleteEmployee}
         onCancel={() => setDeleteTarget(null)}
       />
+      <ConfirmDelete
+        isOpen={Boolean(statusTarget)}
+        title="Mark employee inactive"
+        message={`Mark ${statusTarget?.name ?? 'this employee'} as inactive? You can leave the relieving date blank.`}
+        confirmLabel="Mark inactive"
+        confirmLoadingLabel="Updating status…"
+        confirmClass="bg-amber-600 hover:bg-amber-700"
+        icon={UserRound}
+        onConfirm={confirmEmployeeInactive}
+        onCancel={() => {
+          setStatusTarget(null);
+          setRelievingDate('');
+        }}
+      >
+        <div className="space-y-3">
+          <p className="rounded-lg border border-(--color-border) bg-(--color-accent-soft)/40 p-3 text-xs leading-relaxed text-(--color-text-muted)">
+            The date is optional. If entered, it is treated as the employee’s last working day; later dates appear as Inactive in attendance reports. If left blank, the employee is still marked inactive and attendance reports show Inactive without a last-day boundary.
+          </p>
+          <InputField
+            label="Relieving date (optional)"
+            type="date"
+            value={relievingDate}
+            onChange={(event) => setRelievingDate(event.target.value)}
+            min={String(statusTarget?.joining_date ?? '').slice(0, 10) || undefined}
+          />
+        </div>
+      </ConfirmDelete>
     </div>
   );
 };

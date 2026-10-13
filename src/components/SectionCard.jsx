@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ChevronDown, RefreshCw } from 'lucide-react';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '../utils/cn';
 
 const SectionCard = ({
   title,
@@ -34,7 +34,7 @@ const SectionCard = ({
 
   return (
     <div
-      className={twMerge(
+      className={cn(
         'glass-card py-4 min-h-0 rounded-xl print:bg-transparent print:border-0 print:shadow-none print:rounded-none ',
         scroll && 'flex flex-col flex-1 overflow-hidden',
         sectionClass

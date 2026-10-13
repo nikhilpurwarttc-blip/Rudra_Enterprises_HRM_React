@@ -1,5 +1,5 @@
-import React, { useId } from "react";
-import clsx from "clsx";
+import { useId } from "react";
+import { cn } from "../utils/cn";
 
 /**
  * Reusable Chip Switcher component following InputField UI legacy
@@ -35,7 +35,7 @@ const ChipSwitcher = ({
         role="radiogroup"
         aria-invalid={Boolean(error)}
         aria-describedby={helperText || error ? descriptionId : undefined}
-        className={clsx(
+        className={cn(
           "relative flex min-h-12 items-center rounded-md border bg-transparent p-1.5 transition-colors",
           disabled && "opacity-60 cursor-not-allowed bg-[var(--color-accent-soft)]/20",
           !disabled &&
@@ -64,7 +64,7 @@ const ChipSwitcher = ({
                 type="button"
                 disabled={disabled}
                 onClick={() => onChange(option.value)}
-                className={clsx(
+                className={cn(
                   "flex-1 rounded px-3 py-1.5 text-xs font-medium transition-all focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]",
                   disabled && "cursor-not-allowed",
                   isSelected
@@ -83,7 +83,7 @@ const ChipSwitcher = ({
         <p
           id={descriptionId}
           role={error ? "alert" : undefined}
-          className={clsx(
+          className={cn(
             "mt-1 rounded-md px-2 py-1.5 text-xs",
             error
               ? "border border-[var(--color-danger)]/40 bg-[var(--color-danger)]/10 font-medium text-[var(--color-danger)]"

@@ -1,6 +1,6 @@
 import { useId, useState } from "react";
-import clsx from "clsx";
 import { Eye, EyeOff } from "lucide-react";
+import { cn } from "../utils/cn";
 
 const InputField = ({
   label,
@@ -27,7 +27,7 @@ const InputField = ({
   return (
     <div className="w-auto">
       <div
-        className={clsx(
+        className={cn(
           "relative flex min-h-12 items-center rounded-md border bg-transparent px-3 transition-colors",
           disabled && "opacity-60 cursor-not-allowed bg-[var(--color-accent-soft)]/20",
           !disabled && "focus-within:border-[var(--color-accent)] focus-within:ring-1 focus-within:ring-[var(--color-accent)]",
@@ -55,7 +55,7 @@ const InputField = ({
           disabled={disabled}
           aria-invalid={Boolean(error)}
           aria-describedby={helperText || error ? descriptionId : undefined}
-          className={clsx(
+          className={cn(
             "min-w-0 flex-1 bg-transparent py-3 text-sm text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)]",
             disabled && "cursor-not-allowed text-[var(--color-text-muted)]",
           )}
@@ -76,7 +76,7 @@ const InputField = ({
         <p
           id={descriptionId}
           role={error ? "alert" : undefined}
-          className={clsx(
+          className={cn(
             "mt-1 rounded-md px-2 py-1.5 text-xs",
             error
               ? "border border-[var(--color-danger)]/40 bg-[var(--color-danger)]/10 font-medium text-[var(--color-danger)]"

@@ -13,6 +13,7 @@ const PlantShutdownForm = ({
   isOpen,
   mode,
   initialValues,
+  hasSelectedDateGaps = false,
   saving = false,
   onClose,
   onSubmit,
@@ -44,7 +45,9 @@ const PlantShutdownForm = ({
       <p className="text-sm text-(--color-text-muted) max-w-sm">
         {isApproval
           ? 'Review and update the shutdown details before approving this request.'
-          : 'This request applies only to the selected plant. Attendance punching is paused for the requested dates until an authorized user approves or rejects it.'}
+          : hasSelectedDateGaps
+            ? 'This request applies only to the selected plant. It covers the full date range shown below, including any days between selected calendar cells. Attendance punching is paused for those dates after approval.'
+            : 'This request applies only to the selected plant. Attendance punching is paused for the requested dates until an authorized user approves or rejects it.'}
       </p>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 max-w-sm">
         <label className="sm:col-span-2 text-sm font-medium text-(--color-text)">

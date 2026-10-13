@@ -205,6 +205,7 @@ const AttendanceReport = () => {
 						</div>
 						<AttendanceCalender
 							month={month}
+							joiningDate={selectedEmployeeRecord?.joining_date}
 							onMonthChange={handleMonthChange}
 							onYearChange={handleYearChange}
 							records={records}
