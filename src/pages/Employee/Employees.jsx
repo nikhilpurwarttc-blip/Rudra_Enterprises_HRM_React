@@ -26,7 +26,7 @@ import { useToast } from '../../contexts/ToastContext';
 import Button from '../../components/Button';
 import ConfirmDelete from '../../components/ConfirmDelete';
 import InputField from '../../components/InputField';
-import SearchableSelect from '../../components/SearchableSelect';
+import FilterModal from '../../components/FilterModal';
 import Switch from '../../components/Switch';
 import { Feedback } from '../../components/Feedback';
 import AddEditEmployee from './AddEditEmployee';
@@ -48,6 +48,30 @@ const matchesEmployeeSearch = (employee, query) => {
     employee.email,
     employee.mobile_number,
   ].some((value) => String(value ?? '').toLocaleLowerCase().includes(normalizedQuery));
+};
+const getEmployeeWorkflowStatus = (employee) => {
+  const status = String(employee.approval_status_label ?? employee.approval_status ?? '').toLowerCase();
+  if (status.includes('approv') || status === '1') return 'approved';
+  if (status.includes('reject') || status === '2') return 'rejected';
+  return 'pending';
+};
+const matchesEmployeeFilters = (employee, filters) => {
+  const plantId = String(employee.plant_id ?? employee.plant?.id ?? '');
+  const departmentId = String(employee.department_id ?? employee.department?.id ?? '');
+  const designationId = String(employee.designation_id ?? employee.designation?.id ?? '');
+  const shiftId = String(employee.shift_id ?? employee.shift?.id ?? '');
+  const employeeStatus = employee.status === true
+    || Number(employee.status) === 1
+    || String(employee.status).toLowerCase() === 'active'
+    ? 'active'
+    : 'inactive';
+
+  return (!filters.plants?.length || filters.plants.includes(plantId))
+    && (!filters.status || filters.status === employeeStatus)
+    && (!filters.workflow_status || filters.workflow_status === getEmployeeWorkflowStatus(employee))
+    && (!filters.department || filters.department === departmentId)
+    && (!filters.designation || filters.designation === designationId)
+    && (!filters.shift || filters.shift === shiftId);
 };
 const EmployeePlaceholder = ({ employee, type }) => {
   const isAttendance = type === 'attendance';
@@ -104,7 +128,15 @@ const Employees = () => {
   const [createdEmployee, setCreatedEmployee] = useState(null);
   const [addSessionKey, setAddSessionKey] = useState(0);
   const [search, setSearch] = useState('');
-  const [plantFilter, setPlantFilter] = useState('');
+  const [employeeFilters, setEmployeeFilters] = useState({
+    plants: [],
+    status: '',
+    workflow_status: '',
+    designation: '',
+    department: '',
+    shift: '',
+  });
+  const plantFilter = employeeFilters.plants;
   const [menuEmployeeId, setMenuEmployeeId] = useState(null);
   const [menuPosition, setMenuPosition] = useState(null); // { x, y, fromButton: bool }
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -128,16 +160,22 @@ const Employees = () => {
   const cachedEmployees = useMemo(() => loadedEmployees.filter((e) => cachedIds.has(e.id)), [loadedEmployees, cachedIds]);
 
   const localEmployees = useMemo(() => cachedEmployees.filter((employee) => {
-    const matchesPlant = !plantFilter || String(employee.plant_id ?? employee.plant?.id) === String(plantFilter);
-    return matchesPlant && (!searchQuery || matchesEmployeeSearch(employee, searchQuery));
-  }), [cachedEmployees, plantFilter, searchQuery]);
+    return matchesEmployeeFilters(employee, employeeFilters)
+      && (!searchQuery || matchesEmployeeSearch(employee, searchQuery));
+  }), [cachedEmployees, employeeFilters, searchQuery]);
   const hasLocalSearchResults = Boolean(searchQuery) && localEmployees.length > 0;
   const employeesData = cachedEmployees.length > 0 && (!searchQuery || hasLocalSearchResults)
     ? localEmployees
     : searchQuery && debouncedSearch !== searchQuery
       ? []
       : loadedEmployees;
-  const displayedEmployeeCount = hasLocalSearchResults ? localEmployees.length : totalEmployees || employeesData.length;
+  const hasAppliedEmployeeFilters = Object.values(employeeFilters).some((value) =>
+    Array.isArray(value) ? value.length > 0 : value !== '',
+  );
+  const displayedEmployeeCount = hasLocalSearchResults
+    || (hasAppliedEmployeeFilters && cachedEmployees.length > 0)
+    ? localEmployees.length
+    : totalEmployees || employeesData.length;
   const refreshedEmployee = selectedEmployeeData?.data ?? selectedEmployeeData;
   const selectedEmployee = useMemo(() =>
     refreshedEmployee?.id
@@ -193,30 +231,40 @@ const Employees = () => {
     }
   }, []);
 
-  const loadEmployeePages = useCallback(async (startPage, query, plantId, replace = false, version = requestVersion.current) => {
+  const loadEmployeePages = useCallback(async (startPage, query, plantIds, replace = false, version = requestVersion.current) => {
     if (loadingEmployees.current) return;
 
     loadingEmployees.current = true;
-    let page = startPage;
-    let replacePage = replace;
-    const isUnfiltered = !query && !plantId;
+    let shouldReplace = replace;
+    let loadedTotal = 0;
+    const requestedPlantIds = plantIds.length > 0 ? plantIds : [''];
+    const isUnfiltered = !query && plantIds.length === 0;
 
     try {
-      while (version === requestVersion.current) {
-        const response = await fetchEmployees({ page, per_page: 100, search: query, plant_id: plantId }).unwrap();
+      for (const plantId of requestedPlantIds) {
+        let page = startPage;
+        let replacePage = shouldReplace;
+        while (version === requestVersion.current) {
+          const response = await fetchEmployees({ page, per_page: 100, search: query, plant_id: plantId }).unwrap();
+          if (version !== requestVersion.current) break;
+
+          const pageEmployees = unwrap(response);
+          mergeEmployees(pageEmployees, replacePage, isUnfiltered);
+          replacePage = false;
+          shouldReplace = false;
+          const currentPage = Number(response.meta?.current_page ?? page);
+          const lastPage = Number(response.meta?.last_page ?? currentPage);
+          if (currentPage === startPage) {
+            loadedTotal += Number(response.meta?.total ?? pageEmployees.length);
+          }
+          setHasLoadError(false);
+
+          if (currentPage >= lastPage) break;
+          page = currentPage + 1;
+        }
         if (version !== requestVersion.current) break;
-
-        const pageEmployees = unwrap(response);
-        mergeEmployees(pageEmployees, replacePage, isUnfiltered);
-        setTotalEmployees(Number(response.meta?.total ?? pageEmployees.length));
-        const currentPage = Number(response.meta?.current_page ?? page);
-        const lastPage = Number(response.meta?.last_page ?? currentPage);
-        setHasLoadError(false);
-
-        if (currentPage >= lastPage) break;
-        page = currentPage + 1;
-        replacePage = false;
       }
+      if (version === requestVersion.current) setTotalEmployees(loadedTotal);
     } catch {
       if (version === requestVersion.current) setHasLoadError(true);
     } finally {
@@ -225,7 +273,7 @@ const Employees = () => {
   }, [fetchEmployees, mergeEmployees]);
 
   useEffect(() => {
-    loadEmployeePages(1, '', '', true);
+    loadEmployeePages(1, '', [], true);
     return () => {
       window.clearTimeout(searchTimeout.current);
       requestVersion.current += 1;
@@ -241,10 +289,9 @@ const Employees = () => {
     setSearch(value);
     setHasLoadError(false);
     window.clearTimeout(searchTimeout.current);
-    if (query && cachedEmployees.some((employee) => {
-      const matchesPlant = !plantFilter || String(employee.plant_id ?? employee.plant?.id) === String(plantFilter);
-      return matchesPlant && matchesEmployeeSearch(employee, query);
-    })) {
+    if (query && cachedEmployees.some((employee) =>
+      matchesEmployeeFilters(employee, employeeFilters) && matchesEmployeeSearch(employee, query)
+    )) {
       setDebouncedSearch(query);
       return;
     }
@@ -254,22 +301,27 @@ const Employees = () => {
     }, 250);
   };
 
-  const handlePlantFilterChange = (plantId) => {
+  const handleFilterApply = (filters) => {
+    const nextFilters = {
+      ...employeeFilters,
+      ...filters,
+      plants: (filters.plants ?? []).map(String),
+    };
+    const plantIds = nextFilters.plants;
     const query = search.trim();
     const version = ++requestVersion.current;
     loadingEmployees.current = false;
     window.clearTimeout(searchTimeout.current);
-    setPlantFilter(plantId);
+    setEmployeeFilters(nextFilters);
     setHasLoadError(false);
-    if (query && cachedEmployees.some((employee) => {
-      const matchesPlant = !plantId || String(employee.plant_id ?? employee.plant?.id) === String(plantId);
-      return matchesPlant && matchesEmployeeSearch(employee, query);
-    })) {
+    if (query && cachedEmployees.some((employee) =>
+      matchesEmployeeFilters(employee, nextFilters) && matchesEmployeeSearch(employee, query)
+    )) {
       setDebouncedSearch(query);
       return;
     }
     setDebouncedSearch(query);
-    loadEmployeePages(1, query, plantId, true, version);
+    loadEmployeePages(1, query, plantIds, true, version);
   };
 
   const handleRefreshEmployees = () => {
@@ -515,9 +567,81 @@ const Employees = () => {
               {canCreate && !isReadOnly && <Button type="button" onClick={() => { setCreatedEmployee(null); setAddSessionKey((k) => k + 1); navigate('/employees/add'); }} className="flex items-center gap-1.5 "><Plus size={18} /></Button>}
             </div>
           </div>
-          <div className="mt-4 flex items-center gap-2">
-            <InputField className="min-w-0 max-w-52 flex-1" value={search} onChange={handleSearchChange} placeholder="Search employees" leftIcon={<Search size={16} />} rightIcon={isEmployeeLoading && <LoaderCircle size={15} className="animate-spin" />} />
-            {!isSinglePlantRole && <SearchableSelect label="Plants" ariaLabel="Filter employees by plant" options={[{ value: '', label: 'All Plants' }, ...plants.map((plant) => ({ value: String(plant.id), label: plant.name }))]} value={plantFilter} onChange={handlePlantFilterChange} placeholder="All Plants" className="min-w-22 max-w-31 shrink-0" btnClass=" px-2 text-xs" isLoading={plantsLoading} />}
+          <div className="mt-4 flex items-center justify-between gap-2">
+            <InputField className="min-w-0 flex-1" value={search} onChange={handleSearchChange} placeholder="Search employees" leftIcon={<Search size={16} />} rightIcon={isEmployeeLoading && <LoaderCircle size={15} className="animate-spin" />} />
+            <FilterModal
+              title="Filter employees"
+              values={employeeFilters}
+              onApply={handleFilterApply}
+              fields={[
+                {
+                  key: 'plants',
+                  label: 'Plants',
+                  type: 'multiselect',
+                  permission: 'employees',
+                  visible: !isSinglePlantRole,
+                  options: plants.map((plant) => ({ value: String(plant.id), label: plant.name })),
+                  placeholder: 'All accessible plants',
+                  isLoading: plantsLoading,
+                },
+                {
+                  key: 'status',
+                  label: 'Status',
+                  type: 'select',
+                  permission: 'employees',
+                  options: [
+                    { value: 'active', label: 'Active' },
+                    { value: 'inactive', label: 'Inactive' },
+                  ],
+                  placeholder: 'All statuses',
+                },
+                {
+                  key: 'workflow_status',
+                  label: 'Workflow status',
+                  type: 'select',
+                  permission: 'employees',
+                  options: [
+                    { value: 'pending', label: 'Pending' },
+                    { value: 'approved', label: 'Approved' },
+                    { value: 'rejected', label: 'Rejected' },
+                  ],
+                  placeholder: 'All workflow statuses',
+                },
+                {
+                  key: 'designation',
+                  label: 'Designation',
+                  type: 'select',
+                  permission: 'employees',
+                  options: designations.map((designation) => ({
+                    value: String(designation.id),
+                    label: designation.name,
+                  })),
+                  placeholder: 'All designations',
+                },
+                {
+                  key: 'department',
+                  label: 'Department',
+                  type: 'select',
+                  permission: 'employees',
+                  options: departments.map((department) => ({
+                    value: String(department.id),
+                    label: department.name,
+                  })),
+                  placeholder: 'All departments',
+                },
+                {
+                  key: 'shift',
+                  label: 'Shift',
+                  type: 'select',
+                  permission: 'employees',
+                  options: shifts.map((shift) => ({
+                    value: String(shift.id),
+                    label: shift.name,
+                  })),
+                  placeholder: 'All shifts',
+                },
+              ]}
+            />
           </div>
         </div>
 

@@ -162,7 +162,7 @@ const SearchableSelect = ({
       </button>
       
       {isOpen && createPortal(
-        <div ref={dropdownRef} style={dropdownStyle} className="max-h-60 overflow-hidden rounded-md border border-(--color-border-strong) bg-(--color-bg-elevated) text-(--color-text) shadow-lg">
+        <div ref={dropdownRef} data-searchable-select-dropdown style={dropdownStyle} className="max-h-60 overflow-hidden rounded-md border border-(--color-border-strong) bg-(--color-bg-elevated) text-(--color-text) shadow-lg">
           {showSearch && (
             <div className="border-b border-(--color-border) p-2">
               <div className="flex items-center gap-2">

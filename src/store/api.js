@@ -311,6 +311,10 @@ export const api = createApi({
       query: (body) => ({ url: '/attendances/check-out', method: 'POST', body }),
       invalidatesTags: ['Attendance', 'SalaryReport'],
     }),
+    verifyAttendance: builder.mutation({
+      query: (id) => ({ url: `/attendances/${id}/verify`, method: 'POST' }),
+      invalidatesTags: ['Attendance', 'SalaryReport'],
+    }),
     markShutdownPresent: builder.mutation({
       query: (body) => ({ url: '/attendances/shutdown-present', method: 'POST', body }),
       invalidatesTags: ['Attendance', 'SalaryReport'],
@@ -569,6 +573,7 @@ export const {
   useGetAttendanceRosterQuery,
   useCheckInAttendanceMutation,
   useCheckOutAttendanceMutation,
+  useVerifyAttendanceMutation,
   useMarkShutdownPresentMutation,
   useApproveAllAttendanceMutation,
   useRejectAllAttendanceMutation,

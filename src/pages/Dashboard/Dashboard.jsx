@@ -301,11 +301,14 @@ const Dashboard = () => {
   const pendingActions = (dashboard?.pending_actions ?? []).filter((action) => ACTION_LINKS[action.type]);
   const pendingTotal = pendingActions.reduce((total, action) => total + (Number(action.count) || 0), 0);
   const attendanceSummary = dashboard?.attendance?.status_wise ?? [];
+  // console.log('dashboard', dashboard);
+  // console.log('attendanceSummary', attendanceSummary);
   const attendanceTotal = attendanceSummary.reduce((total, item) => total + (Number(item.count) || 0), 0);
+  // console.log('attendanceTotal', attendanceTotal, 'dashboard?.summary?.present', dashboard?.summary?.present);
   const attendanceRate = attendanceTotal
     ? Math.round(((Number(dashboard?.summary?.present) || 0) / attendanceTotal) * 100)
     : 0;
-
+// console.log('attendanceRate', attendanceRate, 'dashboard?.summary?.present', dashboard?.summary?.present, 'attendanceTotal', attendanceTotal);
   if (!canView) return <AccessDenied pageName="the dashboard" routePath="/" />;
 
   const quickLinks = [
@@ -344,8 +347,8 @@ const Dashboard = () => {
         <div className="relative flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div className="max-w-xl">
             <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-(--color-text) sm:text-3xl">
-               <Activity size={20} aria-hidden="true" /> Good day, {getFirstName(user)}
-            </h1>          
+              <Activity size={20} aria-hidden="true" /> Good Day, {getFirstName(user)}
+            </h1>
             {dashboard?.filters?.label && (
               <p className="mt-3 flex items-center gap-1.5 text-xs font-medium text-(--color-text-muted)">
                 <CalendarDays size={14} aria-hidden="true" /> {dashboard.filters.label}
@@ -454,222 +457,239 @@ const Dashboard = () => {
         )}
       </section>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        {canViewAttendance && dashboard?.attendance && (
-          <DashboardPanel
-            title="Attendance snapshot"
-            description="Status distribution across your permitted workforce"
-            action={<span className="rounded-full bg-teal-500/10 px-2.5 py-1 text-xs font-semibold text-teal-700 dark:text-teal-300">{attendanceRate}% present</span>}
-          >
-            {attendanceTotal ? (
-              <>
-                <div
-                  className="mb-5 flex h-3 overflow-hidden rounded-full bg-(--color-accent-soft)"
-                  role="img"
-                  aria-label={attendanceSummary.map((item) => `${item.label}: ${formatNumber(item.count)}`).join(', ')}
-                >
-                  {attendanceSummary.filter((item) => Number(item.count) > 0).map((item) => {
-                    const styles = {
-                      present: 'bg-teal-500',
-                      absent: 'bg-rose-500',
-                      partial: 'bg-amber-500',
-                      on_leave: 'bg-violet-500',
-                      holiday: 'bg-sky-500',
-                      weekly_off: 'bg-slate-400',
-                    };
-                    return (
-                      <span
-                        key={item.status}
-                        className={`${styles[item.status] ?? 'bg-(--color-accent)'} transition-[width] duration-500 motion-reduce:transition-none`}
-                        style={{ width: `${(Number(item.count) / attendanceTotal) * 100}%` }}
-                        title={`${item.label}: ${formatNumber(item.count)}`}
-                      />
-                    );
-                  })}
-                </div>
-                <DashboardBarList
-                  items={attendanceSummary
-                    .filter((item) => Number(item.count) > 0)
-                    .map((item) => ({ ...item, label: item.label, count: Number(item.count) }))}
-                  formatter={formatNumber}
-                />
-              </>
-            ) : <DashboardEmpty message="No attendance activity for the selected period." />}
-          </DashboardPanel>
-        )}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-6">
 
         {canViewAttendance && dashboard?.attendance && (
-          <DashboardPanel title="Plant attendance" description="Attendance records grouped by working plant">
-            <DashboardBarList
-              items={(dashboard.attendance.plant_wise ?? []).map((item) => ({ ...item, label: item.plant_name, count: item.present }))}
-              formatter={(value) => `${formatNumber(value)} present`}
-            />
-          </DashboardPanel>
+          <div className="grid grid-cols-1 gap-4 xl:col-span-2">
+            <DashboardPanel
+              title="Attendance snapshot"
+              description="Status distribution across your permitted workforce"
+              action={<span className="rounded-full bg-teal-500/10 px-2.5 py-1 text-xs font-semibold text-teal-700 dark:text-teal-300">{attendanceRate}% present</span>}
+            >
+              {attendanceTotal ? (
+                <>
+                  <div
+                    className="mb-5 flex h-3 overflow-hidden rounded-full bg-(--color-accent-soft)"
+                    role="img"
+                    aria-label={attendanceSummary.map((item) => `${item.label}: ${formatNumber(item.count)}`).join(', ')}
+                  >
+                    {attendanceSummary.filter((item) => Number(item.count) > 0).map((item) => {
+                      const styles = {
+                        present: 'bg-teal-500',
+                        absent: 'bg-rose-500',
+                        partial: 'bg-amber-500',
+                        on_leave: 'bg-violet-500',
+                        holiday: 'bg-sky-500',
+                        weekly_off: 'bg-slate-400',
+                      };
+                      return (
+                        <span
+                          key={item.status}
+                          className={`${styles[item.status] ?? 'bg-(--color-accent)'} transition-[width] duration-500 motion-reduce:transition-none`}
+                          style={{ width: `${(Number(item.count) / attendanceTotal) * 100}%` }}
+                          title={`${item.label}: ${formatNumber(item.count)}`}
+                        />
+                      );
+                    })}
+                  </div>
+                  <DashboardBarList
+                    items={attendanceSummary
+                      .filter((item) => Number(item.count) > 0)
+                      .map((item) => ({ ...item, label: item.label, count: Number(item.count) }))}
+                    formatter={formatNumber}
+                  />
+                </>
+              ) : <DashboardEmpty message="No attendance activity for the selected period." />}
+            </DashboardPanel>
+          </div>
+        )}
+        {canViewAttendance && dashboard?.attendance && (
+          <div className="grid grid-cols-1 gap-4 xl:col-span-2">
+            <DashboardPanel title="Plant attendance" description="Attendance records grouped by working plant">
+              <DashboardBarList
+                items={(dashboard.attendance.plant_wise ?? []).map((item) => ({ ...item, label: item.plant_name, count: item.present }))}
+                formatter={(value) => `${formatNumber(value)} present`}
+              />
+            </DashboardPanel>
+          </div>
+        )}
+        {pendingActions.length > 0 && (
+          <div className="grid grid-cols-1 gap-4 xl:col-span-2">
+            <DashboardPanel
+              title="Needs your attention"
+              description="Pending workflows visible to your role"
+              action={<span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-800 dark:text-amber-200">{formatNumber(pendingTotal)} pending</span>}
+              className="p-0 sm:p-0 pb-2 sm:pb-2"
+            >
+              <ul className="divide-y divide-(--color-border)">
+                {pendingActions.map((action) => {
+                  const link = ACTION_LINKS[action.type];
+                  const accessibleLink = link?.path && permissionCheck(canModule, link.linkModules ?? link.modules);
+                  const content = (
+                    <>
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-300">
+                        <ClipboardCheck size={17} aria-hidden="true" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-(--color-text)">{action.title}</span>
+                        <span className="mt-0.5 block text-xs text-(--color-text-muted)">{formatNumber(action.count)} item{Number(action.count) === 1 ? '' : 's'}</span>
+                      </span>
+                      {accessibleLink && <ArrowRight size={16} className="shrink-0 text-(--color-text-muted)" aria-hidden="true" />}
+                    </>
+                  );
+
+                  return (
+                    <li key={action.type} >
+                      {accessibleLink ? (
+                        <Link to={link.path} className="flex items-center gap-3 p-2 px-4 transition-colors hover:bg-(--color-accent-soft) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-accent)">
+                          {content}
+                        </Link>
+                      ) : (
+                        <div className="flex items-center gap-3 rounded-lg p-2">{content}</div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </DashboardPanel>
+          </div>
         )}
 
         {canViewPayroll && dashboard?.payroll && (
-          <DashboardPanel title="Payroll overview" description="Authorized payroll totals for the selected period">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {[
-                ['Gross', dashboard.payroll.gross],
-                ['Net', dashboard.payroll.net],
-                ['Overtime', dashboard.payroll.ot_amount],
-                ['Deductions', dashboard.payroll.total_deductions],
-              ].filter(([, value]) => value !== undefined).map(([label, value]) => (
-                <div key={label} className="rounded-xl border border-(--color-border) bg-(--color-bg-elevated)/70 p-3">
-                  <p className="text-xs text-(--color-text-muted)">{label}</p>
-                  <p className="mt-1 truncate text-sm font-bold text-(--color-text)" title={formatCurrency(value)}>{formatCurrency(value)}</p>
-                </div>
-              ))}
-            </div>
-            {dashboard.payroll.plant_wise?.length > 0 && (
-              <div className="mt-5 border-t border-(--color-border) pt-4">
-                <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-(--color-text-muted)">Gross payroll by plant</p>
-                <DashboardBarList
-                  items={dashboard.payroll.plant_wise.map((item) => ({ ...item, label: item.plant_name }))}
-                  valueKey="gross"
-                  formatter={formatCurrency}
-                />
+          <div className="grid grid-cols-1 gap-4 xl:col-span-3">
+            <DashboardPanel title="Payroll overview" description="Authorized payroll totals for the selected period">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {[
+                  ['Gross', dashboard.payroll.gross],
+                  ['Net', dashboard.payroll.net],
+                  ['Overtime', dashboard.payroll.ot_amount],
+                  ['Deductions', dashboard.payroll.total_deductions],
+                ].filter(([, value]) => value !== undefined).map(([label, value]) => (
+                  <div key={label} className="rounded-xl border border-(--color-border) bg-(--color-bg-elevated)/70 p-3">
+                    <p className="text-xs text-(--color-text-muted)">{label}</p>
+                    <p className="mt-1 truncate text-sm font-bold text-(--color-text)" title={formatCurrency(value)}>{formatCurrency(value)}</p>
+                  </div>
+                ))}
               </div>
-            )}
-            {!dashboard.payroll.plant_wise?.length && dashboard.payroll.net === undefined && (
-              <p className="mt-4 text-xs text-(--color-text-muted)">Payroll totals are not available for this operational period.</p>
-            )}
-          </DashboardPanel>
+              {dashboard.payroll.plant_wise?.length > 0 && (
+                <div className="mt-5 border-t border-(--color-border) pt-4">
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-(--color-text-muted)">Gross payroll by plant</p>
+                  <DashboardBarList
+                    items={dashboard.payroll.plant_wise.map((item) => ({ ...item, label: item.plant_name }))}
+                    valueKey="gross"
+                    formatter={formatCurrency}
+                  />
+                </div>
+              )}
+              {!dashboard.payroll.plant_wise?.length && dashboard.payroll.net === undefined && (
+                <p className="mt-4 text-xs text-(--color-text-muted)">Payroll totals are not available for this operational period.</p>
+              )}
+            </DashboardPanel>
+          </div>
         )}
 
         {canViewStatutory && dashboard?.statutory && (
-          <DashboardPanel title="Statutory contributions" description="PF and ESI totals for the selected period">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {[
-                ['ESI', dashboard.statutory.esi],
-                ['PF', dashboard.statutory.pf],
-              ].map(([label, metric]) => (
-                <div key={label} className="flex items-center justify-between gap-3 rounded-xl border border-(--color-border) bg-(--color-bg-elevated)/70 p-4">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-(--color-accent-soft) text-(--color-accent)">
-                      <ShieldCheck size={17} aria-hidden="true" />
-                    </span>
-                    <div>
-                      <p className="text-sm font-semibold text-(--color-text)">{label}</p>
-                      <p className="text-xs text-(--color-text-muted)">{formatNumber(metric?.employee_count)} employees</p>
+          <div className="grid grid-cols-1 gap-4 xl:col-span-3">
+            <DashboardPanel title="Statutory contributions" description="PF and ESI totals for the selected period">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {[
+                  ['ESI', dashboard.statutory.esi],
+                  ['PF', dashboard.statutory.pf],
+                ].map(([label, metric]) => (
+                  <div key={label} className="flex items-center justify-between gap-3 rounded-xl border border-(--color-border) bg-(--color-bg-elevated)/70 p-4">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-(--color-accent-soft) text-(--color-accent)">
+                        <ShieldCheck size={17} aria-hidden="true" />
+                      </span>
+                      <div>
+                        <p className="text-sm font-semibold text-(--color-text)">{label}</p>
+                        <p className="text-xs text-(--color-text-muted)">{formatNumber(metric?.employee_count)} employees</p>
+                      </div>
                     </div>
+                    <p className="text-sm font-bold text-(--color-text)">{formatCurrency(metric?.total_amount)}</p>
                   </div>
-                  <p className="text-sm font-bold text-(--color-text)">{formatCurrency(metric?.total_amount)}</p>
-                </div>
-              ))}
-            </div>
-          </DashboardPanel>
+                ))}
+              </div>
+            </DashboardPanel>
+          </div>
         )}
 
         {canViewDeputation && dashboard?.deputation && (
-          <DashboardPanel title="Employee deputations" description="Cross-plant workforce movement in the selected period">
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                ['Total', dashboard.deputation.total],
-                ['Active', dashboard.deputation.active],
-                ['Pending', dashboard.deputation.pending_verification],
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-xl bg-(--color-accent-soft) p-3 text-center">
-                  <p className="text-lg font-bold text-(--color-text)">{formatNumber(value)}</p>
-                  <p className="mt-0.5 text-xs text-(--color-text-muted)">{label}</p>
-                </div>
-              ))}
-            </div>
-            {dashboard.deputation.plant_wise?.length > 0 && (
-              <div className="mt-4">
-                <DashboardBarList
-                  items={dashboard.deputation.plant_wise.map((item) => ({ ...item, label: item.plant_name, count: item.total }))}
-                  formatter={formatNumber}
-                />
+          <div className="grid grid-cols-1 gap-4 xl:col-span-2">
+            <DashboardPanel title="Employee deputations" description="Cross-plant workforce movement in the selected period">
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  ['Total', dashboard.deputation.total],
+                  ['Active', dashboard.deputation.active],
+                  ['Pending', dashboard.deputation.pending_verification],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-xl bg-(--color-accent-soft) p-3 text-center">
+                    <p className="text-lg font-bold text-(--color-text)">{formatNumber(value)}</p>
+                    <p className="mt-0.5 text-xs text-(--color-text-muted)">{label}</p>
+                  </div>
+                ))}
               </div>
-            )}
-          </DashboardPanel>
+              {dashboard.deputation.plant_wise?.length > 0 && (
+                <div className="mt-4">
+                  <DashboardBarList
+                    items={dashboard.deputation.plant_wise.map((item) => ({ ...item, label: item.plant_name, count: item.total }))}
+                    formatter={formatNumber}
+                  />
+                </div>
+              )}
+            </DashboardPanel>
+          </div>
         )}
 
         {canViewDowntime && dashboard?.downtime && (
-          <DashboardPanel title="Plant downtime" description="Approved shutdown activity within this period">
-            <div className="mb-4 grid grid-cols-3 gap-2">
-              {[
-                ['Events', dashboard.downtime.events],
-                ['Hours', dashboard.downtime.hours],
-                ['Compensation', formatCurrency(dashboard.downtime.compensation)],
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-xl bg-(--color-accent-soft) p-3">
-                  <p className="truncate text-base font-bold text-(--color-text)">{typeof value === 'string' ? value : formatNumber(value)}</p>
-                  <p className="mt-0.5 text-xs text-(--color-text-muted)">{label}</p>
-                </div>
-              ))}
-            </div>
-            <DashboardBarList
-              items={(dashboard.downtime.plant_wise ?? []).map((item) => ({ ...item, label: item.plant_name, count: item.events }))}
-              formatter={(value) => `${formatNumber(value)} events`}
-            />
-          </DashboardPanel>
+          <div className="grid grid-cols-1 gap-4 xl:col-span-3">
+            <DashboardPanel title="Plant downtime" description="Approved shutdown activity within this period">
+              <div className="mb-4 grid grid-cols-3 gap-2">
+                {[
+                  ['Events', dashboard.downtime.events],
+                  ['Hours', dashboard.downtime.hours],
+                  ['Compensation', formatCurrency(dashboard.downtime.compensation)],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-xl bg-(--color-accent-soft) p-3">
+                    <p className="truncate text-base font-bold text-(--color-text)">{typeof value === 'string' ? value : formatNumber(value)}</p>
+                    <p className="mt-0.5 text-xs text-(--color-text-muted)">{label}</p>
+                  </div>
+                ))}
+              </div>
+              <DashboardBarList
+                items={(dashboard.downtime.plant_wise ?? []).map((item) => ({ ...item, label: item.plant_name, count: item.events }))}
+                formatter={(value) => `${formatNumber(value)} events`}
+              />
+            </DashboardPanel>
+          </div>
         )}
 
-        {pendingActions.length > 0 && (
-          <DashboardPanel
-            title="Needs your attention"
-            description="Pending workflows visible to your role"
-            action={<span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-800 dark:text-amber-200">{formatNumber(pendingTotal)} pending</span>}
-          >
-            <ul className="divide-y divide-(--color-border)">
-              {pendingActions.map((action) => {
-                const link = ACTION_LINKS[action.type];
-                const accessibleLink = link?.path && permissionCheck(canModule, link.linkModules ?? link.modules);
-                const content = (
-                  <>
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-300">
-                      <ClipboardCheck size={17} aria-hidden="true" />
+        {quickLinks.length > 0 && (
+          <div className="grid grid-cols-1 gap-4 xl:col-span-3">
+            <DashboardPanel title="Quick access" description="Go directly to the areas available to your role">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                {quickLinks.map(({ label, detail, path, icon: Icon }) => (
+                  <Link
+                    key={path}
+                    to={path}
+                    className="group flex items-center gap-3 rounded-xl border border-(--color-border) bg-(--color-bg-elevated)/60 p-3 transition duration-200 hover:-translate-y-0.5 hover:border-(--color-border-strong) hover:bg-(--color-accent-soft) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-accent) motion-reduce:transform-none"
+                  >
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-(--color-accent-soft) text-(--color-accent)">
+                      <Icon size={18} aria-hidden="true" />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium text-(--color-text)">{action.title}</span>
-                      <span className="mt-0.5 block text-xs text-(--color-text-muted)">{formatNumber(action.count)} item{Number(action.count) === 1 ? '' : 's'}</span>
+                      <span className="block text-sm font-semibold text-(--color-text)">{label}</span>
+                      <span className="block truncate text-xs text-(--color-text-muted)">{detail}</span>
                     </span>
-                    {accessibleLink && <ArrowRight size={16} className="shrink-0 text-(--color-text-muted)" aria-hidden="true" />}
-                  </>
-                );
-
-                return (
-                  <li key={action.type} className="py-2 first:pt-0 last:pb-0">
-                    {accessibleLink ? (
-                      <Link to={link.path} className="flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-(--color-accent-soft) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-accent)">
-                        {content}
-                      </Link>
-                    ) : (
-                      <div className="flex items-center gap-3 rounded-lg p-2">{content}</div>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </DashboardPanel>
+                    <ArrowUpRight size={16} className="shrink-0 text-(--color-text-muted) transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" aria-hidden="true" />
+                  </Link>
+                ))}
+              </div>
+            </DashboardPanel>
+          </div>
         )}
       </div>
 
-      {quickLinks.length > 0 && (
-        <DashboardPanel title="Quick access" description="Go directly to the areas available to your role">
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
-            {quickLinks.map(({ label, detail, path, icon: Icon }) => (
-              <Link
-                key={path}
-                to={path}
-                className="group flex items-center gap-3 rounded-xl border border-(--color-border) bg-(--color-bg-elevated)/60 p-3 transition duration-200 hover:-translate-y-0.5 hover:border-(--color-border-strong) hover:bg-(--color-accent-soft) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-accent) motion-reduce:transform-none"
-              >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-(--color-accent-soft) text-(--color-accent)">
-                  <Icon size={18} aria-hidden="true" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-semibold text-(--color-text)">{label}</span>
-                  <span className="block truncate text-xs text-(--color-text-muted)">{detail}</span>
-                </span>
-                <ArrowUpRight size={16} className="shrink-0 text-(--color-text-muted) transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" aria-hidden="true" />
-              </Link>
-            ))}
-          </div>
-        </DashboardPanel>
-      )}
 
       {!canViewEmployees && !canViewAttendance && !canViewPayroll && !canViewStatutory && !canViewAdvances && !canViewDeputation && !canViewDowntime && pendingActions.length === 0 && (
         <GlassCard className="p-5 sm:p-7">

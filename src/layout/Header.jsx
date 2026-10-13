@@ -88,7 +88,7 @@ const Header = ({ onToggleSidebar }) => {
       </div>
 
       {/* Middle — nav + search */}
-      <Link to="/" className="flex items-center gap-2 shrink-0">
+      <Link to="/" className="hidden sm:flex items-center gap-2 shrink-0">
         <img src="/favicon.png" alt="Logo" className="h-11 dark:grayscale dark:invert" />
       </Link>
 

@@ -2,7 +2,7 @@ import GlassCard from '../../../components/GlassCard';
 
 export const DashboardPanel = ({ title, description, action, children, className = '' }) => (
   <GlassCard className={`min-w-0 p-4 sm:p-5 ${className}`}>
-    <div className="mb-4 flex items-start justify-between gap-3">
+    <div className={`mb-4 flex items-start justify-between gap-3 ${className ? 'm-4 sm:m-5' : ''} `}>
       <div>
         <h2 className="text-sm font-bold text-(--color-text)">{title}</h2>
         {description && <p className="mt-1 text-xs text-(--color-text-muted)">{description}</p>}

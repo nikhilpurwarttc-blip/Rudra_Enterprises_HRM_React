@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Info, RefreshCw } from 'lucide-react';
+import { CalendarDays, CalendarOff, ChevronLeft, ChevronRight, CircleCheck, CircleX, Clock3, Info, Plane, RefreshCw, Sun, UserRoundX } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import Badge from '../../components/Badge';
 import { Feedback, LoadingState } from '../../components/Feedback';
 import SearchableSelect from '../../components/SearchableSelect';
 import { formatHours } from '../../utils/formatHours';
@@ -11,13 +12,13 @@ const MONTH_OPTIONS = Array.from({ length: 12 }, (_, monthIndex) => ({
 	label: new Intl.DateTimeFormat('en', { month: 'long' }).format(new Date(2000, monthIndex, 1)),
 }));
 const STATUS = {
-	0: { label: 'Absent', cellClass: 'bg-rose-500/10', dotClass: 'bg-rose-500' },
-	1: { label: 'Present', cellClass: 'bg-emerald-500/10', dotClass: 'bg-emerald-500' },
-	2: { label: 'Half Day', cellClass: 'bg-amber-500/10', dotClass: 'bg-amber-500' },
-	3: { label: 'Leave', cellClass: 'bg-violet-500/10', dotClass: 'bg-violet-500' },
-	4: { label: 'Holiday', cellClass: 'bg-sky-500/10', dotClass: 'bg-sky-500' },
-	5: { label: 'Weekly Off', cellClass: 'bg-slate-500/10', dotClass: 'bg-slate-500' },
-	6: { label: 'Inactive', cellClass: 'bg-(--color-bg-elevated)', dotClass: 'bg-slate-400' },
+	0: { label: 'Absent', cellClass: 'bg-rose-500/10', dotClass: 'bg-rose-500', color: 'red', icon: CircleX },
+	1: { label: 'Present', cellClass: 'bg-emerald-500/10', dotClass: 'bg-emerald-500', color: 'green', icon: CircleCheck },
+	2: { label: 'Half Day', cellClass: 'bg-amber-500/10', dotClass: 'bg-amber-500', color: 'amber', icon: Clock3 },
+	3: { label: 'Leave', cellClass: 'bg-violet-500/10', dotClass: 'bg-violet-500', color: 'purple', icon: Plane },
+	4: { label: 'Holiday', cellClass: 'bg-sky-500/10', dotClass: 'bg-sky-500', color: 'blue', icon: Sun },
+	5: { label: 'Weekly Off', cellClass: 'bg-slate-500/10', dotClass: 'bg-slate-500', color: 'gray', icon: CalendarOff },
+	6: { label: 'Inactive', cellClass: 'bg-(--color-bg-elevated)', dotClass: 'bg-slate-400', color: 'gray', icon: UserRoundX },
 };
 
 const dateKey = (date) => [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
@@ -193,6 +194,7 @@ const AttendanceCalender = ({ month, joiningDate, onMonthChange, onYearChange, r
 								const day = inEmploymentRange ? (dailyRecords.get(key) ?? null) : null;
 								const isCurrentMonth = date.getMonth() === month.getMonth();
 								const statuses = day?.records.map((record) => Number(record.status)) ?? [];
+								const statusRecords = day ? [...new Map(day.records.map((record) => [Number(record.status), record])).values()] : [];
 								const statusKey = statuses.includes(1) ? 1 : statuses.includes(0) ? 0 : statuses[0];
 								const status = statusKey === undefined ? null : STATUS[statusKey] ?? { label: 'Recorded', cellClass: 'bg-(--color-accent-soft)', dotClass: 'bg-(--color-accent)' };
 								const cellBackground = status?.cellClass ?? (isCurrentMonth ? 'bg-(--color-surface)' : 'bg-(--color-bg-elevated)');
@@ -202,50 +204,59 @@ const AttendanceCalender = ({ month, joiningDate, onMonthChange, onYearChange, r
 										{/* Date number */}
 										<div className="mb-1.5 flex items-center justify-between gap-1">
 											<time dateTime={key} className={`flex h-7 w-7 items-center justify-center rounded-full text-sm ${key === dateKey(new Date()) ? 'bg-(--color-accent) font-semibold text-white' : 'font-medium'}`}>{date.getDate()}</time>
+											<div className="flex flex-wrap gap-1">
+												{statusRecords.map((record) => {
+													const statusInfo = STATUS[Number(record.status)] ?? { label: 'Recorded', color: 'gray', icon: Info };
+													const Icon = statusInfo.icon;
+													const label = record.status_label ?? statusInfo.label;
+													return (
+														<Badge key={String(record.status ?? 'unknown')} color={statusInfo.color} title={label} className="!gap-1 !rounded-full !px-1.5 !py-0.5 !text-[10px] !normal-case">
+															<Icon size={11} aria-hidden="true" />
+															{label}
+														</Badge>
+													);
+												})}
+											</div>
 										</div>
 
 										{day ? (
 											<div className="space-y-1.5">
-												{day.records.length === 1 && !day.records[0].check_in && STATUS[Number(day.records[0].status)]?.label !== 'Present' && (
-													<p className="rounded px-2 py-1 text-xs font-semibold text-(--color-text)">
-														{day.records[0].status_label ?? STATUS[Number(day.records[0].status)]?.label ?? 'Recorded'}
-													</p>
-												)}
+
 												{!(day.records.length === 1 && !day.records[0].check_in && STATUS[Number(day.records[0].status)]?.label !== 'Present') && (
 													<>
-												{/* Hours summary */}
-												<div className="grid grid-cols-3 gap-x-1 text-[10px] leading-4">
-													<span className="text-(--color-text-muted)">Reg</span>
-													<span className="text-(--color-text-muted)">Work</span>
-													<span className="text-(--color-text-muted) flex items-center gap-0.5">OT{day.overtime > 0 && <Clock3 size={9} className="text-amber-600" />}</span>
-													<span className="font-semibold text-(--color-text)">{formatHours(day.regular)}</span>
-													<span className="font-semibold text-(--color-text)">{formatHours(day.worked)}</span>
-													<span className={`font-semibold ${day.overtime > 0 ? 'text-amber-600' : 'text-(--color-text)'}`}>{formatHours(day.overtime)}</span>
-												</div>
+														{/* Hours summary */}
+														<div className="grid grid-cols-3 gap-x-1 text-[10px] leading-4">
+															<span className="text-(--color-text-muted)">Reg</span>
+															<span className="text-(--color-text-muted)">Work</span>
+															<span className="text-(--color-text-muted) flex items-center gap-0.5">OT{day.overtime > 0 && <Clock3 size={9} className="text-amber-600" />}</span>
+															<span className="font-semibold text-(--color-text)">{formatHours(day.regular)}</span>
+															<span className="font-semibold text-(--color-text)">{formatHours(day.worked)}</span>
+															<span className={`font-semibold ${day.overtime > 0 ? 'text-amber-600' : 'text-(--color-text)'}`}>{formatHours(day.overtime)}</span>
+														</div>
 
-												{/* Punch in/out table */}
-												<div className="rounded border border-(--color-border) overflow-hidden">
-													<table className="w-full text-[10px]">
-														<thead>
-															<tr className="bg-(--color-bg-elevated)">
-																<th className="px-1 py-0.5 text-left font-medium text-(--color-text-muted)">In</th>
-																<th className="px-1 py-0.5 text-left font-medium text-(--color-text-muted)">Out</th>
-																<th className="w-4" />
-															</tr>
-														</thead>
-														<tbody>
-															{day.records.map((rec, idx) => (
-																<tr key={rec.id ?? idx} className="border-t border-(--color-border)">
-																	<td className="px-1 py-0.5 font-medium text-(--color-text)">{formatTime(rec.check_in)}</td>
-																	<td className="px-1 py-0.5 font-medium text-(--color-text)">{formatTime(rec.check_out)}</td>
-																	<td className="px-1 py-0.5 text-right">
-																		{rec.remarks && <RemarkTooltip remark={rec.remarks} />}
-																	</td>
-																</tr>
-															))}
-														</tbody>
-													</table>
-												</div>
+														{/* Punch in/out table */}
+														<div className="rounded border border-(--color-border) overflow-hidden">
+															<table className="w-full text-[10px]">
+																<thead>
+																	<tr className="bg-(--color-bg-elevated)">
+																		<th className="px-1 py-0.5 text-left font-medium text-(--color-text-muted)">In</th>
+																		<th className="px-1 py-0.5 text-left font-medium text-(--color-text-muted)">Out</th>
+																		<th className="w-4" />
+																	</tr>
+																</thead>
+																<tbody>
+																	{day.records.map((rec, idx) => (
+																		<tr key={rec.id ?? idx} className="border-t border-(--color-border)">
+																			<td className="px-1 py-0.5 font-medium text-(--color-text)">{formatTime(rec.check_in)}</td>
+																			<td className="px-1 py-0.5 font-medium text-(--color-text)">{formatTime(rec.check_out)}</td>
+																			<td className="px-1 py-0.5 text-right">
+																				{rec.remarks && <RemarkTooltip remark={rec.remarks} />}
+																			</td>
+																		</tr>
+																	))}
+																</tbody>
+															</table>
+														</div>
 													</>
 												)}
 											</div>
