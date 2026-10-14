@@ -17,16 +17,13 @@ const formatFileSize = (bytes = 0) => {
   if (bytes < 1024 * 1024) {
     return `${(bytes / 1024).toFixed(1)} KB`;
   }
-
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
 const getFileType = (file) => {
   const type = file?.type || "";
-
   if (type.startsWith("image/")) return "image";
   if (type === "application/pdf") return "pdf";
-
   return "document";
 };
 
@@ -35,58 +32,44 @@ const isBrowserFile = (file) =>
 
 const normalizeValue = (value, multiple) => {
   if (!value) return [];
-
   if (multiple) {
     return Array.isArray(value) ? value : [value];
   }
-
   return Array.isArray(value) ? value.slice(0, 1) : [value];
 };
 
 const getFileName = (file) => {
   if (isBrowserFile(file)) return file.name;
-
   return file?.name || file?.fileName || "Document";
 };
 
 const getFileSize = (file) => {
   if (isBrowserFile(file)) return file.size;
-
   return file?.size || 0;
 };
 
 const getFileUrl = (file) => {
   if (!file) return "";
-
   if (isBrowserFile(file)) {
     return URL.createObjectURL(file);
   }
-
   return file?.url || file?.preview || file?.path || "";
 };
 
 const UploadField = ({
   label = "Upload Document",
   required = false,
-
   value,
   onChange,
-
   accept = "image/*,.pdf",
   multiple = false,
-
   maxSize = DEFAULT_MAX_SIZE,
   maxFiles = 5,
-
   disabled = false,
-
   error,
   helperText,
-
   placeholder = "Click to upload or drag and drop",
-
   className = "",
-
   validate,
 }) => {
   const inputId = useId();
@@ -138,7 +121,6 @@ const UploadField = ({
 
       if (typeof validate === "function") {
         const customError = validate(file, existingFiles);
-
         if (customError) {
           return customError;
         }
@@ -152,7 +134,6 @@ const UploadField = ({
     if (disabled) return;
 
     const selectedFiles = Array.from(fileList || []);
-
     if (!selectedFiles.length) return;
 
     setInternalError("");
@@ -170,10 +151,7 @@ const UploadField = ({
     const validFiles = [];
 
     for (const file of selectedFiles) {
-      const validationError = validateFile(file, [
-        ...files,
-        ...validFiles,
-      ]);
+      const validationError = validateFile(file, [...files, ...validFiles]);
 
       if (validationError) {
         setInternalError(validationError);
@@ -184,25 +162,20 @@ const UploadField = ({
     }
 
     const nextFiles = multiple ? [...files, ...validFiles] : validFiles;
-
     onChange?.(multiple ? nextFiles : nextFiles[0] || null);
   };
 
   const handleInputChange = (event) => {
     handleFiles(event.target.files);
-
-    // Allows selecting the same file again
     event.target.value = "";
   };
 
   const handleDrop = (event) => {
     event.preventDefault();
     event.stopPropagation();
-
     setDragging(false);
 
     if (disabled) return;
-
     handleFiles(event.dataTransfer.files);
   };
 
@@ -211,11 +184,9 @@ const UploadField = ({
     event.stopPropagation();
 
     if (disabled) return;
-
     setInternalError("");
 
     const nextFiles = files.filter((_, index) => index !== indexToRemove);
-
     onChange?.(multiple ? nextFiles : null);
   };
 
@@ -227,18 +198,15 @@ const UploadField = ({
 
   return (
     <>
-      <div className={cn("w-full", className)}>
+      <div className={cn("w-full space-y-1.5", className)}>
         {/* Label */}
         {label && (
           <label
             htmlFor={inputId}
-            className="mb-1.5 flex items-center gap-1 text-sm font-semibold text-[var(--color-text)]"
+            className="flex items-center gap-1 text-sm font-semibold text-[var(--color-text)]"
           >
             {label}
-
-            {required && (
-              <span className="text-[var(--color-danger)]">*</span>
-            )}
+            {required && <span className="text-[var(--color-danger)]">*</span>}
           </label>
         )}
 
@@ -262,68 +230,47 @@ const UploadField = ({
           }}
           onDragLeave={() => setDragging(false)}
           onDrop={handleDrop}
-          className={[
-            "group flex min-h-[104px] w-full cursor-pointer items-center justify-between gap-4 rounded-xl border border-dashed px-4 py-4",
-            "bg-[var(--color-surface)]",
-            "transition-all duration-200",
-            "hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-soft)]",
+          className={cn(
+            "group flex min-h-[110px] w-full cursor-pointer items-center justify-between gap-4 rounded-xl border border-dashed px-2 py-2",
+            "bg-[var(--color-surface)] transition-all duration-200",
+            "hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-soft)]/40",
             dragging
-              ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)] shadow-[0_0_0_4px_var(--color-accent-soft)]"
+              ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)] shadow-sm"
               : "",
             activeError
-              ? "border-[var(--color-danger)]"
+              ? "border-[var(--color-danger)] bg-[var(--color-danger)]/5"
               : "border-[var(--color-border-strong)]",
-            disabled ? "cursor-not-allowed opacity-50" : "",
-          ].join(" ")}
+            disabled ? "cursor-not-allowed opacity-50" : ""
+          )}
         >
-          {/* Left Content (Icon/Thumbnail + Details) */}
+          {/* Left Content */}
           <div className="flex min-w-0 items-center gap-4">
             {currentFile ? (
-              /* Selected/Uploaded File Thumbnail or Icon */
-              <div className="h-12 w-12 shrink-0">
+              <div className="shrink-0">
                 {fileType === "image" && previewUrl ? (
                   <img
                     src={previewUrl}
                     alt={getFileName(currentFile)}
-                    className="h-12 w-12 rounded-lg border border-[var(--color-border)] object-cover"
+                    className="h-[100px] rounded-lg border border-[var(--color-border)] object-cover shadow-xs"
                   />
                 ) : (
-                  <div
-                    className="
-                      flex h-12 w-12 items-center justify-center
-                      rounded-lg
-                      bg-[var(--color-accent-soft)]
-                      text-[var(--color-accent)]
-                    "
-                  >
-                    {fileType === "image" ? (
-                      <FileImage size={21} />
-                    ) : fileType === "pdf" ? (
-                      <FileText size={21} />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--color-accent-soft)] text-[var(--color-accent)]">
+                    {fileType === "pdf" ? (
+                      <FileText size={22} />
                     ) : (
-                      <FileIcon size={21} />
+                      <FileIcon size={22} />
                     )}
                   </div>
                 )}
               </div>
             ) : (
-              /* Default Upload Icon */
-              <div
-                className="
-                  flex h-11 w-11 shrink-0 items-center justify-center
-                  rounded-xl border border-[var(--color-border)]
-                  bg-[var(--color-accent-soft)]
-                  text-[var(--color-accent)]
-                  transition-transform duration-200
-                  group-hover:-translate-y-0.5
-                "
-              >
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-accent-soft)] text-[var(--color-accent)] transition-transform duration-200 group-hover:-translate-y-0.5">
                 <Upload size={20} />
               </div>
             )}
 
-            {/* Details or Placeholder */}
-            <div className="min-w-0">
+            {/* Details */}
+            <div className="min-w-0 space-y-0.5">
               {currentFile ? (
                 <>
                   <p
@@ -332,16 +279,14 @@ const UploadField = ({
                   >
                     {getFileName(currentFile)}
                   </p>
-
-                  <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-[var(--color-text-muted)]">
+                  <div className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
                     {getFileSize(currentFile) > 0 && (
                       <span>{formatFileSize(getFileSize(currentFile))}</span>
                     )}
-
                     {getFileSize(currentFile) > 0 && <span>•</span>}
-
-                    <span>{fileType.toUpperCase()}</span>
-
+                    <span className="uppercase tracking-wider font-medium text-[10px] px-1.5 py-0.5 rounded bg-[var(--color-surface-strong)] border border-[var(--color-border)]">
+                      {fileType}
+                    </span>
                     {multiple && files.length > 1 && (
                       <>
                         <span>•</span>
@@ -358,38 +303,24 @@ const UploadField = ({
                   <p className="text-sm font-semibold text-[var(--color-text)]">
                     {placeholder}
                   </p>
-
-                  <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                  <p className="text-xs text-[var(--color-text-muted)]">
                     {accept.replaceAll(",", ", ")}
-                    {maxSize
-                      ? ` • Maximum ${formatFileSize(maxSize)}`
-                      : ""}
+                    {maxSize ? ` • Max ${formatFileSize(maxSize)}` : ""}
                   </p>
                 </>
               )}
             </div>
           </div>
 
-          {/* Right Action Buttons (Shown when file is selected) */}
+          {/* Right Action Buttons */}
           {currentFile && (
-            <div className="flex shrink-0 items-center gap-1.5">
+            <div className="flex shrink-0 items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
               <button
                 type="button"
                 disabled={disabled}
                 onClick={(e) => openPreview(e, currentFile)}
-                title="Preview"
-                className="
-                  inline-flex h-8 w-8 items-center justify-center
-                  rounded-lg border border-[var(--color-border)]
-                  bg-[var(--color-surface)]
-                  text-[var(--color-text)]
-                  transition-all duration-150
-                  hover:border-[var(--color-accent)]
-                  hover:bg-[var(--color-accent-soft)]
-                  hover:text-[var(--color-accent)]
-                  disabled:cursor-not-allowed
-                  disabled:opacity-50
-                "
+                title="Preview document"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-soft)] hover:text-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Eye size={16} />
               </button>
@@ -398,19 +329,8 @@ const UploadField = ({
                 type="button"
                 disabled={disabled}
                 onClick={(e) => removeFile(e, files.length - 1)}
-                title="Remove"
-                className="
-                  inline-flex h-8 w-8 items-center justify-center
-                  rounded-lg border border-[var(--color-border)]
-                  bg-[var(--color-surface)]
-                  text-[var(--color-text)]
-                  transition-all duration-150
-                  hover:border-[var(--color-danger)]
-                  hover:bg-[var(--color-danger)]/10
-                  hover:text-[var(--color-danger)]
-                  disabled:cursor-not-allowed
-                  disabled:opacity-50
-                "
+                title="Remove document"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:border-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 hover:text-[var(--color-danger)] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <X size={16} />
               </button>
@@ -420,22 +340,21 @@ const UploadField = ({
 
         {/* Helper */}
         {helperText && !activeError && (
-          <p className="mt-1.5 text-xs text-[var(--color-text-muted)]">
+          <p className="text-xs text-[var(--color-text-muted)]">
             {helperText}
           </p>
         )}
 
         {/* Error */}
         {activeError && (
-          <div className="mt-1.5 flex items-start gap-1.5 text-xs font-medium text-[var(--color-danger)]">
-            <AlertCircle size={15} className="mt-0.5 shrink-0" />
-
+          <div className="flex items-center gap-1.5 text-xs font-medium text-[var(--color-danger)] pt-0.5">
+            <AlertCircle size={15} className="shrink-0" />
             <span>{activeError}</span>
           </div>
         )}
       </div>
 
-      {/* Modal - only rendered when previewFile state is active */}
+      {/* Preview Modal */}
       {previewFile && (
         <PreviewModal
           file={previewFile}
@@ -474,52 +393,27 @@ const PreviewModal = ({ file, onClose }) => {
         onClose();
       }
     };
-
     document.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-    };
+    return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
   return (
     <div
       role="dialog"
       aria-modal="true"
-      className="
-        fixed inset-0 z-[9999]
-        flex items-center justify-center
-        bg-black/70 p-3 backdrop-blur-md
-      "
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) {
-          onClose();
-        }
-      }}
+      onClick={onClose}
+      className="fixed inset-0 z-[9999] flex items-start justify-center bg-black/75 p-4 pt-6 md:pt-10 backdrop-blur-sm overflow-y-auto"
     >
-      <div
-        className="
-          flex h-[min(90vh,850px)] w-full max-w-6xl
-          flex-col overflow-hidden rounded-2xl
-          border border-[var(--color-border-strong)]
-          bg-[var(--color-bg-elevated)]
-          shadow-2xl
-        "
+      <div 
+        onClick={(e) => e.stopPropagation()}
+        className="flex h-[min(90vh,850px)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-[var(--color-border-strong)] bg-[var(--color-bg-elevated)] shadow-2xl animate-in fade-in zoom-in-95 duration-150"
       >
         {/* Header */}
-        <div
-          className="
-            flex items-center justify-between gap-3
-            border-b border-[var(--color-border)]
-            bg-[var(--color-surface-strong)]
-            px-4 py-3
-          "
-        >
+        <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface-strong)] px-5 py-3.5">
           <div className="min-w-0">
             <p className="text-sm font-bold text-[var(--color-text)]">
               Document Preview
             </p>
-
             <p
               title={getFileName(file)}
               className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]"
@@ -531,34 +425,20 @@ const PreviewModal = ({ file, onClose }) => {
           <button
             type="button"
             onClick={onClose}
-            className="
-              inline-flex h-9 w-9 shrink-0 items-center justify-center
-              rounded-lg border border-[var(--color-border)]
-              bg-[var(--color-surface)]
-              text-[var(--color-text)]
-              transition-all
-              hover:border-[var(--color-danger)]
-              hover:bg-[var(--color-danger)]/10
-              hover:text-[var(--color-danger)]
-            "
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:border-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 hover:text-[var(--color-danger)]"
             aria-label="Close preview"
           >
-            <X size={19} />
+            <X size={18} />
           </button>
         </div>
 
         {/* Body */}
-        <div
-          className="
-            flex min-h-0 flex-1 items-center justify-center
-            overflow-auto bg-[var(--color-bg)] p-4
-          "
-        >
+        <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto bg-[var(--color-bg)] p-6">
           {type === "image" && previewUrl && (
             <img
               src={previewUrl}
               alt={getFileName(file)}
-              className="max-h-full max-w-full rounded-lg object-contain shadow-xl"
+              className="max-h-full max-w-full rounded-xl object-contain shadow-md"
             />
           )}
 
@@ -566,29 +446,20 @@ const PreviewModal = ({ file, onClose }) => {
             <iframe
               src={previewUrl}
               title={getFileName(file)}
-              className="h-full min-h-[600px] w-full rounded-lg border-0 bg-white"
+              className="h-full min-h-[550px] w-full rounded-xl border border-[var(--color-border)] bg-white shadow-xs"
             />
           )}
 
           {type === "document" && (
-            <div className="flex max-w-md flex-col items-center text-center">
-              <div
-                className="
-                  flex h-20 w-20 items-center justify-center
-                  rounded-2xl bg-[var(--color-accent-soft)]
-                  text-[var(--color-accent)]
-                "
-              >
-                <FileIcon size={38} />
+            <div className="flex max-w-sm flex-col items-center text-center p-6">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--color-accent-soft)] text-[var(--color-accent)] shadow-xs">
+                <FileIcon size={32} />
               </div>
-
               <h3 className="mt-4 text-base font-bold text-[var(--color-text)]">
-                Preview unavailable
+                Preview Unavailable
               </h3>
-
-              <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-                This document type cannot be previewed directly
-                in the browser.
+              <p className="mt-1 text-xs text-[var(--color-text-muted)] leading-relaxed">
+                This document format cannot be previewed directly inside the browser. You can download it to view its contents.
               </p>
             </div>
           )}

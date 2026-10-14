@@ -25,7 +25,7 @@ const EmployeeProgress = ({ steps, activeStep, onStepChange, requiredStepIds = s
   };
 
   return (
-    <section aria-label="Employee onboarding progress" className="mt-5">
+    <section aria-label="Employee onboarding progress" className="">
       <div className="mb-2 flex items-center justify-between gap-3 text-xs text-(--color-text-muted)">
         <span>{completedCount} of {requiredStepIds.length} required milestones submitted</span>
         <span>{completionPercent}% complete</span>

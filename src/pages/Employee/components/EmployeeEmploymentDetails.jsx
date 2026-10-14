@@ -1,3 +1,4 @@
+import { Info } from 'lucide-react';
 import InputField from '../../../components/InputField';
 import SearchableSelect from '../../../components/SearchableSelect';
 import SectionCard from '../../../components/SectionCard';
@@ -32,7 +33,7 @@ const EmployeeEmploymentDetails = ({ form, errors, plants, departments, designat
             </label>
           ))}
         </div>
-        <p className="mt-1 text-xs text-(--color-text-muted)">Unselected days are treated as scheduled working days in the attendance report.</p>
+        <p className="mt-4 text-xs text-(--color-text-muted) flex items-center gap-2"><Info className="inline-block h-4 w-4" /> Unselected days are treated as scheduled working days in the attendance report.</p>
       </fieldset>
     </div>
   </SectionCard>

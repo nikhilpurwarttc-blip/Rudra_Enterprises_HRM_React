@@ -47,7 +47,7 @@ const SectionCard = ({
           }`}
         >
           {title && (
-            <h3 className="inline-block rounded-r-full bg-[var(--color-accent)] px-3 py-1 text-base font-semibold text-white">
+            <h3 className="capitalize inline-block rounded-r-full bg-[var(--color-accent)] px-3 py-1 text-base font-semibold text-white">
               {title}
             </h3>
           )}

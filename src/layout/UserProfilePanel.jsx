@@ -2,6 +2,7 @@ import { BriefcaseBusiness, Factory, Mail, ShieldCheck, UserRound, UserRoundCog 
 import RightModal from '../pages/components/RightModal';
 import Button from '../components/Button';
 import { useGetPlantsQuery } from '../store/api';
+import EmployeeAvatar from '../pages/Employee/components/EmployeeAvatar';
 
 const UserProfilePanel = ({ user, roleName, isOpen, onClose, onNavigate, onLogout }) => {
   const { data: plantsData, isLoading: plantsLoading, isError: plantsError } = useGetPlantsQuery({ all: true, per_page: 100 });
@@ -25,9 +26,10 @@ const UserProfilePanel = ({ user, roleName, isOpen, onClose, onNavigate, onLogou
   return (
     <RightModal isOpen={isOpen} onClose={onClose} title="My Profile" settingoff={false} bodyClassName="space-y-5">
       <div className="flex items-center gap-3 border-b border-(--color-border) pb-5">
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-(--color-accent) text-white">
-          <UserRound size={25} />
-        </div>
+        <EmployeeAvatar
+          employee={{ name: user.name, image: employee?.image ?? user.image }}
+          className="h-14 w-14 text-lg"
+        />
         <div className="min-w-0">
           <h3 className="truncate text-lg font-semibold text-(--color-text)">{user.name || 'User'}</h3>
           <p className="text-sm capitalize text-(--color-text-muted)">{displayRole}</p>

@@ -437,7 +437,7 @@ const Plants = () => {
                       </button>
                       {(canEdit && !isReadOnly) && <button type="button" aria-label={`Edit ${plant.name}`} onClick={() => setEditor({ open: true, plant })} className="rounded px-2 text-(--color-accent) hover:scale-110"><Pencil size={15} /></button>}
                       {(canDelete && !isReadOnly) && <button type="button" aria-label={`Delete ${plant.name}`} onClick={() => setDeleteTarget(plant)} className="mr-1 rounded px-2 text-red-500 hover:scale-110"><Trash2 size={15} /></button>}
-                      <Switch
+                      {(canDelete && !isReadOnly) && <Switch
                         checked={Number(plant.status) === 1}
                         disabled={!canEdit || isReadOnly}
                         loading={togglingId === plant.id}
@@ -445,6 +445,7 @@ const Plants = () => {
                         ariaLabel={Number(plant.status) === 1 ? 'Active' : 'Inactive'}
                         className="mr-2"
                       />
+                      }
                     </div>
                   );
                 })}
@@ -467,7 +468,7 @@ const Plants = () => {
                 <span className="min-w-32 text-center text-sm font-semibold text-(--color-text)">{monthLabel}</span>
                 <button type="button" aria-label="Next month" onClick={() => changeMonth(1)} className="flex h-9 w-9 items-center justify-center rounded-md border border-(--color-border) text-(--color-text-muted) hover:bg-(--color-accent-soft)"><ChevronRight size={17} /></button>
                 <button type="button" onClick={() => changeMonth(0)} className="h-9 rounded-md border border-(--color-border) px-3 text-sm font-medium text-(--color-text) hover:bg-(--color-accent-soft)">Today</button>
-                {canRequestShutdown && <Button type="button" onClick={() => openShutdownRequest([])} disabled={submittingShutdown} className="inline-flex items-center gap-2 whitespace-nowrap bg-amber-700 hover:bg-amber-800"><Power size={15} />Request shutdown</Button>}
+                {/* {canRequestShutdown && <Button type="button" onClick={() => openShutdownRequest([])} disabled={submittingShutdown} className="inline-flex items-center gap-2 whitespace-nowrap bg-amber-700 hover:bg-amber-800"><Power size={15} />Request shutdown</Button>} */}
               </div>
             </header>
 
@@ -560,18 +561,18 @@ const Plants = () => {
                       ? 'border-red-500/30 bg-red-500/5 text-red-700 dark:text-red-300'
                       : 'border-slate-500/30 bg-slate-500/5 text-slate-700 dark:text-slate-300';
                   return <div key={shutdown.id ?? `${start}-${shutdown.reason}`} className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 ${statusClass}`}>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold">{start}{end && end !== start ? ` – ${end}` : ''} · {status.label}</p>
-                        <p className="mt-1 text-sm text-(--color-text)">{shutdown.reason || shutdown.shutdown_type || 'Plant shutdown'}</p>
-                        {Number(shutdown.status) === 3 && shutdown.remarks && <p className="mt-1 text-sm text-(--color-text-muted)">Rejection reason: {shutdown.remarks}</p>}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold">{start}{end && end !== start ? ` – ${end}` : ''} · {status.label}</p>
+                      <p className="mt-1 text-sm text-(--color-text)">{shutdown.reason || shutdown.shutdown_type || 'Plant shutdown'}</p>
+                      {Number(shutdown.status) === 3 && shutdown.remarks && <p className="mt-1 text-sm text-(--color-text-muted)">Rejection reason: {shutdown.remarks}</p>}
+                    </div>
+                    {isPending && (canApproveShutdown || canRejectShutdown) && (
+                      <div className="flex items-center gap-2">
+                        {canApproveShutdown && <Button type="button" onClick={() => setShutdownToApprove(shutdown)} disabled={approvingShutdown || rejectingShutdown} className="inline-flex items-center gap-2"><Check size={16} />Approve</Button>}
+                        {canRejectShutdown && <Button type="button" onClick={() => { setShutdownToReject(shutdown); setRejectionReason(''); }} disabled={approvingShutdown || rejectingShutdown} className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700"><XCircle size={16} />Reject</Button>}
                       </div>
-                      {isPending && (canApproveShutdown || canRejectShutdown) && (
-                        <div className="flex items-center gap-2">
-                          {canApproveShutdown && <Button type="button" onClick={() => setShutdownToApprove(shutdown)} disabled={approvingShutdown || rejectingShutdown} className="inline-flex items-center gap-2"><Check size={16} />Approve</Button>}
-                          {canRejectShutdown && <Button type="button" onClick={() => { setShutdownToReject(shutdown); setRejectionReason(''); }} disabled={approvingShutdown || rejectingShutdown} className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700"><XCircle size={16} />Reject</Button>}
-                        </div>
-                      )}
-                    </div>;
+                    )}
+                  </div>;
                 })}
               </section>
             )}

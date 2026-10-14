@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Plus, RefreshCw } from 'lucide-react';
 import Button from '../../../components/Button';
 import { InlineError, LoadingState } from '../../../components/Feedback';
+import SearchableSelect from '../../../components/SearchableSelect';
 import SectionCard from '../../../components/SectionCard';
 
 const toNextDate = (date) => {
@@ -35,7 +36,12 @@ const EmployeeSalarySection = ({
   isLoading,
   isError,
   saving,
+  savingCharges,
   updating,
+  charges,
+  chargeIds,
+  onChargeIdsChange,
+  onSaveCharges,
   onRefresh,
   onSave,
   onUpdate,
@@ -45,6 +51,8 @@ const EmployeeSalarySection = ({
   const [includeInPayroll, setIncludeInPayroll] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [chargesError, setChargesError] = useState('');
+  const [chargesSuccess, setChargesSuccess] = useState('');
 
   const latestEffectiveFrom = useMemo(
     () => salaries.reduce((latest, salary) => (
@@ -53,6 +61,14 @@ const EmployeeSalarySection = ({
     [salaries],
   );
   const minEffectiveFrom = toNextDate(latestEffectiveFrom);
+
+  const handleSaveCharges = async () => {
+    setChargesError('');
+    setChargesSuccess('');
+    const saved = await onSaveCharges();
+    if (saved) setChargesSuccess('Charges and allowances saved.');
+    else setChargesError('Unable to save charges and allowances. Please try again.');
+  };
 
   const handleSave = async (event) => {
     event.preventDefault();
@@ -166,6 +182,26 @@ const EmployeeSalarySection = ({
         <p className="mt-3 text-xs text-(--color-text-muted)">
           When a new included salary starts, the previous included salary ends the day before its effective-from date.
         </p>
+      </SectionCard>
+
+      <SectionCard title="Charges & allowances">
+        <div className="space-y-4">
+          <SearchableSelect
+            label="Charges & allowances"
+            options={charges}
+            value={chargeIds}
+            onChange={onChargeIdsChange}
+            multiSelect
+            placeholder="Select charges"
+          />
+          {chargesError && <InlineError message={chargesError} />}
+          {chargesSuccess && <p role="status" className="text-sm text-emerald-600 dark:text-emerald-400">{chargesSuccess}</p>}
+          <div className="flex justify-end">
+            <Button type="button" onClick={handleSaveCharges} disabled={savingCharges}>
+              {savingCharges ? 'Saving charges…' : 'Save charges'}
+            </Button>
+          </div>
+        </div>
       </SectionCard>
 
       <SectionCard title="Add salary / increment" >

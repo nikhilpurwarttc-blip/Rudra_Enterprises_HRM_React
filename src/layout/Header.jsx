@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Menu, LogOut, User, Search, X, ChevronLeft, ChevronRight, Bell } from "lucide-react";
+import { Menu, LogOut, Search, X, ChevronLeft, ChevronRight, Bell } from "lucide-react";
 import { useSelector, useDispatch } from "react-redux";
 import { selectUser, selectRole, clearCredentials } from "../store/authSlice";
 import { api, useLogoutMutation } from "../store/api";
@@ -10,6 +10,7 @@ import Breadcrumb from "../components/Breadcrumb";
 import { useSearch } from "../contexts/SearchContext";
 import UserProfilePanel from "./UserProfilePanel";
 import NotificationModal from "./NotifiModal";
+import EmployeeAvatar from "../pages/Employee/components/EmployeeAvatar";
 
 const Header = ({ onToggleSidebar }) => {
   const user = useSelector(selectUser);
@@ -163,7 +164,7 @@ const Header = ({ onToggleSidebar }) => {
 
         <button
           onClick={() => setIsNotificationOpen(true)}
-          className="relative p-2 rounded-md hover:bg-gray-300 dark:hover:bg-white/10"
+          className="relative p-2 rounded-md hover:bg-[var(--color-border)] transition-colors"
         >
           <Bell size={16} className="text-gray-600 dark:text-gray-200" />
           <span className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-red-500" />
@@ -174,11 +175,12 @@ const Header = ({ onToggleSidebar }) => {
           type="button"
           onClick={() => setIsProfileOpen(true)}
           aria-label="Open user profile"
-          className="flex items-center gap-2 border-l border-[var(--color-border)] pl-2 text-left hover:animate-pulse focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
+          className="flex items-center gap-2 border-l border-[var(--color-border)] pl-2 text-left hover:scale-105 focus:outline-none"
         >
-          <div className="w-8 h-8 bg-[var(--color-accent)] rounded-full flex items-center justify-center text-white shrink-0">
-            <User size={15} />
-          </div>
+          <EmployeeAvatar
+            employee={{ name: user?.name, image: user?.employee?.image ?? user?.image }}
+            className="h-8 w-8 text-xs"
+          />
           <div className="hidden md:block leading-tight">
             <p className="text-sm font-medium text-[var(--color-text)]">{user?.name ?? 'User'}</p>
             {roleName && <p className="text-[10px] text-[var(--color-text-muted)] capitalize">{roleName}</p>}

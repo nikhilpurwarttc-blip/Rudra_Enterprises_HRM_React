@@ -1,6 +1,5 @@
 import { Trash2 } from 'lucide-react';
 import Button from '../../../components/Button';
-import EmployeeAdditionalDetails from './EmployeeAdditionalDetails';
 import EmployeeContactDetails from './EmployeeContactDetails';
 import EmployeeEmploymentDetails from './EmployeeEmploymentDetails';
 import EmployeePersonalDetails from './EmployeePersonalDetails';
@@ -12,7 +11,6 @@ const EmployeeDetailsSection = ({
   departments,
   designations,
   shifts,
-  charges,
   setField,
   selectField,
   updateForm,
@@ -28,6 +26,7 @@ const EmployeeDetailsSection = ({
         setField={setField}
         setGender={selectField('gender')}
         setMaritalStatus={selectField('marital_status')}
+        updateForm={updateForm}
       />
     </div>
     <div data-employee-section="employment">
@@ -45,14 +44,6 @@ const EmployeeDetailsSection = ({
     </div>
     <div data-employee-section="contact">
       <EmployeeContactDetails form={form} errors={errors} setField={setField} />
-    </div>
-    <div data-employee-section="extras">
-      <EmployeeAdditionalDetails
-        form={form}
-        charges={charges}
-        updateForm={updateForm}
-        setField={setField}
-      />
     </div>
     <div className="flex flex-wrap items-center justify-between gap-3">
       <Button type="button" variant="ghost" onClick={onClearDraft} className="flex items-center gap-2">

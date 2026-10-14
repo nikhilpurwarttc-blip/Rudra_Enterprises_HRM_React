@@ -1,9 +1,8 @@
 import { useMemo, useState } from 'react';
-import { BadgeCheck, CalendarDays, RefreshCw, WalletCards } from 'lucide-react';
-import Button from '../../components/Button';
+import { BadgeCheck, CalendarDays, ChevronLeft, ChevronRight, RefreshCw, WalletCards } from 'lucide-react';
 import GlassCard from '../../components/GlassCard';
 import { Feedback, InlineError, LoadingState } from '../../components/Feedback';
-import InputField from '../../components/InputField';
+import SearchableSelect from '../../components/SearchableSelect';
 import usePermission from '../../hooks/usePermission';
 import { useGetMonthlySalaryReportQuery } from '../../store/api';
 
@@ -11,6 +10,10 @@ const currentMonth = () => {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 };
+const MONTH_OPTIONS = Array.from({ length: 12 }, (_, monthIndex) => ({
+  value: String(monthIndex),
+  label: new Intl.DateTimeFormat('en', { month: 'long' }).format(new Date(2000, monthIndex, 1)),
+}));
 
 const formatCurrency = (value) => new Intl.NumberFormat('en-IN', {
   style: 'currency',
@@ -61,6 +64,33 @@ const EmployeeSalary = ({ employee }) => {
     ? new Intl.DateTimeFormat('en-IN', { month: 'long', year: 'numeric' })
       .format(new Date(`${payrollMonth}-01T00:00:00`))
     : 'Selected month';
+  const selectedDate = validMonth ? new Date(year, month - 1, 1) : new Date();
+  const today = new Date();
+  const currentMonthDate = new Date(today.getFullYear(), today.getMonth(), 1);
+  const joiningDate = employee?.joining_date
+    ? new Date(`${String(employee.joining_date).slice(0, 10)}T00:00:00`)
+    : null;
+  const joinedMonth = joiningDate && !Number.isNaN(joiningDate.getTime())
+    ? new Date(joiningDate.getFullYear(), joiningDate.getMonth(), 1)
+    : new Date(currentMonthDate.getFullYear() - 50, 0, 1);
+  const minimumMonth = joinedMonth > currentMonthDate ? currentMonthDate : joinedMonth;
+  const canGoPrevious = selectedDate > minimumMonth;
+  const canGoNext = selectedDate < currentMonthDate;
+  const yearOptions = Array.from(
+    { length: currentMonthDate.getFullYear() - minimumMonth.getFullYear() + 1 },
+    (_, index) => {
+      const yearValue = currentMonthDate.getFullYear() - index;
+      return { value: String(yearValue), label: String(yearValue) };
+    },
+  );
+  const setSelectedMonth = (target) => {
+    const clampedDate = target < minimumMonth
+      ? minimumMonth
+      : target > currentMonthDate
+        ? currentMonthDate
+        : target;
+    setPayrollMonth(`${clampedDate.getFullYear()}-${String(clampedDate.getMonth() + 1).padStart(2, '0')}`);
+  };
 
   if (!canViewSalaryReport) {
     return (
@@ -80,34 +110,72 @@ const EmployeeSalary = ({ employee }) => {
     <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-4 sm:p-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-(--color-accent-soft) text-(--color-accent)">
+          <span className="flex h-10 w-10 items-center justify-center rounded-md bg-(--color-accent-soft) text-(--color-accent)">
             <WalletCards size={19} aria-hidden="true" />
           </span>
           <div>
-            <h2 className="text-lg font-semibold text-(--color-text)">Salary slip</h2>
-            <p className="text-xs text-(--color-text-muted)">{employee?.name} · {employee?.employee_code}</p>
+            <h2 className="text-lg font-semibold text-(--color-text)">{monthLabel}</h2>
+            <p className="text-xs text-(--color-text-muted)">Salary slip · {employee?.name} · {employee?.employee_code}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <InputField
-            label="Payroll month"
-            type="month"
-            value={payrollMonth}
-            onChange={(event) => setPayrollMonth(event.target.value)}
-            className="min-w-40"
-            max={currentMonth()}
-          />
-          <Button
+        <div className="flex flex-wrap items-center gap-1">
+          <button
             type="button"
-            variant="ghost"
-            onClick={() => reportQuery.refetch()}
-            disabled={reportQuery.isFetching || !validMonth}
+            aria-label="Previous salary month"
+            title="Previous month"
+            onClick={() => setSelectedMonth(new Date(year, month - 2, 1))}
+            disabled={!canGoPrevious}
+            className="flex h-9 w-9 items-center justify-center rounded-md border border-(--color-border) text-(--color-text-muted) hover:bg-(--color-accent-soft) hover:text-(--color-text) disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <ChevronLeft size={17} />
+          </button>
+          <SearchableSelect
+            ariaLabel="Select salary month"
+            options={MONTH_OPTIONS}
+            value={String(selectedDate.getMonth())}
+            onChange={(value) => setSelectedMonth(new Date(year, Number(value), 1))}
+            className="w-32"
+            btnClass="!min-h-9 h-9 px-2"
+            placeholder="Month"
+            clearable={false}
+          />
+          <SearchableSelect
+            ariaLabel="Select salary year"
+            options={yearOptions}
+            value={String(selectedDate.getFullYear())}
+            onChange={(selectedYear) => setSelectedMonth(new Date(Number(selectedYear), selectedDate.getMonth(), 1))}
+            className="w-24"
+            btnClass="!min-h-9 h-9 px-2"
+            placeholder="Year"
+            clearable={false}
+          />
+          <button
+            type="button"
+            onClick={() => setPayrollMonth(currentMonth())}
+            className="h-9 rounded-md border border-(--color-border) px-3 text-sm font-medium text-(--color-text) hover:bg-(--color-accent-soft)"
+          >
+            Today
+          </button>
+          <button
+            type="button"
             aria-label="Refresh salary slip"
             title="Refresh salary slip"
-            className="h-11 w-11 p-0"
+            onClick={() => reportQuery.refetch()}
+            disabled={reportQuery.isFetching || !validMonth}
+            className="flex h-9 w-9 items-center justify-center rounded-md border border-(--color-border) text-(--color-text-muted) hover:bg-(--color-accent-soft) hover:text-(--color-text) disabled:cursor-wait disabled:opacity-60"
           >
-            <RefreshCw size={16} className={reportQuery.isFetching ? 'animate-spin' : ''} aria-hidden="true" />
-          </Button>
+            <RefreshCw size={15} className={reportQuery.isFetching ? 'animate-spin' : ''} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            aria-label="Next salary month"
+            title="Next month"
+            onClick={() => setSelectedMonth(new Date(year, month, 1))}
+            disabled={!canGoNext}
+            className="flex h-9 w-9 items-center justify-center rounded-md border border-(--color-border) text-(--color-text-muted) hover:bg-(--color-accent-soft) hover:text-(--color-text) disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <ChevronRight size={17} />
+          </button>
         </div>
       </header>
 
@@ -120,7 +188,7 @@ const EmployeeSalary = ({ employee }) => {
       {reportQuery.isLoading || reportQuery.isFetching ? (
         <LoadingState message="Loading salary slip..." />
       ) : reportQuery.isError ? null : salary?.is_paid ? (
-        <GlassCard className="mx-auto w-full max-w-3xl overflow-hidden">
+        <GlassCard className="mx-auto w-full max-w-3xl overflow-x-auto">
           <div className="flex flex-wrap items-start justify-between gap-4 border-b border-(--color-border) bg-(--color-accent-soft)/40 p-5 sm:p-6">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-(--color-text-muted)">Payroll statement</p>

@@ -527,7 +527,7 @@ const Employees = () => {
 
   return (
     <div className="flex h-full min-h-0 overflow-hidden">
-      <aside className="flex w-full max-w-md shrink-0 flex-col border-r border-(--color-border) bg-(--color-bg-elevated) lg:w-92">
+      <aside className="flex w-full max-w-sm shrink-0 flex-col border-r border-(--color-border) bg-(--color-bg-elevated) lg:w-92">
         {/* Header */}
         <div className="border-b border-(--color-border) px-4 py-4">
           <div className="flex items-center justify-between gap-3">

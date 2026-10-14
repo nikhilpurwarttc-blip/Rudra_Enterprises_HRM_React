@@ -189,6 +189,15 @@ const AddEditEmployee = ({
     if (saved) setAccountDraft(EMPTY_ACCOUNT);
   };
 
+  const handleSaveCharges = async () => {
+    const savedEmployee = await onSubmit(createEmployeePayload(form, employeeId));
+    if (!savedEmployee) return false;
+
+    setSubmittedEmployee(savedEmployee);
+    draft.clearDraft();
+    return true;
+  };
+
   const handleStepChange = (stepId) => {
     if (!steps.some((step) => step.id === stepId)) return;
     setActiveStep(stepId);
@@ -208,12 +217,12 @@ const AddEditEmployee = ({
   return (
     <div className="flex h-full min-w-0 flex-col overflow-hidden">
       <header className="border-b border-(--color-border) px-5 py-4">
-        <EmployeeFormHeader
+        {/* <EmployeeFormHeader
           employee={employee ?? form}
           draftSavedAt={draft.draftSavedAt}
           onSaveDraft={handleSaveDraft}
           onClose={onClose}
-        />
+        /> */}
         <EmployeeProgress
           steps={steps}
           activeStep={activeStep}
@@ -232,7 +241,6 @@ const AddEditEmployee = ({
               departments={selectOptions.departments}
               designations={selectOptions.designations}
               shifts={selectOptions.shifts}
-              charges={selectOptions.charges}
               setField={handleFieldChange}
               selectField={handleSelectChange}
               updateForm={updateForm}
@@ -274,7 +282,12 @@ const AddEditEmployee = ({
               isLoading={salaryHistoryLoading}
               isError={salaryHistoryError}
               saving={savingSalary}
+              savingCharges={saving}
               updating={updatingSalary}
+              charges={selectOptions.charges}
+              chargeIds={form.charge_ids}
+              onChargeIdsChange={handleSelectChange('charge_ids')}
+              onSaveCharges={handleSaveCharges}
               onRefresh={refetchSalaryHistory}
               onSave={(body) => createEmployeeSalary(body).unwrap()}
               onUpdate={(body) => updateEmployeeSalary(body).unwrap()}

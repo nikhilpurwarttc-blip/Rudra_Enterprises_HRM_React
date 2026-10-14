@@ -41,8 +41,7 @@ export const EMPLOYEE_STEPS = [
 ];
 
 export const DETAIL_SECTIONS = [
-  { id: 'personal', fields: ['name', 'dob', 'gender', 'marital_status'] },
+  { id: 'personal', fields: ['name', 'dob', 'gender', 'marital_status', 'image', 'status'] },
   { id: 'employment', fields: ['joining_date', 'plant_id', 'department_id', 'designation_id', 'shift_id'] },
   { id: 'contact', fields: ['mobile_number', 'email', 'address'] },
-  { id: 'extras', fields: ['charge_ids', 'image'] },
 ];
