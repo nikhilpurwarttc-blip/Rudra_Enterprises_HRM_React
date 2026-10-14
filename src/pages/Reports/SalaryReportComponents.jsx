@@ -3,10 +3,12 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
-  Calculator,
+  BadgeCheck,
+  Banknote,
   FileSpreadsheet,
   Landmark,
-  LockKeyhole,
+  LoaderCircle,
+  RefreshCw,
   RotateCcw,
   ShieldCheck,
   Wallet,
@@ -19,6 +21,7 @@ import Button from '../../components/Button';
 import { Feedback } from '../../components/Feedback';
 import PageTable from '../../components/PageTable';
 import SearchableSelect from '../../components/SearchableSelect';
+import { resolveApiAssetUrl } from '../../config/config';
 
 const REPORT_TABS = [
   { id: 'monthly', label: 'Monthly payroll', icon: Wallet },
@@ -63,11 +66,9 @@ const FilterSelect = ({ label, options, value, onChange, isLoading = false, mult
   />
 );
 
-const EmployeeCell = ({ code, name }) => (
+const EmployeeCell = ({ code, name, image }) => (
   <div className="flex min-w-0 items-center gap-2">
-    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-(--color-accent-soft) text-[0.9em] font-semibold text-(--color-accent)">
-      {(name || 'E').trim().charAt(0).toLocaleUpperCase()}
-    </span>
+    <EmployeeInitialAvatar name={name} image={image} />
     <div className="min-w-0">
       <p className="truncate text-[0.95em] font-semibold text-(--color-text)" title={name}>
         {name || 'Unknown employee'}
@@ -76,6 +77,29 @@ const EmployeeCell = ({ code, name }) => (
     </div>
   </div>
 );
+
+const EmployeeInitialAvatar = ({ name, image }) => {
+  const [failedImageUrl, setFailedImageUrl] = useState(null);
+  const imageUrl = resolveApiAssetUrl(image);
+  const nameParts = String(name ?? '').trim().split(/\s+/).filter(Boolean);
+  const initials = nameParts.length > 1
+    ? `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`
+    : nameParts[0]?.[0] ?? 'E';
+
+  return (
+    <span aria-hidden="true" className="relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-(--color-accent-soft) text-[0.9em] font-semibold text-(--color-accent)">
+      {initials.toLocaleUpperCase()}
+      {imageUrl && failedImageUrl !== imageUrl && (
+        <img
+          src={imageUrl}
+          alt=""
+          onError={() => setFailedImageUrl(imageUrl)}
+          className="absolute inset-0 h-full w-full rounded-full object-cover"
+        />
+      )}
+    </span>
+  );
+};
 
 const SalaryReportTabs = ({ activeReport, onChange }) => (
   <div className="flex flex-wrap gap-2 border-b border-(--color-border)" role="tablist" aria-label="Salary report type">
@@ -86,11 +110,10 @@ const SalaryReportTabs = ({ activeReport, onChange }) => (
         role="tab"
         aria-selected={activeReport === id}
         onClick={() => onChange(id)}
-        className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-medium transition-colors ${
-          activeReport === id
+        className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-medium transition-colors ${activeReport === id
             ? 'border-(--color-accent) text-(--color-accent)'
             : 'border-transparent text-(--color-text-muted) hover:text-(--color-text)'
-        }`}
+          }`}
       >
         <Icon size={14} aria-hidden="true" /> {label}
       </button>
@@ -195,13 +218,13 @@ const STICKY_SNO_BODY = '!bg-white dark:!bg-slate-900 sticky left-0 z-20 shadow-
 const STICKY_EMP_HEADER = '!bg-slate-100 dark:!bg-slate-900 sticky left-[55px] z-40 shadow-[4px_0_10px_rgba(0,0,0,0.12)]';
 const STICKY_EMP_BODY = '!bg-white dark:!bg-slate-900 sticky left-[55px] z-20 shadow-[4px_0_10px_rgba(0,0,0,0.08)]';
 
-const STICKY_NET_HEADER = '!bg-emerald-200 dark:!bg-emerald-950 sticky right-[132px] z-40 shadow-[-4px_0_10px_rgba(0,0,0,0.12)]';
-const STICKY_NET_BODY = '!bg-emerald-100 dark:!bg-emerald-900 sticky right-[132px] z-20 shadow-[-4px_0_10px_rgba(0,0,0,0.08)]';
+const STICKY_NET_HEADER = '!bg-emerald-200 dark:!bg-emerald-950 sticky z-40 shadow-[-4px_0_10px_rgba(0,0,0,0.12)]';
+const STICKY_NET_BODY = '!bg-emerald-100 dark:!bg-emerald-900 sticky z-20 shadow-[-4px_0_10px_rgba(0,0,0,0.08)]';
 
 const STICKY_ACTION_HEADER = '!bg-slate-100 dark:!bg-slate-900 sticky right-0 z-40 shadow-[-3px_0_8px_rgba(0,0,0,0.12)]';
 const STICKY_ACTION_BODY = '!bg-white dark:!bg-slate-900 sticky right-0 z-20 shadow-[-3px_0_8px_rgba(0,0,0,0.08)]';
 
-const getColumns = (activeReport, chargeColumns, onLockEmployee, lockingEmployeeId, canLockEmployees, isLocking) => {
+const getColumns = (activeReport, chargeColumns, onPayEmployee, payingEmployeeId, canPayEmployees, isPaying) => {
   if (activeReport === 'monthly') {
     return [
       {
@@ -220,7 +243,7 @@ const getColumns = (activeReport, chargeColumns, onLockEmployee, lockingEmployee
         className: `min-w-[170px] w-[170px] ${STICKY_EMP_HEADER}`,
         tdClass: `min-w-[170px] w-[170px] ${STICKY_EMP_BODY}`,
         sortable: false,
-        render: (row) => <EmployeeCell code={row.employee_code} name={row.employee_name} />,
+        render: (row) => <EmployeeCell code={row.employee_code} name={row.employee_name} image={row.image} />,
       },
       { key: 'designation_name', label: 'Desig.', fullLabel: 'Designation', className: 'min-w-[110px]', tdClass: 'min-w-[110px]', render: (row) => row.designation_name || '—' },
       { key: 'base_salary', label: 'Base Sal.', fullLabel: 'Base Salary', className: 'min-w-[95px]', tdClass: 'min-w-[95px] text-right', render: (row) => formatCurrency(row.base_salary) },
@@ -249,47 +272,41 @@ const getColumns = (activeReport, chargeColumns, onLockEmployee, lockingEmployee
         key: 'net_salary',
         label: 'Net Pay',
         fullLabel: 'Net Payable Salary',
-        className: `min-w-[110px] w-[110px] ${STICKY_NET_HEADER}`,
-        tdClass: `min-w-[110px] w-[110px] text-right font-bold ${STICKY_NET_BODY}`,
+        className: `min-w-[110px] w-[110px] ${STICKY_NET_HEADER} right-[132px]`,
+        tdClass: `min-w-[110px] w-[110px] text-right font-bold ${STICKY_NET_BODY} right-[132px]`,
         render: (row) => formatCurrency(row.net_salary),
       },
       {
         key: 'actions',
         label: 'Action',
-        fullLabel: 'Lock / Approval Status',
+        fullLabel: 'Payment Status / Action',
         className: `min-w-[132px] w-[132px] text-center ${STICKY_ACTION_HEADER}`,
         tdClass: `min-w-[132px] w-[132px] text-center ${STICKY_ACTION_BODY}`,
         sortable: false,
         render: (row) =>
-          row.is_locked ? (
+          row.is_paid ? (
             <span className="inline-flex items-center gap-1 rounded-full border border-emerald-600/20 bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-              <LockKeyhole size={13} aria-hidden="true" />
-              Locked
+              <BadgeCheck size={13} aria-hidden="true" />
+              Paid
             </span>
-          ) : canLockEmployees && row.eligible_for_lock ? (
+          ) : canPayEmployees && row.eligible_for_lock ? (
             <Button
               type="button"
-              onClick={() => onLockEmployee(row)}
-              disabled={isLocking}
-              title={row.payroll_id
-                ? 'Lock this employee’s current salary calculation in the existing draft payroll. This does not approve or pay it.'
-                : 'Create or refresh a draft payroll for this month and plant, then lock this employee’s salary calculation.'}
-              aria-label={row.payroll_id
-                ? `Lock salary for ${row.employee_name}`
-                : `Generate payroll and lock salary for ${row.employee_name}`}
+              onClick={() => onPayEmployee(row)}
+              disabled={isPaying}
+              title="Prepare and lock this employee’s salary calculation if needed, then continue to payment."
+              aria-label={`Pay ${row.employee_name}`}
               className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap px-2.5 py-1.5 text-xs"
             >
-              {lockingEmployeeId === String(row.employee_id) ? (
-                'Locking…'
-              ) : row.payroll_id ? (
+              {payingEmployeeId === String(row.employee_id) ? (
                 <>
-                  <LockKeyhole size={13} aria-hidden="true" />
-                  Lock salary
+                  <LoaderCircle size={13} className="animate-spin" aria-hidden="true" />
+                  Preparing…
                 </>
               ) : (
                 <>
-                  <Calculator size={13} aria-hidden="true" />
-                  Generate &amp; lock
+                  <Banknote size={14} aria-hidden="true" />
+                  Pay Now
                 </>
               )}
             </Button>
@@ -302,7 +319,7 @@ const getColumns = (activeReport, chargeColumns, onLockEmployee, lockingEmployee
 
   if (activeReport === 'yearly') {
     return [
-      { key: 'employee_name', label: 'Employee', fullLabel: 'Employee Name', className: 'min-w-[160px]', tdClass: 'min-w-[160px]', sortable: false, render: (row) => <EmployeeCell code={row.employee_code} name={row.employee_name} /> },
+      { key: 'employee_name', label: 'Employee', fullLabel: 'Employee Name', className: 'min-w-[160px]', tdClass: 'min-w-[160px]', sortable: false, render: (row) => <EmployeeCell code={row.employee_code} name={row.employee_name} image={row.image} /> },
       { key: 'plant_name', label: 'Plant', fullLabel: 'Plant Name', className: 'min-w-[110px]', tdClass: 'min-w-[110px]' },
       ...['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((monthName) => ({
         key: `months.${monthName}`,
@@ -320,7 +337,7 @@ const getColumns = (activeReport, chargeColumns, onLockEmployee, lockingEmployee
   }
 
   return [
-    { key: 'employee_name', label: 'Employee', fullLabel: 'Employee Name', className: 'min-w-[160px]', tdClass: 'min-w-[160px]', sortable: false, render: (row) => <EmployeeCell code={row.employee_code} name={row.employee_name} /> },
+    { key: 'employee_name', label: 'Employee', fullLabel: 'Employee Name', className: 'min-w-[160px]', tdClass: 'min-w-[160px]', sortable: false, render: (row) => <EmployeeCell code={row.employee_code} name={row.employee_name} image={row.image} /> },
     { key: 'plant_name', label: 'Plant', fullLabel: 'Working Plant', className: 'min-w-[120px]', tdClass: 'min-w-[120px]' },
     { key: 'gross_wages', label: 'Gross Wages', fullLabel: 'Total Gross Wages', className: 'min-w-[110px]', tdClass: 'min-w-[110px] text-right', render: (row) => formatCurrency(row.gross_wages) },
     { key: 'employee_share', label: 'Emp. Share', fullLabel: 'Employee Contribution Share', className: 'min-w-[110px]', tdClass: 'min-w-[110px] text-right', render: (row) => formatCurrency(row.employee_share) },
@@ -339,10 +356,12 @@ const SalaryReportTable = ({
   isLoading = false,
   payrollMonth,
   chargeColumns = [],
-  onLockEmployee,
-  lockingEmployeeId,
-  canLockEmployees = false,
-  isLocking = false,
+  onPayEmployee,
+  payingEmployeeId,
+  canPayEmployees = false,
+  isPaying = false,
+  refreshReport,
+  isRefreshing = false,
 }) => {
   const [sort, setSort] = useState({ key: null, direction: 'asc' });
   const [zoomLevel, setZoomLevel] = useState(100);
@@ -352,8 +371,8 @@ const SalaryReportTable = ({
   const handleResetZoom = useCallback(() => setZoomLevel(100), []);
 
   const columns = useMemo(
-    () => getColumns(activeReport, chargeColumns, onLockEmployee, lockingEmployeeId, canLockEmployees, isLocking),
-    [activeReport, chargeColumns, onLockEmployee, lockingEmployeeId, canLockEmployees, isLocking]
+    () => getColumns(activeReport, chargeColumns, onPayEmployee, payingEmployeeId, canPayEmployees, isPaying),
+    [activeReport, chargeColumns, onPayEmployee, payingEmployeeId, canPayEmployees, isPaying]
   );
 
   const sortedRows = useMemo(() => {
@@ -452,7 +471,18 @@ const SalaryReportTable = ({
               )}
             </div>
 
-            {isLoading && <span role="status" className="text-[11px] text-(--color-text-muted)">Updating salary data…</span>}
+            <button
+              type="button"
+              variant="ghost"
+              onClick={refreshReport}
+              disabled={isRefreshing || !refreshReport}
+              aria-label="Refresh salary report"
+            >
+              <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} aria-hidden="true" />
+              {/* <span>{isRefreshing ? 'Refreshing…' : 'Refresh'}</span> */}
+            </button>
+
+            {/* {isLoading && <span role="status" className="text-[11px] text-(--color-text-muted)">Updating salary data…</span>} */}
           </div>
         </div>
 
@@ -559,15 +589,15 @@ const SalaryReportTable = ({
 
   return (
     // <div className="relative flex-1 min-h-0 w-full overflow-auto">
-      <PageTable
-        className="w-full min-w-max"
-        columns={columns}
-        rows={rows}
-        total={rows.length}
-        label={activeReport === 'statutory' ? 'contribution records' : 'payroll records'}
-        emptyText={emptyText}
-        isLoading={isLoading}
-      />
+    <PageTable
+      className="w-full min-w-max"
+      columns={columns}
+      rows={rows}
+      total={rows.length}
+      label={activeReport === 'statutory' ? 'contribution records' : 'payroll records'}
+      emptyText={emptyText}
+      isLoading={isLoading}
+    />
     // </div>
   );
 };

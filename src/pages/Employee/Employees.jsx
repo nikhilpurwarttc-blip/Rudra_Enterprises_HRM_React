@@ -32,6 +32,7 @@ import { Feedback } from '../../components/Feedback';
 import AddEditEmployee from './AddEditEmployee';
 import EmployeeProfile from './EmployeeProfile';
 import EmployeeAttendance from './EmployeeAttendance';
+import EmployeeSalary from './EmployeeSalary';
 import EmployeeAvatar from './components/EmployeeAvatar';
 import { getApiErrorMessage } from '../../components/feedbackUtils';
 import { useRenderPerformance } from '../../utils/performance';
@@ -73,22 +74,6 @@ const matchesEmployeeFilters = (employee, filters) => {
     && (!filters.designation || filters.designation === designationId)
     && (!filters.shift || filters.shift === shiftId);
 };
-const EmployeePlaceholder = ({ employee, type }) => {
-  const isAttendance = type === 'attendance';
-  const Icon = isAttendance ? CalendarDays : WalletCards;
-  const title = isAttendance ? 'Attendance' : 'Salary';
-
-  return (
-    <div className="flex h-full items-center justify-center p-8">
-      <div className="max-w-md text-center">
-        <Icon size={36} className="mx-auto mb-3 text-(--color-accent)" />
-        <h2 className="text-lg font-semibold text-(--color-text)">{employee.name} {title}</h2>
-        <p className="mt-2 text-sm text-(--color-text-muted)">{title} details for this employee will appear here.</p>
-      </div>
-    </div>
-  );
-};
-
 const Employees = () => {
   const toast = useToast();
   const navigate = useNavigate();
@@ -746,7 +731,7 @@ const Employees = () => {
         {(isAddRoute || (isEditRoute && selectedEmployee)) && <AddEditEmployee key={isAddRoute ? `add-${addSessionKey}` : `edit-${selectedEmployee.id}`} employee={isEditRoute ? selectedEmployee : createdEmployee ?? undefined} plants={plants} departments={departments} designations={designations} shifts={shifts} charges={charges} documents={employeeDocuments} accounts={employeeAccounts} documentsLoading={employeeDocumentsLoading} accountsLoading={employeeAccountsLoading} errors={errors} saving={creating || updating} savingDocument={savingDocument} savingAccount={savingAccount} onClose={() => { setCreatedEmployee(null); navigate('/employees'); }} onSubmit={handleSave} onSaveDocument={handleSaveDocument} onDeleteDocument={handleDeleteDocument} onSaveAccount={handleSaveAccount} onDeleteAccount={handleDeleteAccount} />}
         {!isAddRoute && !isEditRoute && selectedEmployee && activeView === 'profile' && <EmployeeProfile key={selectedEmployee.id} employeeId={selectedEmployee.id} initialEmployee={selectedEmployee} embedded onClose={() => navigate('/employees')} />}
         {!isAddRoute && !isEditRoute && selectedEmployee && activeView === 'attendance' && <EmployeeAttendance key={selectedEmployee.id} employeeId={selectedEmployee.id} joiningDate={selectedEmployee.joining_date} />}
-        {!isAddRoute && !isEditRoute && selectedEmployee && activeView === 'salary' && <EmployeePlaceholder key={selectedEmployee.id} employee={selectedEmployee} type="salary" />}
+        {!isAddRoute && !isEditRoute && selectedEmployee && activeView === 'salary' && <EmployeeSalary key={selectedEmployee.id} employee={selectedEmployee} />}
         {!isAddRoute && !isEditRoute && !selectedEmployee && <div className="flex h-full items-center justify-center p-8"><div className="max-w-sm text-center text-(--color-text-muted)"><UserRound size={28} className="mx-auto mb-4 text-(--color-accent)" /><h2 className="text-base font-semibold text-(--color-text)">Select an employee</h2><p className="mt-1 text-sm">Choose an employee from the list to view their profile.</p></div></div>}
         </div>
       </main>

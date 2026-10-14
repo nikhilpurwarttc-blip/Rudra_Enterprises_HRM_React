@@ -178,7 +178,10 @@ const AttendanceReport = () => {
 										aria-pressed={String(selectedEmployee) === String(employee.id)}
 										className={`mb-1 flex w-full items-center gap-3 rounded-lg border px-3 py-3 text-left transition ${String(selectedEmployee) === String(employee.id) ? 'border-(--color-accent) bg-(--color-accent-soft)' : 'border-transparent hover:border-(--color-border) hover:bg-(--color-accent-soft)'}`}
 									>
-										<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-(--color-accent) text-sm font-semibold text-white">{String(employee.name ?? '?').split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase()}</span>
+										{employee.image
+											? <img src={employee.image} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
+											: <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-(--color-accent) text-sm font-semibold text-white">{String(employee.name ?? '?').split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase()}</span>
+										}
 										<span className="min-w-0 flex-1">
 											<span className="block truncate text-sm font-semibold text-(--color-text)">{employee.name}</span>
 											<span className="mt-0.5 block truncate text-xs text-(--color-text-muted)">{employee.employee_code ?? 'No employee code'} · {employee.department?.name ?? 'No department'}</span>

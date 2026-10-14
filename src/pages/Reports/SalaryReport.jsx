@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
-import { Download, Filter, RefreshCw } from 'lucide-react';
+import { Banknote, Building2, CreditCard, Download, Filter, RefreshCw } from 'lucide-react';
 import AccessDenied from '../../components/AccessDenied';
 import Button from '../../components/Button';
 import { Feedback, InlineError, LoadingState } from '../../components/Feedback';
+import InputField from '../../components/InputField';
 import usePermission from '../../hooks/usePermission';
+import RightModal from '../components/RightModal';
 import {
-  useCreatePayrollMutation,
+  useGenerateEmployeePayrollMutation,
   useGetDepartmentsQuery,
   useGetDesignationsQuery,
   useGetMonthlySalaryReportQuery,
@@ -14,7 +16,9 @@ import {
   useGetYearlySalaryReportQuery,
   useLazyExportMonthlySalaryReportQuery,
   useLazyExportYearlySalaryReportQuery,
+  useLazyGetPayrollEmployeePaymentAccountsQuery,
   useLockPayrollEmployeeMutation,
+  usePayPayrollEmployeeMutation,
 } from '../../store/api';
 import {
   SalaryReportFilters,
@@ -22,6 +26,7 @@ import {
   SalaryReportTable,
   SalaryReportTabs,
 } from './SalaryReportComponents';
+import SearchableSelect from '../../components/SearchableSelect';
 
 const unwrapList = (response) => {
   const list = response?.data ?? response;
@@ -35,13 +40,27 @@ const currentMonth = () => {
 
 const getErrorMessage = (error) => (
   error?.data?.message
+  ?? Object.values(error?.data?.errors ?? {})[0]?.[0]
   ?? error?.error
   ?? error?.message
   ?? 'The report could not be loaded. Please try again.'
 );
 
+const formatCurrency = (value) => new Intl.NumberFormat('en-IN', {
+  style: 'currency',
+  currency: 'INR',
+  maximumFractionDigits: 2,
+}).format(Number(value) || 0);
+
 const isValidYear = (value) => /^\d{4}$/.test(value) && Number(value) >= 2000;
 const isValidPayrollMonth = (value) => /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
+const PAYMENT_MODES = [
+  { value: 'cash', label: 'Cash' },
+  { value: 'bank_transfer', label: 'Bank Transfer' },
+  { value: 'neft', label: 'NEFT' },
+  { value: 'rtgs', label: 'RTGS' },
+  { value: 'imps', label: 'IMPS' },
+];
 
 const SalaryReport = () => {
   const { canView, can, isReadOnly } = usePermission('/reports/salary');
@@ -57,13 +76,20 @@ const SalaryReport = () => {
   const [payrollError, setPayrollError] = useState('');
   const [payrollMessage, setPayrollMessage] = useState('');
   const [lockingEmployeeId, setLockingEmployeeId] = useState('');
+  const [paymentTarget, setPaymentTarget] = useState(null);
+  const [paymentDetails, setPaymentDetails] = useState(null);
+  const [paymentMode, setPaymentMode] = useState('cash');
+  const [paymentBankAccountId, setPaymentBankAccountId] = useState('');
+  const [paymentReference, setPaymentReference] = useState('');
+  const [paymentError, setPaymentError] = useState('');
+  const [loadingPaymentAccounts, setLoadingPaymentAccounts] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [filtersVisible, setFiltersVisible] = useState(false);
 
   const canViewPlants = canModule('plants', 'view');
   const canViewDepartments = canModule('departments', 'view');
   const canViewDesignations = canModule('designations', 'view');
-  const canLockEmployees = !isReadOnly
+  const canPayEmployees = !isReadOnly
     && (
       (canModule('salary-report', 'create') && canModule('salary-report', 'edit'))
       || (canModule('payrolls', 'create') && canModule('payrolls', 'edit'))
@@ -115,8 +141,10 @@ const SalaryReport = () => {
     { ...reportFilters, type: statutoryType, payroll_month: payrollMonth },
     { skip: activeReport !== 'statutory' || !validPayrollMonth },
   );
-  const [createPayroll, { isLoading: generatingPayroll }] = useCreatePayrollMutation();
-  const [lockPayrollEmployee] = useLockPayrollEmployeeMutation();
+  const [generateEmployeePayroll, { isLoading: generatingPayroll }] = useGenerateEmployeePayrollMutation();
+  const [lockPayrollEmployee, { isLoading: lockingPayrollEmployee }] = useLockPayrollEmployeeMutation();
+  const [loadPaymentAccounts] = useLazyGetPayrollEmployeePaymentAccountsQuery();
+  const [payPayrollEmployee, { isLoading: recordingPayment }] = usePayPayrollEmployeeMutation();
   const [exportMonthly] = useLazyExportMonthlySalaryReportQuery();
   const [exportYearly] = useLazyExportYearlySalaryReportQuery();
 
@@ -183,18 +211,86 @@ const SalaryReport = () => {
     }
   };
 
-  const handleLockEmployee = async (row) => {
+  const closePaymentPanel = () => {
+    if (generatingPayroll || lockingPayrollEmployee || recordingPayment || lockingEmployeeId) return;
+    setPaymentTarget(null);
+    setPaymentDetails(null);
+    setPaymentError('');
+    setPaymentMode('cash');
+    setPaymentBankAccountId('');
+    setPaymentReference('');
+  };
+
+  const handlePayEmployee = async (row) => {
     if (!validPayrollMonth) {
-      setPayrollError('Select a valid payroll month before locking salary.');
+      setPayrollError('Select a valid payroll month before opening payment.');
       return;
     }
 
     setPayrollError('');
     setPayrollMessage('');
-    setLockingEmployeeId(String(row.employee_id));
+    const details = {
+      employee: {
+        id: row.employee_id,
+        name: row.employee_name,
+        employee_code: row.employee_code,
+        designation: row.designation_name,
+      },
+      payroll: {
+        id: row.payroll_id,
+        month: payrollMonth,
+        status: row.payroll_status,
+      },
+      item: {
+        gross_salary: row.gross_salary,
+        total_deductions: row.total_deductions,
+        net_salary: row.net_salary,
+        present_days: row.present_days,
+        regular_hours: row.regular_hours,
+        overtime_hours: row.overtime_hours,
+      },
+      bank_accounts: [],
+    };
+    setPaymentDetails(details);
+    setPaymentTarget({ payrollId: row.payroll_id, employeeId: row.employee_id, row });
+    setPaymentMode('cash');
+    setPaymentReference('');
+    setPaymentBankAccountId('');
+    setPaymentError('');
+    setLoadingPaymentAccounts(true);
     try {
-      let payrollId = row.payroll_id;
+      const accountsResponse = await loadPaymentAccounts(row.employee_id).unwrap();
+      const accounts = accountsResponse?.data ?? accountsResponse;
+      const primaryAccount = accounts.find((account) => account.is_primary) ?? accounts[0];
+      setPaymentDetails((current) => current
+        ? { ...current, bank_accounts: accounts }
+        : current);
+      setPaymentBankAccountId(primaryAccount ? String(primaryAccount.id) : '');
+    } catch (error) {
+      setPaymentError(getErrorMessage(error));
+    } finally {
+      setLoadingPaymentAccounts(false);
+    }
+  };
+
+  const handleRecordPayment = async () => {
+    if (!paymentTarget) return;
+    const isCashPayment = paymentMode === 'cash';
+    if (!isCashPayment && !paymentBankAccountId) {
+      setPaymentError('Select an active employee bank account for this payment mode.');
+      return;
+    }
+    if (!isCashPayment && !paymentReference.trim()) {
+      setPaymentError('Enter the bank transaction reference number.');
+      return;
+    }
+
+    setPaymentError('');
+    setLockingEmployeeId(String(paymentTarget.employeeId));
+    try {
+      let payrollId = paymentTarget.payrollId;
       if (!payrollId) {
+        const { row } = paymentTarget;
         const payrollPlantId = plantIds.length === 1
           ? plantIds[0]
           : plantIds.length > 1
@@ -203,20 +299,48 @@ const SalaryReport = () => {
         if (plantIds.length > 1 && !payrollPlantId) {
           throw new Error('Unable to determine the employee plant for payroll generation. Refresh the report and try again.');
         }
-        const result = await createPayroll({
+        const result = await generateEmployeePayroll({
+          employeeId: paymentTarget.employeeId,
           payroll_month: payrollMonth,
           ...(payrollPlantId ? { plant_id: Number(payrollPlantId) } : {}),
         }).unwrap();
         const payroll = result?.data ?? result;
         payrollId = payroll?.id;
+        setPaymentTarget((current) => current
+          ? { ...current, payrollId }
+          : current);
+        setPaymentDetails((current) => current
+          ? { ...current, payroll: { ...current.payroll, id: payrollId } }
+          : current);
       }
       if (!payrollId) {
         throw new Error('Payroll was generated but its identifier was not returned. Refresh the report and try again.');
       }
-      await lockPayrollEmployee({ payrollId, employeeId: row.employee_id }).unwrap();
-      setPayrollMessage(`${row.employee_name || 'Employee'}'s salary snapshot is locked for ${payrollMonth}.`);
+      if (!paymentTarget.row.is_locked) {
+        await lockPayrollEmployee({ payrollId, employeeId: paymentTarget.employeeId }).unwrap();
+        setPaymentTarget((current) => current
+          ? { ...current, row: { ...current.row, is_locked: true } }
+          : current);
+      }
+      const paymentResponse = await payPayrollEmployee({
+        payrollId,
+        employeeId: paymentTarget.employeeId,
+        payment_mode: paymentMode,
+        ...(isCashPayment ? {} : {
+          employee_bank_account_id: Number(paymentBankAccountId),
+          payment_reference: paymentReference.trim(),
+        }),
+      }).unwrap();
+      const paidItem = paymentResponse?.data?.data ?? paymentResponse?.data ?? paymentResponse;
+      setPayrollMessage(`${paymentDetails?.employee?.name || paymentTarget.row.employee_name || 'Employee'} paid ${formatCurrency(paidItem?.net_salary ?? paymentDetails?.item?.net_salary ?? paymentTarget.row.net_salary)} by ${PAYMENT_MODES.find((mode) => mode.value === paymentMode)?.label ?? paymentMode}.`);
+      setPaymentTarget(null);
+      setPaymentDetails(null);
+      setPaymentMode('cash');
+      setPaymentBankAccountId('');
+      setPaymentReference('');
+      await monthlyQuery.refetch();
     } catch (error) {
-      setPayrollError(getErrorMessage(error));
+      setPaymentError(getErrorMessage(error));
     } finally {
       setLockingEmployeeId('');
     }
@@ -257,13 +381,14 @@ const SalaryReport = () => {
           </Button>
           <Button
             type="button"
+            variant='ghost'
             onClick={() => selectedQuery.refetch()}
             disabled={selectedQuery.isFetching || (activeReport === 'yearly' ? !validYear : !validPayrollMonth)}
             aria-label="Refresh salary report"
-            className="flex items-center gap-2"
+          // className="flex items-center gap-2"
           >
             <RefreshCw size={16} className={selectedQuery.isFetching ? 'animate-spin' : ''} aria-hidden="true" />
-            {selectedQuery.isFetching ? 'Refreshing…' : 'Refresh'}
+            {/* {selectedQuery.isFetching ? 'Refreshing…' : 'Refresh'} */}
           </Button>
           {can('export') && activeReport !== 'statutory' && (
             <Button
@@ -343,16 +468,135 @@ const SalaryReport = () => {
           <SalaryReportTable
             activeReport={activeReport}
             rows={rows}
-            isLoading={selectedQuery.isFetching || generatingPayroll}
+            isLoading={selectedQuery.isFetching}
             payrollMonth={payrollMonth}
             chargeColumns={response?.charge_columns ?? []}
-            onLockEmployee={handleLockEmployee}
-            lockingEmployeeId={lockingEmployeeId}
-            canLockEmployees={canLockEmployees}
-            isLocking={generatingPayroll || Boolean(lockingEmployeeId)}
+            onPayEmployee={handlePayEmployee}
+            payingEmployeeId={lockingEmployeeId}
+            canPayEmployees={canPayEmployees}
+            isPaying={generatingPayroll || lockingPayrollEmployee || recordingPayment || Boolean(lockingEmployeeId)}
+            refreshReport={() => selectedQuery.refetch()}
+            isRefreshing={selectedQuery.isFetching}
           />
         </div>
       )}
+
+      <RightModal
+        isOpen={Boolean(paymentTarget && paymentDetails)}
+        onClose={closePaymentPanel}
+        onSubmit={handleRecordPayment}
+        title={`Pay employee${paymentDetails?.employee?.name ? ` · ${paymentDetails.employee.name}` : ''}`}
+        saving={generatingPayroll || lockingPayrollEmployee || recordingPayment}
+        submitDisabled={loadingPaymentAccounts}
+        submitLabel="Record Payment"
+        submitLoadingLabel="Generating, locking & recording…"
+        className="max-w-xs"
+      >
+        {paymentDetails && (
+          <>
+            <section className="rounded-lg border border-(--color-border) bg-(--color-bg-elevated) p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-(--color-text)">{paymentDetails.employee?.name}</p>
+                  <p className="mt-0.5 text-xs text-(--color-text-muted)">
+                    {paymentDetails.employee?.employee_code || `Employee #${paymentDetails.employee?.id}`}
+                    {paymentDetails.employee?.designation ? ` · ${paymentDetails.employee.designation}` : ''}
+                  </p>
+                  <p className="mt-1 text-xs text-(--color-text-muted)">
+                    Payroll {paymentDetails.payroll?.month} · {paymentDetails.payroll?.id ? `#${paymentDetails.payroll.id}` : 'will be generated on payment'}
+                  </p>
+                </div>
+                <Banknote size={20} className="shrink-0 text-(--color-accent)" aria-hidden="true" />
+              </div>
+              <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                <dt className="text-(--color-text-muted)">Gross pay</dt>
+                <dd className="text-right font-medium text-(--color-text)">{formatCurrency(paymentDetails.item?.gross_salary)}</dd>
+                <dt className="text-(--color-text-muted)">Deductions</dt>
+                <dd className="text-right font-medium text-(--color-text)">{formatCurrency(paymentDetails.item?.total_deductions)}</dd>
+                <dt className="border-t border-(--color-border) pt-2 font-semibold text-(--color-text)">Net payable</dt>
+                <dd className="border-t border-(--color-border) pt-2 text-right text-base font-bold text-emerald-700 dark:text-emerald-300">
+                  {formatCurrency(paymentDetails.item?.net_salary)}
+                </dd>
+              </dl>
+            </section>
+
+            <section className="space-y-3">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-(--color-text)">
+                <Building2 size={16} aria-hidden="true" /> Employee bank accounts
+              </h3>
+              {paymentDetails.bank_accounts?.length ? (
+                paymentDetails.bank_accounts.map((account) => (
+                  <div key={account.id} className="rounded-lg border border-(--color-border) p-3 text-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium text-(--color-text)">{account.bank_name}</span>
+                      {account.is_primary && (
+                        <span className="rounded-full bg-(--color-accent-soft) px-2 py-0.5 text-[10px] font-semibold text-(--color-accent)">Primary</span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-(--color-text-muted)">A/C {account.account_number}</p>
+                    <p className="text-xs text-(--color-text-muted)">
+                      {account.account_holder_name}{account.ifsc_code ? ` · IFSC ${account.ifsc_code}` : ''}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p className="rounded-lg border border-dashed border-(--color-border-strong) p-3 text-xs text-(--color-text-muted)">
+                  {loadingPaymentAccounts
+                    ? 'Loading active bank accounts…'
+                    : 'No active bank account is on file. Add an employee bank account before selecting a bank payment mode; Cash remains available.'}
+                </p>
+              )}
+            </section>
+
+            <section className="space-y-4">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-(--color-text)">
+                <CreditCard size={16} aria-hidden="true" /> Payment details
+              </h3>
+              <div>
+                <SearchableSelect
+                  label="Payment Mode"
+                  id="salary-payment-mode"
+                  value={paymentMode}
+                  onChange={(value) => {
+                    setPaymentMode(value);
+                    setPaymentError('');
+                  }}
+                  options={PAYMENT_MODES}
+                />
+              </div>
+
+              {paymentMode !== 'cash' && (
+                <>
+                  <div>
+                    <SearchableSelect
+                      label="Payment Account"
+                      id="salary-payment-account"
+                      value={paymentBankAccountId}
+                      onChange={(value) => setPaymentBankAccountId(value)}
+                      options={(paymentDetails.bank_accounts ?? []).map((account) => ({
+                        value: account.id,
+                        label: `${account.bank_name} · ${account.account_number}${account.is_primary ? ' · Primary' : ''}`
+                      }))}
+                    />
+                  </div>
+                  <InputField
+                    label="Transaction number / reference"
+                    value={paymentReference}
+                    onChange={(event) => setPaymentReference(event.target.value)}
+                    placeholder="Enter bank transaction reference"
+                    required
+                    autoComplete="off"
+                  />
+                </>
+              )}
+              {paymentError && <InlineError message={paymentError} />}
+              <p className="text-xs text-(--color-text-muted)">
+                This report amount is a preview. Record Payment generates and locks only this employee’s payroll calculation, then marks this employee paid.
+              </p>
+            </section>
+          </>
+        )}
+      </RightModal>
     </div>
   );
 };

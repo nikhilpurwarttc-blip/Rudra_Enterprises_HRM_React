@@ -268,10 +268,32 @@ export const api = createApi({
       query: (body) => ({ url: '/payrolls', method: 'POST', body }),
       invalidatesTags: ['SalaryReport'],
     }),
+    generateEmployeePayroll: builder.mutation({
+      query: ({ employeeId, ...body }) => ({
+        url: `/payrolls/employees/${employeeId}/generate`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['SalaryReport'],
+    }),
     lockPayrollEmployee: builder.mutation({
       query: ({ payrollId, employeeId }) => ({
         url: `/payrolls/${payrollId}/employees/${employeeId}/lock`,
         method: 'POST',
+      }),
+      invalidatesTags: ['SalaryReport'],
+    }),
+    getPayrollEmployeePaymentDetails: builder.query({
+      query: ({ payrollId, employeeId }) => `/payrolls/${payrollId}/employees/${employeeId}/payment-details`,
+    }),
+    getPayrollEmployeePaymentAccounts: builder.query({
+      query: (employeeId) => `/payrolls/employees/${employeeId}/payment-accounts`,
+    }),
+    payPayrollEmployee: builder.mutation({
+      query: ({ payrollId, employeeId, ...body }) => ({
+        url: `/payrolls/${payrollId}/employees/${employeeId}/pay`,
+        method: 'POST',
+        body,
       }),
       invalidatesTags: ['SalaryReport'],
     }),
@@ -567,7 +589,11 @@ export const {
   useGetYearlySalaryReportQuery,
   useGetStatutorySalaryReportQuery,
   useCreatePayrollMutation,
+  useGenerateEmployeePayrollMutation,
   useLockPayrollEmployeeMutation,
+  useLazyGetPayrollEmployeePaymentDetailsQuery,
+  useLazyGetPayrollEmployeePaymentAccountsQuery,
+  usePayPayrollEmployeeMutation,
   useLazyExportMonthlySalaryReportQuery,
   useLazyExportYearlySalaryReportQuery,
   useGetAttendanceRosterQuery,
