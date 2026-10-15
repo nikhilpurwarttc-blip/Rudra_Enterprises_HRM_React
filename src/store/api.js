@@ -168,14 +168,14 @@ export const api = createApi({
     }),
     createEmployee: builder.mutation({
       query: (body) => ({ url: '/employees', method: 'POST', body: toEmployeeRequestBody(body) }),
-      invalidatesTags: ['Employee'],
+      invalidatesTags: ['Employee', 'SalaryReport'],
     }),
     updateEmployee: builder.mutation({
       query: ({ id, ...body }) => {
         const requestBody = toEmployeeRequestBody(body, 'PUT');
         return { url: `/employees/${id}`, method: requestBody instanceof FormData ? 'POST' : 'PUT', body: requestBody };
       },
-      invalidatesTags: ['Employee'],
+      invalidatesTags: ['Employee', 'SalaryReport'],
     }),
     approveEmployee: builder.mutation({
       query: (id) => ({ url: `/employees/${id}/approve`, method: 'POST' }),
@@ -498,15 +498,15 @@ export const api = createApi({
     }),
     createCharge: builder.mutation({
       query: (body) => ({ url: '/charges', method: 'POST', body }),
-      invalidatesTags: ['Charge'],
+      invalidatesTags: ['Charge', 'Employee', 'SalaryReport'],
     }),
     updateCharge: builder.mutation({
       query: ({ id, ...body }) => ({ url: `/charges/${id}`, method: 'PUT', body }),
-      invalidatesTags: ['Charge'],
+      invalidatesTags: ['Charge', 'Employee', 'SalaryReport'],
     }),
     deleteCharge: builder.mutation({
       query: (id) => ({ url: `/charges/${id}`, method: 'DELETE' }),
-      invalidatesTags: ['Charge'],
+      invalidatesTags: ['Charge', 'Employee', 'SalaryReport'],
     }),
 
     // Roles

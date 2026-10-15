@@ -43,6 +43,8 @@ const SearchableSelect = ({
     : option.value === value;
 
   const handleOptionChange = (option) => {
+    if (option.disabled && !isSelected(option)) return;
+
     if (!multiSelect) {
       onChange(option.value);
       setIsOpen(false);
@@ -211,8 +213,14 @@ const SearchableSelect = ({
                   type="button"
                   role={multiSelect ? 'option' : undefined}
                   aria-selected={multiSelect ? isSelected(opt) : undefined}
+                  aria-disabled={opt.disabled && !isSelected(opt)}
+                  disabled={opt.disabled && !isSelected(opt)}
                   onClick={() => handleOptionChange(opt)}
-                  className={`flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-(--color-accent-soft) ${
+                  className={`flex w-full items-center gap-2 px-3 py-2 text-left ${
+                    opt.disabled && !isSelected(opt)
+                      ? 'cursor-not-allowed opacity-50'
+                      : 'hover:bg-(--color-accent-soft)'
+                  } ${
                     isSelected(opt) ? 'bg-(--color-accent-soft) text-(--color-accent)' : 'text-(--color-text)'
                   }`}
                 >

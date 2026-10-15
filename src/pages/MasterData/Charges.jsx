@@ -25,6 +25,13 @@ import AddEditCharge from './AddEditCharge';
 const unwrap = (value) => (Array.isArray(value) ? value : value?.data ?? []);
 const isActive = (value) =>
   value === true || value === 1 || value === '1' || value === 'true';
+const formatChargeValue = (value, valueType) => {
+  const amount = Number(value ?? 0);
+  return valueType === 'percentage' ? `${amount}%` : `₹${amount.toFixed(2)}`;
+};
+const formatCurrency = (value) => `₹${Number(value ?? 0).toFixed(2)}`;
+const formatDate = (value, fallback = '—') =>
+  value ? String(value).slice(0, 10) : fallback;
 
 const Charges = () => {
   const toast = useToast();
@@ -52,7 +59,7 @@ const Charges = () => {
     return charges.filter(
       (charge) =>
         !query ||
-        [charge.deduction, charge.value_type].some((value) =>
+        [charge.code, charge.name ?? charge.deduction, charge.value_type].some((value) =>
           String(value ?? '').toLowerCase().includes(query)
         )
     );
@@ -61,10 +68,24 @@ const Charges = () => {
   // Form submit handler
   const handleSave = async ({ id, ...payload }) => {
     const nextErrors = {};
-    if (!payload.deduction) nextErrors.deduction = 'Deduction name is required.';
+    if (!payload.name) nextErrors.name = 'Charge name is required.';
     if (!payload.value_type) nextErrors.value_type = 'Value type is required.';
-    if (payload.value === '' || Number.isNaN(payload.value) || payload.value < 0) {
-      nextErrors.value = 'Value is required and cannot be negative.';
+    if (
+      payload.employee_value === '' ||
+      !Number.isFinite(payload.employee_value) ||
+      payload.employee_value < 0
+    ) {
+      nextErrors.employee_value = 'Employee value is required and cannot be negative.';
+    }
+    if (!payload.effective_from) {
+      nextErrors.effective_from = 'Effective from date is required.';
+    }
+    if (
+      payload.effective_to &&
+      payload.effective_from &&
+      payload.effective_to < payload.effective_from
+    ) {
+      nextErrors.effective_to = 'Effective to must be on or after the start date.';
     }
 
     if (Object.keys(nextErrors).length) {
@@ -127,16 +148,21 @@ const Charges = () => {
   const columns = useMemo(
     () => [
       {
-        key: 'deduction',
-        label: 'Deduction',
+        key: 'name',
+        label: 'Charge',
         render: (charge) => (
           <div className="flex items-center gap-2">
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-(--color-accent) text-white">
               <Coins size={14} />
             </span>
-            <span className="font-medium">{charge.deduction}</span>
+            <span className="font-medium">{charge.name ?? charge.deduction}</span>
           </div>
         ),
+      },
+      {
+        key: 'code',
+        label: 'Code',
+        render: (charge) => charge.code || '—',
       },
       {
         key: 'value_type',
@@ -144,12 +170,26 @@ const Charges = () => {
         render: (charge) => (charge.value_type === 'fixed' ? 'Fixed' : 'Percentage'),
       },
       {
-        key: 'value',
-        label: 'Value',
+        key: 'employee_value',
+        label: 'Employee',
+        render: (charge) => formatChargeValue(charge.employee_value ?? charge.value, charge.value_type),
+      },
+      {
+        key: 'employer_value',
+        label: 'Employer',
+        render: (charge) => formatChargeValue(charge.employer_value, charge.value_type),
+      },
+      {
+        key: 'salary_limit',
+        label: 'Salary limit',
         render: (charge) =>
-          charge.value_type === 'percentage'
-            ? `${Number(charge.value ?? 0)}%`
-            : `₹${Number(charge.value ?? 0).toFixed(2)}`,
+          Number(charge.salary_limit) > 0 ? formatCurrency(charge.salary_limit) : 'No limit',
+      },
+      {
+        key: 'effective_from',
+        label: 'Effective period',
+        render: (charge) =>
+          `${formatDate(charge.effective_from)} - ${formatDate(charge.effective_to, 'Ongoing')}`,
       },
       {
         key: 'status',
@@ -260,7 +300,7 @@ const Charges = () => {
         title="Delete Charge"
         message={
           deleteTarget
-            ? `Are you sure you want to delete "${deleteTarget.deduction}"? This action cannot be undone.`
+            ? `Are you sure you want to delete "${deleteTarget.name ?? deleteTarget.deduction}"? This action cannot be undone.`
             : 'Are you sure you want to delete this charge?'
         }
         onConfirm={handleDelete}

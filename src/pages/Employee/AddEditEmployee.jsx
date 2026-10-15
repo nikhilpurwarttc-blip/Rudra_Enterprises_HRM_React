@@ -28,6 +28,14 @@ const EMPTY_ACCOUNT = {
   is_primary: false,
 };
 
+const isChargeActive = (status) =>
+  status === true || status === 1 || status === '1' || status === 'true';
+
+const formatChargeValue = (value, valueType) => {
+  const amount = Number(value ?? 0);
+  return valueType === 'percentage' ? `${amount}%` : `₹${amount.toFixed(2)}`;
+};
+
 const AddEditEmployee = ({
   employee,
   plants = [],
@@ -97,13 +105,44 @@ const AddEditEmployee = ({
     ),
   [serverErrors, clearedServerFields]);
   const fieldErrors = useMemo(() => ({ ...visibleServerErrors, ...clientErrors }), [visibleServerErrors, clientErrors]);
-  const selectOptions = useMemo(() => ({
-    plants: buildSelectOptions(plants, (item) => item.name),
-    departments: buildSelectOptions(departments, (item) => item.name),
-    designations: buildSelectOptions(designations, (item) => item.name),
-    shifts: buildSelectOptions(shifts, (item) => item.name),
-    charges: buildSelectOptions(charges, (item) => item.name ?? item.deduction),
-  }), [plants, departments, designations, shifts, charges]);
+  const selectOptions = useMemo(() => {
+    const chargesById = new Map(charges.map((charge) => [String(charge.id), charge]));
+    (employee?.charges ?? []).forEach((charge) => {
+      if (!chargesById.has(String(charge.id))) {
+        chargesById.set(String(charge.id), charge);
+      }
+    });
+
+    const chargeOptions = [...chargesById.values()].map((charge) => {
+      const name = charge.name ?? charge.deduction ?? 'Unnamed charge';
+      const code = charge.code ? `${charge.code} — ` : '';
+      const statusLabel = isChargeActive(charge.status) ? '' : ' · Inactive';
+      const employeeValue = formatChargeValue(
+        charge.employee_value ?? charge.value,
+        charge.value_type,
+      );
+      const employerValue = formatChargeValue(charge.employer_value, charge.value_type);
+      const salaryLimit = Number(charge.salary_limit) > 0
+        ? ` · Salary limit ₹${Number(charge.salary_limit).toFixed(2)}`
+        : ' · No salary limit';
+      const label = `${code}${name} · Employee ${employeeValue} ${salaryLimit}${statusLabel}`;
+
+      return {
+        value: String(charge.id),
+        label,
+        searchText: `${charge.code ?? ''} ${name} ${charge.value_type ?? ''} ${label}`,
+        disabled: !isChargeActive(charge.status),
+      };
+    });
+
+    return {
+      plants: buildSelectOptions(plants, (item) => item.name),
+      departments: buildSelectOptions(departments, (item) => item.name),
+      designations: buildSelectOptions(designations, (item) => item.name),
+      shifts: buildSelectOptions(shifts, (item) => item.name),
+      charges: chargeOptions,
+    };
+  }, [plants, departments, designations, shifts, charges, employee?.charges]);
   const steps = useMemo(() => EMPLOYEE_STEPS
     .filter((step) => step.id !== 'salary' || showSalaryStep)
     .map((step) => ({

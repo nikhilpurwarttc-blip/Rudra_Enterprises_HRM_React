@@ -9,6 +9,7 @@ import {
   useGetAttendanceFiltersQuery,
   useGetAttendanceRosterQuery,
   useGetPlantShutdownsQuery,
+  useGetShiftsQuery,
   useMarkAttendanceAbsentMutation,
   useMarkShutdownPresentMutation,
   useRejectAllAttendanceMutation,
@@ -116,10 +117,13 @@ const Marking = () => {
   }, [search]);
 
   const filtersQuery = useGetAttendanceFiltersQuery();
+  const shiftsQuery = useGetShiftsQuery({ all: true, per_page: 100 });
   const lookupData = filtersQuery.data ?? {};
   const plants = unwrap(lookupData.plants);
   const departments = unwrap(lookupData.departments);
-  const shifts = unwrap(lookupData.shifts);
+  const shifts = unwrap(shiftsQuery.data).length
+    ? unwrap(shiftsQuery.data)
+    : unwrap(lookupData.shifts);
   const assignedPlantIds = lookupData.allowed_plant_ids;
   const singleAssignedPlant = Array.isArray(assignedPlantIds) && assignedPlantIds.length === 1
     ? String(assignedPlantIds[0])
@@ -167,7 +171,11 @@ const Marking = () => {
     ...(filters.shift ? { shift_id: filters.shift } : {}),
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
   });
-  const isRefreshing = employeeQuery.isFetching || filtersQuery.isFetching || shutdownQuery.isFetching || rejectedShutdownQuery.isFetching;
+  const isRefreshing = employeeQuery.isFetching
+    || filtersQuery.isFetching
+    || shiftsQuery.isFetching
+    || shutdownQuery.isFetching
+    || rejectedShutdownQuery.isFetching;
 
   const employees = unwrap(employeeQuery.currentData ?? employeeQuery.data);
   const searchQuery = search.trim();
@@ -692,7 +700,7 @@ const Marking = () => {
                 visible: !singleAssignedPlant,
                 options: plantOptions,
                 placeholder: 'All plants',
-                isLoading: filtersQuery.isLoading,
+                isLoading: shiftsQuery.isLoading || filtersQuery.isLoading,
                 showSearch: false,
               },
               {
@@ -729,7 +737,7 @@ const Marking = () => {
             variant='ghost'
             aria-label="Refresh attendance roster"
             title="Refresh attendance roster"
-            onClick={() => { employeeQuery.refetch(); filtersQuery.refetch(); shutdownQuery.refetch(); if (effectivePlant) rejectedShutdownQuery.refetch(); }}
+            onClick={() => { employeeQuery.refetch(); filtersQuery.refetch(); shiftsQuery.refetch(); shutdownQuery.refetch(); if (effectivePlant) rejectedShutdownQuery.refetch(); }}
             disabled={isRefreshing}
           >
             <RefreshCw size={15} className={isRefreshing ? 'animate-spin' : ''} />

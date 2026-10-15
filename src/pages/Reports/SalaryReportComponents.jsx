@@ -5,6 +5,7 @@ import {
   ArrowUpDown,
   BadgeCheck,
   Banknote,
+  ChevronDown,
   FileSpreadsheet,
   Landmark,
   LoaderCircle,
@@ -225,6 +226,7 @@ const STICKY_ACTION_HEADER = '!bg-slate-100 dark:!bg-slate-900 sticky right-0 z-
 const STICKY_ACTION_BODY = '!bg-white dark:!bg-slate-900 sticky right-0 z-20 shadow-[-3px_0_8px_rgba(0,0,0,0.08)]';
 
 const getColumns = (activeReport, chargeColumns, onPayEmployee, payingEmployeeId, canPayEmployees, isPaying) => {
+  console.log(chargeColumns);
   if (activeReport === 'monthly') {
     return [
       {
@@ -246,32 +248,59 @@ const getColumns = (activeReport, chargeColumns, onPayEmployee, payingEmployeeId
         render: (row) => <EmployeeCell code={row.employee_code} name={row.employee_name} image={row.image} />,
       },
       { key: 'designation_name', label: 'Desig.', fullLabel: 'Designation', className: 'min-w-[110px]', tdClass: 'min-w-[110px]', render: (row) => row.designation_name || '—' },
-      { key: 'base_salary', label: 'Base Sal.', fullLabel: 'Base Salary', className: 'min-w-[95px]', tdClass: 'min-w-[95px] text-right', render: (row) => formatCurrency(row.base_salary) },
-      { key: 'present_days', label: 'Days', fullLabel: 'Present Days', className: 'min-w-[65px]', tdClass: 'min-w-[65px] text-right', render: (row) => formatNumber(row.present_days) },
+      { key: 'base_salary', label: 'Base Sal.', fullLabel: 'Base Salary (latest salary record with status = 1)', className: 'min-w-[95px]', tdClass: 'min-w-[95px] text-right', render: (row) => formatCurrency(row.base_salary) },
+      {
+        key: 'current_salary',
+        label: 'Current Sal.',
+        fullLabel: 'Current Salary (latest salary effective in the selected payroll month)',
+        className: 'min-w-[110px]',
+        tdClass: 'min-w-[110px] text-right',
+        render: (row) => row.current_salary == null
+          ? '—'
+          : <span title={`Effective from ${row.current_salary_effective_from || 'unknown date'}`}>{formatCurrency(row.current_salary)}</span>,
+      },
+      { key: 'present_days', label: 'Present', fullLabel: 'Present Days', className: 'min-w-[65px]', tdClass: 'min-w-[65px] text-right', render: (row) => formatNumber(row.present_days) },
       { key: 'regular_hours', label: 'Basic Hrs', fullLabel: 'Basic Hours Worked', className: 'min-w-[80px]', tdClass: 'min-w-[80px] text-right', render: (row) => formatNumber(row.regular_hours) },
       { key: 'auto_pay', label: 'Auto/Shut.', fullLabel: 'Auto Pay / Shutdown Pay', className: 'min-w-[95px]', tdClass: 'min-w-[95px] text-right', render: (row) => formatCurrency(Number(row.furnace_allowance || 0) + Number(row.shutdown_pay || 0)) },
-      { key: 'regular_pay', label: 'Basic Pay', fullLabel: 'Basic Pay', className: 'min-w-[90px]', tdClass: 'min-w-[90px] text-right', render: (row) => formatCurrency(row.regular_pay) },
+      {
+        key: 'current_salary_pay',
+        label: 'Basic Pay',
+        fullLabel: 'Current Salary Pay (salary effective in the selected payroll month)',
+        className: 'min-w-[125px]',
+        tdClass: 'min-w-[125px] text-right',
+        render: (row) => row.current_salary_pay == null
+          ? '—'
+          : <span title={`Salary effective from ${row.current_salary_pay_effective_from || 'unknown date'}`}>{formatCurrency(row.current_salary_pay)}</span>,
+      },
+      {
+        key: 'base_salary_pay',
+        label: 'Base Sal. Pay',
+        fullLabel: 'Base Salary Pay (latest salary record with status 1)',
+        className: 'min-w-[120px]',
+        tdClass: 'min-w-[120px] text-right',
+        render: (row) => row.base_salary_pay == null
+          ? '—'
+          : <span title={`Salary effective from ${row.base_salary_pay_effective_from || 'unknown date'}`}>{formatCurrency(row.base_salary_pay)}</span>,
+      },
       { key: 'overtime_hours', label: 'OT Hrs', fullLabel: 'Overtime Hours', className: 'min-w-[70px]', tdClass: 'min-w-[70px] text-right', render: (row) => formatNumber(row.overtime_hours) },
       { key: 'overtime_pay', label: 'OT Pay', fullLabel: 'Overtime Pay', className: 'min-w-[85px]', tdClass: 'min-w-[85px] text-right', render: (row) => formatCurrency(row.overtime_pay) },
       { key: 'total_hours', label: 'Tot. Hrs', fullLabel: 'Total Hours Worked', className: 'min-w-[80px]', tdClass: 'min-w-[80px] text-right', sortable: false, render: (row) => formatNumber(Number(row.regular_hours || 0) + Number(row.overtime_hours || 0)) },
-      { key: 'gross_salary', label: 'Tot. Pay', fullLabel: 'Total Gross Pay', className: 'min-w-[100px]', tdClass: 'min-w-[100px] text-right font-semibold', render: (row) => formatCurrency(row.gross_salary) },
+      { key: 'total_pay', label: 'Tot. Pay', fullLabel: 'Total Regular + Overtime Pay (Total Hours × current salary hourly rate)', className: 'min-w-[100px]', tdClass: 'min-w-[100px] text-right font-semibold', render: (row) => formatCurrency(row.total_pay) },
       ...chargeColumns.map((charge) => ({
         key: `charge-${charge.id}`,
-        label: charge.name,
+        label: charge.code || charge.name,
         fullLabel: charge.name,
         className: 'min-w-[90px]',
         tdClass: 'min-w-[90px] text-right',
         sortable: false,
         render: (row) => formatCurrency(row.charge_breakdown?.find((item) => String(item.id) === String(charge.id))?.amount),
       })),
-      { key: 'basic_pf_amount', label: 'B. PF', fullLabel: 'Basic Provident Fund', className: 'min-w-[85px]', tdClass: 'min-w-[85px] text-right', render: (row) => formatCurrency(row.basic_pf_amount ?? row.pf_amount) },
-      { key: 'ot_pf_amount', label: 'OT PF', fullLabel: 'Overtime Provident Fund', className: 'min-w-[80px]', tdClass: 'min-w-[80px] text-right', render: (row) => formatCurrency(row.ot_pf_amount) },
       { key: 'advance', label: 'Adv.', fullLabel: 'Cash / Bank Advance', className: 'min-w-[85px]', tdClass: 'min-w-[85px] text-right', sortable: false, render: (row) => formatCurrency(Number(row.cash_advance || 0) + Number(row.bank_advance || 0)) },
       { key: 'total_deductions', label: 'Deductions', fullLabel: 'Total Deductions', className: 'min-w-[105px]', tdClass: 'min-w-[105px] text-right', render: (row) => formatCurrency(row.total_deductions) },
       {
         key: 'net_salary',
         label: 'Net Pay',
-        fullLabel: 'Net Payable Salary',
+        fullLabel: 'Net Pay (Total Pay + Auto / Shutdown Pay + other additions - deductions)',
         className: `min-w-[110px] w-[110px] ${STICKY_NET_HEADER} right-[132px]`,
         tdClass: `min-w-[110px] w-[110px] text-right font-bold ${STICKY_NET_BODY} right-[132px]`,
         render: (row) => formatCurrency(row.net_salary),
@@ -365,6 +394,7 @@ const SalaryReportTable = ({
 }) => {
   const [sort, setSort] = useState({ key: null, direction: 'asc' });
   const [zoomLevel, setZoomLevel] = useState(100);
+  const [showDeductionDetails, setShowDeductionDetails] = useState(false);
 
   const handleZoomIn = useCallback(() => setZoomLevel((prev) => Math.min(prev + ZOOM_STEP, MAX_ZOOM)), []);
   const handleZoomOut = useCallback(() => setZoomLevel((prev) => Math.max(prev - ZOOM_STEP, MIN_ZOOM)), []);
@@ -393,18 +423,21 @@ const SalaryReportTable = ({
     const monthLabel = payrollMonth
       ? new Date(`${payrollMonth}-01T00:00:00`).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
       : 'Selected period';
+    const visibleColumns = showDeductionDetails
+      ? columns
+      : columns.filter((column) => !column.key.startsWith('charge-') && column.key !== 'advance');
 
-    const styledColumns = columns.map((column) => {
+    const styledColumns = visibleColumns.map((column) => {
       let headerBg = 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200';
       let bodyBg = 'bg-white dark:bg-slate-900';
 
       if (column.key === 'regular_hours' || column.key === 'overtime_hours' || column.key === 'total_hours') {
         headerBg = 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300';
         bodyBg = 'bg-slate-50 dark:bg-slate-900';
-      } else if (column.key === 'regular_pay' || column.key === 'overtime_pay') {
+      } else if (column.key === 'current_salary_pay' || column.key === 'base_salary_pay' || column.key === 'overtime_pay') {
         headerBg = 'bg-indigo-100 text-indigo-950 dark:bg-indigo-950 dark:text-indigo-200';
         bodyBg = 'bg-indigo-50/70 dark:bg-indigo-950/50';
-      } else if (column.key === 'gross_salary') {
+      } else if (column.key === 'total_pay' || column.key === 'gross_salary') {
         headerBg = 'bg-emerald-100 text-emerald-950 dark:bg-emerald-950 dark:text-emerald-100';
         bodyBg = 'bg-emerald-50/70 dark:bg-emerald-950/50';
       } else if (column.key === 'total_deductions' || column.key.startsWith('charge-') || column.key.includes('pf_amount') || column.key === 'advance') {
@@ -433,6 +466,29 @@ const SalaryReportTable = ({
           </div>
 
           <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 rounded-lg border border-(--color-border) bg-white p-0.5 text-xs shadow-xs dark:bg-slate-900">
+              <button
+                type="button"
+                onClick={() => setShowDeductionDetails((visible) => !visible)}
+                aria-expanded={showDeductionDetails}
+                aria-controls="monthly-salary-table"
+                aria-label={showDeductionDetails ? 'Hide deduction details' : 'Show deduction details'}
+                title={showDeductionDetails ? 'Hide deduction details' : 'Show deduction details'}
+                className={`inline-flex h-6 items-center gap-1.5 rounded-md px-2 text-[10px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-accent) ${
+                  showDeductionDetails
+                    ? 'bg-(--color-accent-soft) text-(--color-accent)'
+                    : 'text-(--color-text-muted) hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                Deductions
+                <ChevronDown
+                  size={13}
+                  aria-hidden="true"
+                  className={`transition-transform ${showDeductionDetails ? 'rotate-180' : ''}`}
+                />
+              </button>
+            </div>
+
             {/* Text Zoom Controls Bar */}
             <div className="flex items-center gap-1 rounded-lg border border-(--color-border) bg-white dark:bg-slate-900 p-0.5 text-xs shadow-xs">
               <button
@@ -491,6 +547,7 @@ const SalaryReportTable = ({
           tabIndex={0}
           role="region"
           aria-label="Salary Data Table"
+          id="monthly-salary-table"
           style={{
             fontSize: `${0.75 * (zoomLevel / 100)}rem`,
           }}

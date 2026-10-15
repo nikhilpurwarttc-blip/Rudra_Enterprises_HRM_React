@@ -99,7 +99,7 @@ const Employees = () => {
   const { data: departmentsData } = useGetDepartmentsQuery();
   const { data: designationsData } = useGetDesignationsQuery();
   const { data: shiftsData } = useGetShiftsQuery();
-  const { data: chargesData } = useGetChargesQuery();
+  const { data: chargesData } = useGetChargesQuery({ all: true, per_page: 100 });
   // Also fetch attendance filters — same endpoint Marking.jsx uses, always accessible
   // Use it as fallback so dropdowns work even without master data permissions
   const { data: attendanceFilters } = useGetAttendanceFiltersQuery();

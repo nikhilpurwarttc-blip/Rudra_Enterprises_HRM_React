@@ -133,6 +133,7 @@ const SalaryReport = () => {
     { ...reportFilters, month: reportMonth, year: reportYear },
     { skip: activeReport !== 'monthly' || !validPayrollMonth },
   );
+  // console.log('monthlyQuery', monthlyQuery);
   const yearlyQuery = useGetYearlySalaryReportQuery(
     { ...reportFilters, year: Number(year) },
     { skip: activeReport !== 'yearly' || !validYear },

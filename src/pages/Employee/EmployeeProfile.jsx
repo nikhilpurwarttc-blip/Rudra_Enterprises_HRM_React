@@ -11,6 +11,12 @@ import EmployeeAvatar from './components/EmployeeAvatar';
 import { displayDate } from './utils/employeeForm.utils';
 
 const unwrap = (value) => value?.data ?? value;
+const formatChargeValue = (value, valueType) => {
+  const amount = Number(value ?? 0);
+  return valueType === 'percentage' ? `${amount}%` : `₹${amount.toFixed(2)}`;
+};
+const isChargeActive = (status) =>
+  status === true || status === 1 || status === '1' || status === 'true';
 
 const EmployeeProfile = ({ employeeId, initialEmployee, embedded = false, onClose }) => {
   const navigate = useNavigate();
@@ -25,6 +31,7 @@ const EmployeeProfile = ({ employeeId, initialEmployee, embedded = false, onClos
   const { canEdit, isReadOnly } = usePermission('/employees');
   useRenderPerformance('getEmployeeById', data);
   const close = onClose ?? (() => navigate('/employees'));
+  const assignedCharges = employee?.charges ?? [];
 
   if (!employee && isLoading) return <LoadingState message="Loading employee profile..." className="min-h-[60vh]" />;
   if (isError || !employee) {
@@ -126,8 +133,36 @@ const EmployeeProfile = ({ employeeId, initialEmployee, embedded = false, onClos
             <p className="text-sm text-(--color-text-muted)">Gender: {employee.gender ?? '—'}</p>
             <p className="text-sm text-(--color-text-muted)">Marital status: {employee.marital_status ?? '—'}</p>
             <p className="flex items-center gap-2 text-sm text-(--color-text-muted)">
-              <IdCard size={14} /> Charges: {employee.charges?.length ?? 0}
+              <IdCard size={14} /> Assigned charges: {assignedCharges.length}
             </p>
+            {assignedCharges.length > 0 && (
+              <ul className="mt-3 space-y-2">
+                {assignedCharges.map((charge) => (
+                  <li
+                    key={charge.id}
+                    className="rounded-md bg-(--color-bg-elevated) px-3 py-2 text-sm"
+                  >
+                    <p className="font-medium text-(--color-text)">
+                      {charge.code ? `${charge.code} — ` : ''}
+                      {charge.name ?? charge.deduction ?? 'Unnamed charge'}
+                      {!isChargeActive(charge.status) && (
+                        <span className="ml-2 text-xs font-normal text-(--color-text-muted)">
+                          Inactive
+                        </span>
+                      )}
+                    </p>
+                    <p className="mt-1 text-xs text-(--color-text-muted)">
+                      Employee: {formatChargeValue(charge.employee_value ?? charge.value, charge.value_type)}
+                      {' · '}
+                      Employer: {formatChargeValue(charge.employer_value, charge.value_type)}
+                      {Number(charge.salary_limit) > 0
+                        ? ` · Salary limit: ₹${Number(charge.salary_limit).toFixed(2)}`
+                        : ''}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
       </GlassCard>

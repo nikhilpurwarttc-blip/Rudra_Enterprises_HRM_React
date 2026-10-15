@@ -122,18 +122,20 @@ const EmployeeSalarySection = ({
     <div className="space-y-4">
       <SectionCard
         title={`Salary history · ${salaries.length} entries`}
-        action={(
-          <Button
-            type="button"
-            variant="ghost"
-            className="flex items-center gap-1"
-            onClick={onRefresh}
-            disabled={isLoading}
-            aria-label="Refresh salary history"
-          >
-            <RefreshCw size={14} /> Refresh
-          </Button>
-        )}
+        onRefresh={onRefresh}
+        isRefreshing={isLoading}
+        // action={(
+        //   <Button
+        //     type="button"
+        //     variant="ghost"
+        //     className="flex items-center gap-1"
+        //     onClick={onRefresh}
+        //     disabled={isLoading}
+        //     aria-label="Refresh salary history"
+        //   >
+        //     <RefreshCw size={14} /> Refresh
+        //   </Button>
+        // )}
       >
         {isLoading ? (
           <LoadingState message="Loading salary history…" />
