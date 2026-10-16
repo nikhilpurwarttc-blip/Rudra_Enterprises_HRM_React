@@ -224,7 +224,8 @@ const EmployeeSalary = ({ employee }) => {
                 <SalaryLine label="Base salary" value={formatCurrency(salary.base_salary)} />
                 <SalaryLine label="Basic pay" value={formatCurrency(salary.regular_pay)} />
                 <SalaryLine label="Overtime pay" value={formatCurrency(salary.overtime_pay)} />
-                <SalaryLine label="Auto pay / shutdown pay" value={formatCurrency(Number(salary.furnace_allowance || 0) + Number(salary.shutdown_pay || 0))} />
+                <SalaryLine label="Furnace allowance" value={formatCurrency(salary.furnace_allowance)} />
+                <SalaryLine label="Shutdown pay" value={formatCurrency(salary.shutdown_pay)} />
                 {Number(salary.other_additions) > 0 && (
                   <SalaryLine label="Other additions" value={formatCurrency(salary.other_additions)} />
                 )}

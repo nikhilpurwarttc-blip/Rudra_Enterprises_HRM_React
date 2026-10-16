@@ -180,10 +180,10 @@ const Marking = () => {
   const employees = unwrap(employeeQuery.currentData ?? employeeQuery.data);
   const searchQuery = search.trim();
   const cachedEmployees = useMemo(() => employees.filter((employee) => (
-      (!effectivePlant || String(employee.plant_id) === effectivePlant)
-      && (!filters.department || String(employee.department_id) === String(filters.department))
-      && (!filters.shift || String(employee.shift_id) === String(filters.shift))
-      && (!searchQuery || matchesEmployeeSearch(employee, searchQuery))
+    (!effectivePlant || String(employee.plant_id) === effectivePlant)
+    && (!filters.department || String(employee.department_id) === String(filters.department))
+    && (!filters.shift || String(employee.shift_id) === String(filters.shift))
+    && (!searchQuery || matchesEmployeeSearch(employee, searchQuery))
   )), [employees, effectivePlant, filters.department, filters.shift, searchQuery]);
   const isSearchPending = searchQuery !== debouncedSearch;
   const useCachedSearchResults = Boolean(searchQuery)
@@ -226,8 +226,8 @@ const Marking = () => {
   const counts = useCachedSearchResults ? pageCounts : employeeQuery.data?.summary ?? pageCounts;
   const pendingApprovalCount = Number(
     employeeQuery.currentData?.summary?.pending_verification
-      ?? employeeQuery.data?.summary?.pending_verification
-      ?? pageCounts.pendingVerification,
+    ?? employeeQuery.data?.summary?.pending_verification
+    ?? pageCounts.pendingVerification,
   );
   const bulkDecisionFilters = {
     date: today,
@@ -609,11 +609,15 @@ const Marking = () => {
     <div className="flex h-full flex-col gap-4 p-4 sm:p-6 overflow-y-auto">
       {/* ── Page header ── */}
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-bold text-(--color-text)">Daily Attendance</h1>
-          <p className="flex items-center gap-1.5 text-sm text-(--color-text-muted) mt-0.5">
-            <CalendarDays size={14} />{todayLabel}
-          </p>
+        <div className="min-w-52 max-w-80 flex-[2]">
+          <InputField
+            aria-label="Search employees"
+            value={search}
+            onChange={(event) => { setSearch(event.target.value); setPage(1); }}
+            placeholder="Search name or employee code"
+            leftIcon={<Search size={16} />}
+            rightIcon={(isSearchPending || employeeQuery.isFetching) ? <LoaderCircle size={15} className="animate-spin" /> : null}
+          />
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {canApproveAttendance && (
@@ -634,130 +638,122 @@ const Marking = () => {
             pendingShutdown
               ? <span className="inline-flex h-9 items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 text-sm font-medium text-amber-800 dark:text-amber-200"><Power size={14} /> Shutdown pending</span>
               : activeShutdown
-              ? <span className="inline-flex h-9 items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 text-sm font-medium text-amber-800 dark:text-amber-200"><Power size={14} /> Shutdown active</span>
-              : (
-                <>
-                  {rejectedShutdown && (
-                    <span title={`Rejected ${getShutdownDateRange(rejectedShutdown)}. Reason: ${rejectedShutdown.remarks || 'No reason provided.'}`}
-                      className="inline-flex h-9 cursor-help items-center gap-2 rounded-lg border border-red-500/40 bg-red-500/10 px-3 text-sm font-medium text-red-800 dark:text-red-200">
-                      <Power size={14} /> Shutdown rejected
-                    </span>
-                  )}
-                  <button type="button"
-                    onClick={() => { setShutdownForm(getShutdownDefaults()); setShutdownDialogOpen(true); }}
-                    disabled={!effectivePlant || shutdownQuery.isFetching || rejectedShutdownQuery.isFetching}
-                    className="inline-flex h-9 items-center gap-2 rounded-lg bg-amber-700 px-3 text-sm font-semibold text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50 transition-colors">
-                    <Power size={14} /> Request shutdown
-                  </button>
-                </>
-              )
+                ? <span className="inline-flex h-9 items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 text-sm font-medium text-amber-800 dark:text-amber-200"><Power size={14} /> Shutdown active</span>
+                : (
+                  <>
+                    {rejectedShutdown && (
+                      <span title={`Rejected ${getShutdownDateRange(rejectedShutdown)}. Reason: ${rejectedShutdown.remarks || 'No reason provided.'}`}
+                        className="inline-flex h-9 cursor-help items-center gap-2 rounded-lg border border-red-500/40 bg-red-500/10 px-3 text-sm font-medium text-red-800 dark:text-red-200">
+                        <Power size={14} /> Shutdown rejected
+                      </span>
+                    )}
+                    <button type="button"
+                      onClick={() => { setShutdownForm(getShutdownDefaults()); setShutdownDialogOpen(true); }}
+                      disabled={!effectivePlant || shutdownQuery.isFetching || rejectedShutdownQuery.isFetching}
+                      className="inline-flex h-9 items-center gap-2 rounded-lg bg-amber-700 px-3 text-sm font-semibold text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50 transition-colors">
+                      <Power size={14} /> Request shutdown
+                    </button>
+                  </>
+                )
           )}
-        </div>
-      </div>
-
-      {/* ── Stats bar ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 overflow-hidden rounded-xl border border-(--color-border) divide-x divide-(--color-border) bg-(--color-surface)">
-          {[
-            { label: 'Roster',           value: counts.roster,                                    color: 'text-(--color-accent)',              icon: <Users size={15} /> },
-            { label: 'Not started',      value: counts.notStarted,                                color: 'text-(--color-text)',                icon: null },
-            { label: 'Punched in',       value: counts.punchedIn,                                 color: 'text-emerald-600 dark:text-emerald-400', icon: null },
-            { label: 'Completed',        value: counts.completed,                                 color: 'text-sky-600 dark:text-sky-400',     icon: null },
-            { label: 'Shutdown present', value: counts.shutdown_present ?? counts.shutdownPresent ?? 0, color: 'text-amber-700 dark:text-amber-300', icon: null },
-          ].map(({ label, value, color, icon }) => (
-            <div key={label} className="flex flex-col gap-1 p-3 col-span-1 first:col-span-2 first:sm:col-span-1">
-              <p className="text-xs font-medium text-(--color-text-muted) truncate">{label}</p>
-              <p className={`text-xl font-bold tabular-nums flex items-center gap-1.5 ${color}`}>{icon}{value}</p>
-            </div>
-          ))}
-      </div>
-
-      {/* ── Filters ── */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="min-w-52 max-w-80 flex-[2]">
-            <InputField
-              aria-label="Search employees"
-              value={search}
-              onChange={(event) => { setSearch(event.target.value); setPage(1); }}
-              placeholder="Search name or employee code"
-              leftIcon={<Search size={16} />}
-              rightIcon={(isSearchPending || employeeQuery.isFetching) ? <LoaderCircle size={15} className="animate-spin" /> : null}
-            />
-          </div>
           <div className="flex flex-wrap items-center gap-2">
-          <FilterModal
-            title="Filter attendance"
-            values={filters}
-            onApply={(nextFilters) => {
-              setFilters(nextFilters);
-              setPage(1);
-            }}
-            fields={[
-              {
-                key: 'plant',
-                label: 'Plant',
-                type: 'select',
-                permission: 'attendance',
-                visible: !singleAssignedPlant,
-                options: plantOptions,
-                placeholder: 'All plants',
-                isLoading: shiftsQuery.isLoading || filtersQuery.isLoading,
-                showSearch: false,
-              },
-              {
-                key: 'department',
-                label: 'Department',
-                type: 'select',
-                permission: 'attendance',
-                options: departmentOptions,
-                placeholder: 'All departments',
-                isLoading: filtersQuery.isLoading,
-                showSearch: false,
-              },
-              {
-                key: 'shift',
-                label: 'Shift',
-                type: 'select',
-                permission: 'attendance',
-                options: shiftOptions,
-                placeholder: 'All shifts',
-                isLoading: filtersQuery.isLoading,
-                showSearch: false,
-              },
-            ]}
-          />
-          {/* <button
+            <FilterModal
+              title="Filter attendance"
+              values={filters}
+              onApply={(nextFilters) => {
+                setFilters(nextFilters);
+                setPage(1);
+              }}
+              fields={[
+                {
+                  key: 'plant',
+                  label: 'Plant',
+                  type: 'select',
+                  permission: 'attendance',
+                  visible: !singleAssignedPlant,
+                  options: plantOptions,
+                  placeholder: 'All plants',
+                  isLoading: shiftsQuery.isLoading || filtersQuery.isLoading,
+                  showSearch: false,
+                },
+                {
+                  key: 'department',
+                  label: 'Department',
+                  type: 'select',
+                  permission: 'attendance',
+                  options: departmentOptions,
+                  placeholder: 'All departments',
+                  isLoading: filtersQuery.isLoading,
+                  showSearch: false,
+                },
+                {
+                  key: 'shift',
+                  label: 'Shift',
+                  type: 'select',
+                  permission: 'attendance',
+                  options: shiftOptions,
+                  placeholder: 'All shifts',
+                  isLoading: filtersQuery.isLoading,
+                  showSearch: false,
+                },
+              ]}
+            />
+            {/* <button
             type="button"
             onClick={() => { setSearch(''); setDebouncedSearch(''); setFilters({ plant: '', department: '', shift: '' }); setPage(1); }}
             className="inline-flex h-12 items-center justify-center gap-1.5 rounded-md border border-(--color-border-strong) px-3 text-sm font-medium text-(--color-text-muted) hover:bg-(--color-accent-soft) hover:text-(--color-text) transition-colors"
           >
             <RotateCcw size={14} /> Reset
           </button> */}
-          <Button
-            type="button"
-            variant='ghost'
-            aria-label="Refresh attendance roster"
-            title="Refresh attendance roster"
-            onClick={() => { employeeQuery.refetch(); filtersQuery.refetch(); shiftsQuery.refetch(); shutdownQuery.refetch(); if (effectivePlant) rejectedShutdownQuery.refetch(); }}
-            disabled={isRefreshing}
-          >
-            <RefreshCw size={15} className={isRefreshing ? 'animate-spin' : ''} />
-          </Button>
+            <Button
+              type="button"
+              variant='ghost'
+              aria-label="Refresh attendance roster"
+              title="Refresh attendance roster"
+              onClick={() => { employeeQuery.refetch(); filtersQuery.refetch(); shiftsQuery.refetch(); shutdownQuery.refetch(); if (effectivePlant) rejectedShutdownQuery.refetch(); }}
+              disabled={isRefreshing}
+            >
+              <RefreshCw size={15} className={isRefreshing ? 'animate-spin' : ''} />
+            </Button>
           </div>
         </div>
+      </div>
+
+      {/* ── Stats bar ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 overflow-hidden rounded-xl border border-(--color-border) divide-x divide-(--color-border) bg-(--color-surface)">
+        {[
+          { label: 'Roster', value: counts.roster, color: 'text-(--color-accent)', icon: <Users size={15} /> },
+          { label: 'Not started', value: counts.notStarted, color: 'text-(--color-text)', icon: null },
+          { label: 'Punched in', value: counts.punchedIn, color: 'text-emerald-600 dark:text-emerald-400', icon: null },
+          { label: 'Completed', value: counts.completed, color: 'text-sky-600 dark:text-sky-400', icon: null },
+          { label: 'Shutdown present', value: counts.shutdown_present ?? counts.shutdownPresent ?? 0, color: 'text-amber-700 dark:text-amber-300', icon: null },
+        ].map(({ label, value, color, icon }) => (
+          <div key={label} className="flex flex-col gap-1 p-3 col-span-1 first:col-span-2 first:sm:col-span-1">
+            <p className="text-xs font-medium text-(--color-text-muted) truncate">{label}</p>
+            <p className={`text-xl font-bold tabular-nums flex items-center gap-1.5 ${color}`}>{icon}{value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Filters ── */}
+      {/* <div className="flex flex-wrap items-center justify-between gap-2">
+        
+        
+      </div> */}
 
       {/* ── Table card ── */}
       <div className="">
         {(filtersQuery.isError || (employeeQuery.isError && displayedEmployees.length === 0))
           ? <Feedback type="error" title="Unable to load attendance roster" message="Please refresh the page and try again." />
           : <PageTable
-              columns={columns}
-              rows={displayedEmployees}
-              total={useCachedSearchResults ? displayedEmployees.length : Number(meta.total ?? displayedEmployees.length)}
-              label="employees"
-              isLoading={employeeQuery.isLoading || (Boolean(searchQuery) && (isSearchPending || employeeQuery.isFetching) && displayedEmployees.length === 0)}
-              pagination={useCachedSearchResults ? null : <Pagination page={currentPage} lastPage={lastPage} onPageChange={setPage} />}
-              emptyText="No employees match these filters"
-            />}
+            columns={columns}
+            rows={displayedEmployees}
+            total={useCachedSearchResults ? displayedEmployees.length : Number(meta.total ?? displayedEmployees.length)}
+            label="employees"
+            isLoading={employeeQuery.isLoading || (Boolean(searchQuery) && (isSearchPending || employeeQuery.isFetching) && displayedEmployees.length === 0)}
+            pagination={useCachedSearchResults ? null : <Pagination page={currentPage} lastPage={lastPage} onPageChange={setPage} />}
+            emptyText="No employees match these filters"
+          />}
       </div>
 
       {shutdownDialogOpen && (

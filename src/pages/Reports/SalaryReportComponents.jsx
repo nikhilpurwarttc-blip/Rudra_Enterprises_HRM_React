@@ -226,7 +226,6 @@ const STICKY_ACTION_HEADER = '!bg-slate-100 dark:!bg-slate-900 sticky right-0 z-
 const STICKY_ACTION_BODY = '!bg-white dark:!bg-slate-900 sticky right-0 z-20 shadow-[-3px_0_8px_rgba(0,0,0,0.08)]';
 
 const getColumns = (activeReport, chargeColumns, onPayEmployee, payingEmployeeId, canPayEmployees, isPaying) => {
-  console.log(chargeColumns);
   if (activeReport === 'monthly') {
     return [
       {
@@ -261,7 +260,7 @@ const getColumns = (activeReport, chargeColumns, onPayEmployee, payingEmployeeId
       },
       { key: 'present_days', label: 'Present', fullLabel: 'Present Days', className: 'min-w-[65px]', tdClass: 'min-w-[65px] text-right', render: (row) => formatNumber(row.present_days) },
       { key: 'regular_hours', label: 'Basic Hrs', fullLabel: 'Basic Hours Worked', className: 'min-w-[80px]', tdClass: 'min-w-[80px] text-right', render: (row) => formatNumber(row.regular_hours) },
-      { key: 'auto_pay', label: 'Auto/Shut.', fullLabel: 'Auto Pay / Shutdown Pay', className: 'min-w-[95px]', tdClass: 'min-w-[95px] text-right', render: (row) => formatCurrency(Number(row.furnace_allowance || 0) + Number(row.shutdown_pay || 0)) },
+      { key: 'shutdown_pay', label: 'Shutdown', fullLabel: 'Shutdown Pay', className: 'min-w-[105px]', tdClass: 'min-w-[105px] text-right', render: (row) => formatCurrency(row.shutdown_pay) },
       {
         key: 'current_salary_pay',
         label: 'Basic Pay',
@@ -269,8 +268,8 @@ const getColumns = (activeReport, chargeColumns, onPayEmployee, payingEmployeeId
         className: 'min-w-[125px]',
         tdClass: 'min-w-[125px] text-right',
         render: (row) => row.current_salary_pay == null
-          ? '—'
-          : <span title={`Salary effective from ${row.current_salary_pay_effective_from || 'unknown date'}`}>{formatCurrency(row.current_salary_pay)}</span>,
+        ? '—'
+        : <span title={`Salary effective from ${row.current_salary_pay_effective_from || 'unknown date'}`}>{formatCurrency(row.current_salary_pay)}</span>,
       },
       {
         key: 'base_salary_pay',
@@ -281,7 +280,7 @@ const getColumns = (activeReport, chargeColumns, onPayEmployee, payingEmployeeId
         render: (row) => row.base_salary_pay == null
           ? '—'
           : <span title={`Salary effective from ${row.base_salary_pay_effective_from || 'unknown date'}`}>{formatCurrency(row.base_salary_pay)}</span>,
-      },
+        },
       { key: 'overtime_hours', label: 'OT Hrs', fullLabel: 'Overtime Hours', className: 'min-w-[70px]', tdClass: 'min-w-[70px] text-right', render: (row) => formatNumber(row.overtime_hours) },
       { key: 'overtime_pay', label: 'OT Pay', fullLabel: 'Overtime Pay', className: 'min-w-[85px]', tdClass: 'min-w-[85px] text-right', render: (row) => formatCurrency(row.overtime_pay) },
       { key: 'total_hours', label: 'Tot. Hrs', fullLabel: 'Total Hours Worked', className: 'min-w-[80px]', tdClass: 'min-w-[80px] text-right', sortable: false, render: (row) => formatNumber(Number(row.regular_hours || 0) + Number(row.overtime_hours || 0)) },
@@ -297,6 +296,7 @@ const getColumns = (activeReport, chargeColumns, onPayEmployee, payingEmployeeId
       })),
       { key: 'advance', label: 'Adv.', fullLabel: 'Cash / Bank Advance', className: 'min-w-[85px]', tdClass: 'min-w-[85px] text-right', sortable: false, render: (row) => formatCurrency(Number(row.cash_advance || 0) + Number(row.bank_advance || 0)) },
       { key: 'total_deductions', label: 'Deductions', fullLabel: 'Total Deductions', className: 'min-w-[105px]', tdClass: 'min-w-[105px] text-right', render: (row) => formatCurrency(row.total_deductions) },
+      { key: 'furnace_allowance', label: 'Furnace', fullLabel: 'Furnace Allowance', className: 'min-w-[105px]', tdClass: 'min-w-[105px] text-right', render: (row) => formatCurrency(row.furnace_allowance) },
       {
         key: 'net_salary',
         label: 'Net Pay',

@@ -295,7 +295,7 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['SalaryReport'],
+      invalidatesTags: ['SalaryReport', 'MaintenanceRecord'],
     }),
     exportMonthlySalaryReport: builder.query({
       query: (params) => ({

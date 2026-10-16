@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Banknote, Building2, CreditCard, Download, Filter, RefreshCw } from 'lucide-react';
+import { Banknote, Building2, CreditCard, Download, RefreshCw } from 'lucide-react';
 import AccessDenied from '../../components/AccessDenied';
 import Button from '../../components/Button';
 import { Feedback, InlineError, LoadingState } from '../../components/Feedback';
+import FilterModal from '../../components/FilterModal';
 import InputField from '../../components/InputField';
 import usePermission from '../../hooks/usePermission';
 import RightModal from '../components/RightModal';
@@ -20,12 +21,7 @@ import {
   useLockPayrollEmployeeMutation,
   usePayPayrollEmployeeMutation,
 } from '../../store/api';
-import {
-  SalaryReportFilters,
-  SalaryReportSummary,
-  SalaryReportTable,
-  SalaryReportTabs,
-} from './SalaryReportComponents';
+import { SalaryReportSummary, SalaryReportTable, SalaryReportTabs } from './SalaryReportComponents';
 import SearchableSelect from '../../components/SearchableSelect';
 
 const unwrapList = (response) => {
@@ -84,7 +80,6 @@ const SalaryReport = () => {
   const [paymentError, setPaymentError] = useState('');
   const [loadingPaymentAccounts, setLoadingPaymentAccounts] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [filtersVisible, setFiltersVisible] = useState(false);
 
   const canViewPlants = canModule('plants', 'view');
   const canViewDepartments = canModule('departments', 'view');
@@ -120,9 +115,9 @@ const SalaryReport = () => {
   }), []);
 
   const reportFilters = useMemo(() => ({
-    ...(plantIds.length ? { 'plant_ids[]': plantIds } : {}),
-    ...(departmentId ? { department_id: departmentId } : {}),
-    ...(designationId ? { designation_id: designationId } : {}),
+    ...Object.fromEntries(plantIds.map((plantId, index) => [`plant_ids[${index}]`, plantId])),
+    ...(departmentId ? { department_id: Number(departmentId) } : {}),
+    ...(designationId ? { designation_id: Number(designationId) } : {}),
   }), [plantIds, departmentId, designationId]);
   const validPayrollMonth = isValidPayrollMonth(payrollMonth);
   const [reportYear, reportMonth] = validPayrollMonth
@@ -133,7 +128,7 @@ const SalaryReport = () => {
     { ...reportFilters, month: reportMonth, year: reportYear },
     { skip: activeReport !== 'monthly' || !validPayrollMonth },
   );
-  // console.log('monthlyQuery', monthlyQuery);
+  console.log('monthlyQuery', monthlyQuery);
   const yearlyQuery = useGetYearlySalaryReportQuery(
     { ...reportFilters, year: Number(year) },
     { skip: activeReport !== 'yearly' || !validYear },
@@ -165,8 +160,6 @@ const SalaryReport = () => {
       ? response?.employees ?? []
       : response?.items ?? [];
   const summary = activeReport === 'statutory' ? response?.summary : response?.totals;
-  const hasActiveFilters = plantIds.length > 0 || Boolean(departmentId) || Boolean(designationId);
-
   const handleExport = async () => {
     setExportError('');
     setExporting(true);
@@ -367,19 +360,80 @@ const SalaryReport = () => {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <SalaryReportTabs activeReport={activeReport} onChange={handleReportChange} />
         <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => setFiltersVisible((visible) => !visible)}
-            aria-label={filtersVisible ? 'Hide salary report filters' : 'Show salary report filters'}
-            aria-expanded={filtersVisible}
-            aria-controls="salary-report-filters"
-            title={hasActiveFilters ? 'Filters applied' : 'Filters'}
-            className={`h-11 w-11 p-0 ${hasActiveFilters ? 'border-(--color-accent) bg-(--color-accent-soft) text-(--color-accent)' : ''}`}
-          >
-            <Filter size={16} aria-hidden="true" />
-            <span className="sr-only">Filters</span>
-          </Button>
+          <FilterModal
+            title="Filter salary report"
+            values={{
+              payrollMonth,
+              year,
+              statutoryType,
+              plants: plantIds.map(String),
+              department: departmentId,
+              designation: designationId,
+            }}
+            onApply={(nextFilters) => {
+              setPayrollMonth(nextFilters.payrollMonth || currentMonth());
+              setYear(nextFilters.year || String(new Date().getFullYear()));
+              setStatutoryType(nextFilters.statutoryType || 'esi');
+              setPlantIds((nextFilters.plants ?? []).map(Number).filter(Number.isFinite));
+              setDepartmentId(nextFilters.department || '');
+              setDesignationId(nextFilters.designation || '');
+              setPayrollError('');
+              setPayrollMessage('');
+            }}
+            fields={[
+              {
+                key: 'payrollMonth',
+                label: 'Payroll month',
+                type: 'month',
+                visible: activeReport === 'monthly' || activeReport === 'statutory',
+              },
+              {
+                key: 'year',
+                label: 'Calendar year',
+                type: 'select',
+                options: yearOptions,
+                placeholder: 'Select calendar year',
+                visible: activeReport === 'yearly',
+              },
+              {
+                key: 'statutoryType',
+                label: 'Contribution type',
+                type: 'select',
+                options: [
+                  { value: 'esi', label: 'ESI' },
+                  { value: 'pf', label: 'PF' },
+                ],
+                visible: activeReport === 'statutory',
+              },
+              {
+                key: 'plants',
+                label: 'Plants',
+                type: 'multiselect',
+                permission: 'plants',
+                options: plantOptions,
+                placeholder: 'All plants',
+                isLoading: plantsQuery.isLoading,
+              },
+              {
+                key: 'department',
+                label: 'Department',
+                type: 'select',
+                permission: 'departments',
+                options: departmentOptions,
+                placeholder: 'All departments',
+                isLoading: departmentsQuery.isLoading,
+              },
+              {
+                key: 'designation',
+                label: 'Designation',
+                type: 'select',
+                permission: 'designations',
+                options: designationOptions,
+                placeholder: 'All designations',
+                isLoading: designationsQuery.isLoading,
+              },
+            ]}
+          />
           <Button
             type="button"
             variant='ghost'
@@ -403,40 +457,6 @@ const SalaryReport = () => {
           )}
         </div>
       </div>
-
-      {filtersVisible && (
-        <div id="salary-report-filters">
-          <SalaryReportFilters
-            activeReport={activeReport}
-            payrollMonth={payrollMonth}
-            onPayrollMonthChange={(event) => {
-              setPayrollMonth(event.target.value);
-              setPayrollError('');
-              setPayrollMessage('');
-            }}
-            year={year}
-            onYearChange={setYear}
-            yearOptions={yearOptions}
-            statutoryType={statutoryType}
-            onStatutoryTypeChange={setStatutoryType}
-            plantIds={plantIds}
-            onPlantChange={(value) => { setPlantIds(value); setDepartmentId(''); }}
-            plantOptions={plantOptions}
-            isLoadingPlants={plantsQuery.isLoading}
-            canViewPlants={canViewPlants}
-            departmentId={departmentId}
-            onDepartmentChange={setDepartmentId}
-            departmentOptions={departmentOptions}
-            isLoadingDepartments={departmentsQuery.isLoading}
-            canViewDepartments={canViewDepartments}
-            designationId={designationId}
-            onDesignationChange={setDesignationId}
-            designationOptions={designationOptions}
-            isLoadingDesignations={designationsQuery.isLoading}
-            canViewDesignations={canViewDesignations}
-          />
-        </div>
-      )}
 
       {/* {activeReport === 'monthly' && canLockEmployees && (
         <div className="space-y-0.5 text-[11px] leading-tight text-(--color-text-muted)">
