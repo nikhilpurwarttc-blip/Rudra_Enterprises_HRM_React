@@ -236,6 +236,7 @@ const Dashboard = () => {
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState(today);
   const [plantIds, setPlantIds] = useState([]);
+  const [manualRefreshing, setManualRefreshing] = useState(false);
   const canSelectPlants = canModule('plants', 'view');
   const {
     data: plantsResponse,
@@ -271,13 +272,20 @@ const Dashboard = () => {
     data: response,
     error,
     isError,
-    isFetching,
     isLoading,
     refetch,
   } = useGetDashboardQuery(queryParams, {
     skip: !canView || (period === 'custom' && (!startDate || !endDate || startDate > endDate)),
     refetchOnMountOrArgChange: true,
   });
+  const refreshDashboard = async () => {
+    setManualRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setManualRefreshing(false);
+    }
+  };
   const dashboard = response?.data;
 
   const capabilities = dashboard?.capabilities;
@@ -378,17 +386,17 @@ const Dashboard = () => {
             />
             <Button
               variant="ghost"
-              onClick={() => refetch()}
-              disabled={isFetching}
+              onClick={refreshDashboard}
+              disabled={manualRefreshing || isLoading}
               aria-label="Refresh dashboard"
               className="h-10 min-h-10 shrink-0 px-3"
             >
-              <RefreshCw size={15} className={isFetching ? 'animate-spin motion-reduce:animate-none' : ''} aria-hidden="true" />
+              <RefreshCw size={15} className={manualRefreshing ? 'animate-spin motion-reduce:animate-none' : ''} aria-hidden="true" />
               <span className="sm:hidden">Refresh</span>
             </Button>
           </div>
         </div>
-        {isFetching && <div className="absolute inset-x-0 bottom-0 h-0.5 animate-pulse bg-(--color-accent) motion-reduce:animate-none" aria-label="Refreshing dashboard" />}
+        {isLoading && <div className="absolute inset-x-0 bottom-0 h-0.5 animate-pulse bg-(--color-accent) motion-reduce:animate-none" aria-label="Loading dashboard" />}
       </GlassCard>
 
       {isError && dashboard && (

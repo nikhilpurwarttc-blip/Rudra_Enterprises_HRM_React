@@ -36,7 +36,7 @@ const MENU = [
     label: "Employees",
     // menuKey: "employees",
     to: "/employees",
-    paths: ["/employees", "/employees/add", "/employees/:id", "/employees/:id/edit", "/employees/:id/attendance", "/employees/:id/salary"],
+    paths: ["/employees", "/employees/add", "/employees/barcodes", "/employees/:id", "/employees/:id/edit", "/employees/:id/attendance", "/employees/:id/salary"],
     // submenu: [
     //   { icon: Users, label: "Employee List", to: "/employees", paths: ["/employees"] },
     // ],

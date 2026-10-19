@@ -93,7 +93,9 @@ const timedBaseQuery = async (args, api, extraOptions) => {
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: timedBaseQuery,
-  tagTypes: ['User', 'Users', 'Employee', 'EmployeeDocument', 'EmployeeBankAccount', 'EmployeeAdvance', 'EmployeeSalary', 'Attendance', 'PlantShutdown', 'MaintenanceRecord', 'SalaryReport', 'Role', 'Permission', 'Shift', 'Charge', 'Plant', 'Department', 'Holiday', 'Designation', 'Dashboard'],
+  refetchOnFocus: true,
+  refetchOnReconnect: true,
+  tagTypes: ['User', 'Users', 'Employee', 'EmployeeDocument', 'EmployeeBankAccount', 'EmployeeAdvance', 'EmployeeSalary', 'Attendance', 'PlantShutdown', 'MaintenanceRecord', 'SalaryReport', 'PayrollPaymentDetails', 'PayrollPaymentAccounts', 'Role', 'Permission', 'Shift', 'Charge', 'Plant', 'Department', 'Holiday', 'Designation', 'Dashboard'],
   endpoints: (builder) => ({
     login: builder.mutation({
       query: (credentials) => ({ url: '/login', method: 'POST', body: credentials }),
@@ -128,7 +130,7 @@ export const api = createApi({
         const queryString = searchParams.toString();
         return { url: queryString ? `/dashboard?${queryString}` : '/dashboard' };
       },
-      providesTags: ['Dashboard', 'Employee', 'Attendance', 'SalaryReport', 'EmployeeAdvance', 'PlantShutdown', 'MaintenanceRecord'],
+      providesTags: ['Dashboard', 'Employee', 'Attendance', 'SalaryReport', 'EmployeeAdvance', 'PlantShutdown', 'MaintenanceRecord', 'Plant', 'Department', 'Designation', 'Shift', 'Charge', 'Holiday'],
     }),
 
     // Users
@@ -195,14 +197,18 @@ export const api = createApi({
     }),
     createEmployeeSalary: builder.mutation({
       query: (body) => ({ url: '/employee-salaries', method: 'POST', body }),
-      invalidatesTags: (_result, _error, body) => [{ type: 'EmployeeSalary', id: body.employee_id }],
+      invalidatesTags: (_result, _error, body) => [
+        { type: 'EmployeeSalary', id: body.employee_id },
+        'SalaryReport',
+      ],
     }),
     updateEmployeeSalary: builder.mutation({
       query: ({ id, ...body }) => ({ url: `/employee-salaries/${id}`, method: 'PUT', body }),
-      invalidatesTags: ['EmployeeSalary'],
+      invalidatesTags: ['EmployeeSalary', 'SalaryReport'],
     }),
     getAttendanceFilters: builder.query({
       query: () => '/attendances/filters',
+      providesTags: ['Plant', 'Department', 'Shift', 'Charge', 'Role'],
     }),
     getPlantShutdowns: builder.query({
       query: (filters = {}) => ({ url: '/plant-shutdowns', params: filters }),
@@ -241,6 +247,7 @@ export const api = createApi({
     }),
     getAttendanceReportFilters: builder.query({
       query: () => '/attendance-report/filters',
+      providesTags: ['Plant', 'Department', 'Shift', 'Role'],
     }),
     getAttendanceReport: builder.query({
       query: (filters = {}) => {
@@ -250,7 +257,7 @@ export const api = createApi({
         });
         return { url: '/attendance-report', params };
       },
-      providesTags: ['Attendance'],
+      providesTags: ['Attendance', 'Employee'],
     }),
     getMonthlySalaryReport: builder.query({
       query: (params) => ({ url: '/salary-reports/monthly', params }),
@@ -281,13 +288,22 @@ export const api = createApi({
         url: `/payrolls/${payrollId}/employees/${employeeId}/lock`,
         method: 'POST',
       }),
-      invalidatesTags: ['SalaryReport'],
+      invalidatesTags: (_result, _error, { payrollId, employeeId }) => [
+        'SalaryReport',
+        { type: 'PayrollPaymentDetails', id: `${payrollId}-${employeeId}` },
+      ],
     }),
     getPayrollEmployeePaymentDetails: builder.query({
       query: ({ payrollId, employeeId }) => `/payrolls/${payrollId}/employees/${employeeId}/payment-details`,
+      providesTags: (_result, _error, { payrollId, employeeId }) => [
+        { type: 'PayrollPaymentDetails', id: `${payrollId}-${employeeId}` },
+      ],
     }),
     getPayrollEmployeePaymentAccounts: builder.query({
       query: (employeeId) => `/payrolls/employees/${employeeId}/payment-accounts`,
+      providesTags: (_result, _error, employeeId) => [
+        { type: 'PayrollPaymentAccounts', id: employeeId },
+      ],
     }),
     payPayrollEmployee: builder.mutation({
       query: ({ payrollId, employeeId, ...body }) => ({
@@ -295,7 +311,11 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['SalaryReport', 'MaintenanceRecord'],
+      invalidatesTags: (_result, _error, { payrollId, employeeId }) => [
+        'SalaryReport',
+        'MaintenanceRecord',
+        { type: 'PayrollPaymentDetails', id: `${payrollId}-${employeeId}` },
+      ],
     }),
     exportMonthlySalaryReport: builder.query({
       query: (params) => ({
@@ -323,7 +343,7 @@ export const api = createApi({
         });
         return { url: '/attendances/roster', params };
       },
-      providesTags: ['Attendance'],
+      providesTags: ['Attendance', 'Employee'],
     }),
     checkInAttendance: builder.mutation({
       query: (body) => ({ url: '/attendances/check-in', method: 'POST', body }),
@@ -363,19 +383,19 @@ export const api = createApi({
     }),
     createEmployeeAdvance: builder.mutation({
       query: (body) => ({ url: '/employee-advances', method: 'POST', body }),
-      invalidatesTags: ['EmployeeAdvance'],
+      invalidatesTags: ['EmployeeAdvance', 'SalaryReport'],
     }),
     updateEmployeeAdvance: builder.mutation({
       query: ({ id, ...body }) => ({ url: `/employee-advances/${id}`, method: 'PUT', body }),
-      invalidatesTags: ['EmployeeAdvance'],
+      invalidatesTags: ['EmployeeAdvance', 'SalaryReport'],
     }),
     recoverEmployeeAdvance: builder.mutation({
       query: ({ id, ...body }) => ({ url: `/employee-advances/${id}/recover`, method: 'POST', body }),
-      invalidatesTags: ['EmployeeAdvance'],
+      invalidatesTags: ['EmployeeAdvance', 'SalaryReport'],
     }),
     cancelEmployeeAdvance: builder.mutation({
       query: (id) => ({ url: `/employee-advances/${id}/cancel`, method: 'POST' }),
-      invalidatesTags: ['EmployeeAdvance'],
+      invalidatesTags: ['EmployeeAdvance', 'SalaryReport'],
     }),
     getEmployeeDocuments: builder.query({
       query: (employeeId) => `/employee-documents?employee_id=${employeeId}`,
@@ -395,11 +415,14 @@ export const api = createApi({
     }),
     createEmployeeBankAccount: builder.mutation({
       query: (body) => ({ url: '/employee-bank-accounts', method: 'POST', body }),
-      invalidatesTags: (_result, _error, body) => [{ type: 'EmployeeBankAccount', id: body.employee_id }],
+      invalidatesTags: (_result, _error, body) => [
+        { type: 'EmployeeBankAccount', id: body.employee_id },
+        { type: 'PayrollPaymentAccounts', id: body.employee_id },
+      ],
     }),
     deleteEmployeeBankAccount: builder.mutation({
       query: (id) => ({ url: `/employee-bank-accounts/${id}`, method: 'DELETE' }),
-      invalidatesTags: ['EmployeeBankAccount'],
+      invalidatesTags: ['EmployeeBankAccount', 'PayrollPaymentAccounts'],
     }),
 
     // Shifts
@@ -409,15 +432,15 @@ export const api = createApi({
     }),
     createShift: builder.mutation({
       query: (body) => ({ url: '/shifts', method: 'POST', body }),
-      invalidatesTags: ['Shift'],
+      invalidatesTags: ['Shift', 'Employee'],
     }),
     updateShift: builder.mutation({
       query: ({ id, ...body }) => ({ url: `/shifts/${id}`, method: 'PUT', body }),
-      invalidatesTags: ['Shift'],
+      invalidatesTags: ['Shift', 'Employee'],
     }),
     deleteShift: builder.mutation({
       query: (id) => ({ url: `/shifts/${id}`, method: 'DELETE' }),
-      invalidatesTags: ['Shift'],
+      invalidatesTags: ['Shift', 'Employee'],
     }),
 
     // Master data
@@ -427,15 +450,15 @@ export const api = createApi({
     }),
     createPlant: builder.mutation({
       query: (body) => ({ url: '/plants', method: 'POST', body }),
-      invalidatesTags: ['Plant', 'Department', 'Holiday'],
+      invalidatesTags: ['Plant', 'Department', 'Holiday', 'Employee'],
     }),
     updatePlant: builder.mutation({
       query: ({ id, ...body }) => ({ url: `/plants/${id}`, method: 'PUT', body }),
-      invalidatesTags: ['Plant', 'Department', 'Holiday'],
+      invalidatesTags: ['Plant', 'Department', 'Holiday', 'Employee'],
     }),
     deletePlant: builder.mutation({
       query: (id) => ({ url: `/plants/${id}`, method: 'DELETE' }),
-      invalidatesTags: ['Plant', 'Department', 'Holiday'],
+      invalidatesTags: ['Plant', 'Department', 'Holiday', 'Employee'],
     }),
     getDepartments: builder.query({
       query: (arg) => {
@@ -452,7 +475,7 @@ export const api = createApi({
     }),
     createDesignation: builder.mutation({
       query: (body) => ({ url: '/designations', method: 'POST', body }),
-      invalidatesTags: ['Designation'],
+      invalidatesTags: ['Designation', 'Employee'],
     }),
     updateDesignation: builder.mutation({
       query: ({ id, ...body }) => ({ url: `/designations/${id}`, method: 'PUT', body }),
@@ -464,15 +487,15 @@ export const api = createApi({
     }),
     createDepartment: builder.mutation({
       query: (body) => ({ url: '/departments', method: 'POST', body }),
-      invalidatesTags: ['Department'],
+      invalidatesTags: ['Department', 'Employee'],
     }),
     updateDepartment: builder.mutation({
       query: ({ id, ...body }) => ({ url: `/departments/${id}`, method: 'PUT', body }),
-      invalidatesTags: ['Department'],
+      invalidatesTags: ['Department', 'Employee'],
     }),
     deleteDepartment: builder.mutation({
       query: (id) => ({ url: `/departments/${id}`, method: 'DELETE' }),
-      invalidatesTags: ['Department'],
+      invalidatesTags: ['Department', 'Employee'],
     }),
     getHolidays: builder.query({
       query: (plantId) => plantId ? `/holidays?plant_id=${plantId}` : '/holidays',
@@ -480,15 +503,15 @@ export const api = createApi({
     }),
     createHoliday: builder.mutation({
       query: (body) => ({ url: '/holidays', method: 'POST', body }),
-      invalidatesTags: ['Holiday'],
+      invalidatesTags: ['Holiday', 'Attendance'],
     }),
     updateHoliday: builder.mutation({
       query: ({ id, ...body }) => ({ url: `/holidays/${id}`, method: 'PUT', body }),
-      invalidatesTags: ['Holiday'],
+      invalidatesTags: ['Holiday', 'Attendance'],
     }),
     deleteHoliday: builder.mutation({
       query: (id) => ({ url: `/holidays/${id}`, method: 'DELETE' }),
-      invalidatesTags: ['Holiday'],
+      invalidatesTags: ['Holiday', 'Attendance'],
     }),
 
     // Charges
@@ -516,15 +539,15 @@ export const api = createApi({
     }),
     createRole: builder.mutation({
       query: (body) => ({ url: '/roles', method: 'POST', body }),
-      invalidatesTags: ['Role', 'User', 'Dashboard'],
+      invalidatesTags: ['Role', 'User', 'Users', 'Dashboard'],
     }),
     updateRole: builder.mutation({
       query: ({ id, ...body }) => ({ url: `/roles/${id}`, method: 'PUT', body }),
-      invalidatesTags: ['Role', 'User', 'Dashboard'],
+      invalidatesTags: ['Role', 'User', 'Users', 'Dashboard'],
     }),
     deleteRole: builder.mutation({
       query: (id) => ({ url: `/roles/${id}`, method: 'DELETE' }),
-      invalidatesTags: ['Role', 'User', 'Dashboard'],
+      invalidatesTags: ['Role', 'User', 'Users', 'Dashboard'],
     }),
 
     // Permissions
@@ -534,19 +557,19 @@ export const api = createApi({
     }),
     seedPermissions: builder.mutation({
       query: (body) => ({ url: '/permissions/seed', method: 'POST', body }),
-      invalidatesTags: ['Permission'],
+      invalidatesTags: ['Permission', 'Role', 'User', 'Users', 'Dashboard'],
     }),
     createPermission: builder.mutation({
       query: (body) => ({ url: '/permissions', method: 'POST', body }),
-      invalidatesTags: ['Permission'],
+      invalidatesTags: ['Permission', 'Role', 'User', 'Users', 'Dashboard'],
     }),
     updatePermission: builder.mutation({
       query: ({ id, ...body }) => ({ url: `/permissions/${id}`, method: 'PUT', body }),
-      invalidatesTags: ['Permission'],
+      invalidatesTags: ['Permission', 'Role', 'User', 'Users', 'Dashboard'],
     }),
     deletePermission: builder.mutation({
       query: (id) => ({ url: `/permissions/${id}`, method: 'DELETE' }),
-      invalidatesTags: ['Permission'],
+      invalidatesTags: ['Permission', 'Role', 'User', 'Users', 'Dashboard'],
     }),
   }),
 });
@@ -566,6 +589,7 @@ export const {
   useLazyGetEmployeesQuery,
   useGetEmployeeByIdQuery,
   useGetEmployeeAttendanceQuery,
+  useLazyGetEmployeeAttendanceQuery,
   useCreateEmployeeMutation,
   useUpdateEmployeeMutation,
   useApproveEmployeeMutation,

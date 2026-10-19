@@ -9,6 +9,10 @@ export default defineConfig({
     tailwindcss()
   ],
 
+  resolve: {
+    dedupe: ['react', 'react-dom'],
+  },
+
   server: {
     host: true,
     port: 5173,

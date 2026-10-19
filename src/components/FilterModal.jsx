@@ -29,6 +29,7 @@ const FilterModal = ({
   onApply,
   buttonLabel = 'Filters',
   title = 'Filters',
+  buttonRef,
 }) => {
   const { can } = usePermission();
   const [isOpen, setIsOpen] = useState(false);
@@ -142,7 +143,10 @@ const FilterModal = ({
         aria-label={`${buttonLabel}${activeCount ? `, ${activeCount} applied` : ''}`}
         aria-haspopup="dialog"
         aria-expanded={isOpen}
-        ref={triggerRef}
+        ref={(element) => {
+          triggerRef.current = element;
+          if (buttonRef) buttonRef.current = element;
+        }}
         onClick={() => {
           if (!isOpen) setDraft(values);
           setIsOpen(!isOpen);

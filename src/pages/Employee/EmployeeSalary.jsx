@@ -47,6 +47,7 @@ const SalaryLine = ({ label, value, emphasized = false }) => (
 
 const EmployeeSalary = ({ employee }) => {
   const [payrollMonth, setPayrollMonth] = useState(currentMonth);
+  const [manualRefreshing, setManualRefreshing] = useState(false);
   const { canView: canViewSalaryReport } = usePermission('/reports/salary');
   const validMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(payrollMonth);
   const [year, month] = validMonth ? payrollMonth.split('-').map(Number) : [undefined, undefined];
@@ -54,6 +55,14 @@ const EmployeeSalary = ({ employee }) => {
     { employee_id: employee?.id, year, month },
     { skip: !employee?.id || !validMonth || !canViewSalaryReport },
   );
+  const refreshReport = async () => {
+    setManualRefreshing(true);
+    try {
+      await reportQuery.refetch();
+    } finally {
+      setManualRefreshing(false);
+    }
+  };
 
   const reportData = reportQuery.data?.data;
   const salary = useMemo(
@@ -160,11 +169,11 @@ const EmployeeSalary = ({ employee }) => {
             type="button"
             aria-label="Refresh salary slip"
             title="Refresh salary slip"
-            onClick={() => reportQuery.refetch()}
-            disabled={reportQuery.isFetching || !validMonth}
+            onClick={refreshReport}
+            disabled={manualRefreshing || reportQuery.isLoading || !validMonth}
             className="flex h-9 w-9 items-center justify-center rounded-md border border-(--color-border) text-(--color-text-muted) hover:bg-(--color-accent-soft) hover:text-(--color-text) disabled:cursor-wait disabled:opacity-60"
           >
-            <RefreshCw size={15} className={reportQuery.isFetching ? 'animate-spin' : ''} aria-hidden="true" />
+            <RefreshCw size={15} className={manualRefreshing ? 'animate-spin' : ''} aria-hidden="true" />
           </button>
           <button
             type="button"
@@ -185,7 +194,7 @@ const EmployeeSalary = ({ employee }) => {
         />
       )}
 
-      {reportQuery.isLoading || reportQuery.isFetching ? (
+      {reportQuery.isLoading ? (
         <LoadingState message="Loading salary slip..." />
       ) : reportQuery.isError ? null : salary?.is_paid ? (
         <GlassCard className="mx-auto w-full max-w-3xl overflow-x-auto">

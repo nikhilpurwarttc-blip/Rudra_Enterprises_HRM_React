@@ -26,6 +26,7 @@ import Button from '../../components/Button';
 import ChipSwitcher from '../../components/ChipSwitcher';
 import { useRenderPerformance } from '../../utils/performance';
 import { getApiErrorMessage } from '../../components/feedbackUtils';
+import useRefreshOnFocus from '../../hooks/useRefreshOnFocus';
 
 const EMPTY_FORM = { name: '', username: '', email: '', password: '', role_id: '', employee_id: '', selected_role: null, selected_employee: null, status: true };
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -131,7 +132,7 @@ const Users = () => {
   const toast = useToast();
   const { canCreate, canEdit, canDelete, isSuperAdmin, isReadOnly } = usePermission('/users');
   const pageTitle = getRouteConfig(location.pathname)?.name ?? 'Users';
-  const [fetchUsers, { isLoading, isFetching }] = useLazyGetUsersQuery();
+  const [fetchUsers, { isLoading, isFetching }] = useLazyGetUsersQuery({ refetchOnFocus: false });
   const { data: rolesData } = useGetRolesQuery({ per_page: 100 });
   const [fetchEmployeeOptions] = useLazyGetEmployeesQuery();
   const [fetchRoleOptions] = useLazyGetRolesQuery();
@@ -140,6 +141,7 @@ const Users = () => {
   const [deleteUser] = useDeleteUserMutation();
 
   const [loadedUsers, setLoadedUsers] = useState([]);
+  const [backgroundRefreshing, setBackgroundRefreshing] = useState(false);
   const [totalUsers, setTotalUsers] = useState(0);
   const [currentPage, setCurrentPage] = useState(0);
   const [lastPage, setLastPage] = useState(1);
@@ -187,8 +189,9 @@ const Users = () => {
       setLoadedUsers((current) => {
         if (replace) return pageUsers;
 
-        const existingIds = new Set(current.map((user) => user.id));
-        return [...current, ...pageUsers.filter((user) => !existingIds.has(user.id))];
+        const merged = new Map(current.map((user) => [user.id, user]));
+        pageUsers.forEach((user) => merged.set(user.id, user));
+        return [...merged.values()];
       });
       setTotalUsers(Number(response?.meta?.total ?? pageUsers.length));
       setCurrentPage(Number(response?.meta?.current_page ?? page));
@@ -201,16 +204,46 @@ const Users = () => {
     }
   }, [fetchUsers]);
 
-  const refreshUsers = useCallback(() => {
+  const refreshUsers = useCallback(async ({ silent = true } = {}) => {
     const version = ++requestVersion.current;
+    const pagesToRefresh = Math.max(1, Math.min(currentPage, lastPage));
     loadingUsers.current = false;
-    setLoadedUsers([]);
-    setTotalUsers(0);
-    setCurrentPage(0);
-    setLastPage(1);
     setHasLoadError(false);
-    return loadUserPage(1, debouncedSearch, true, version);
-  }, [debouncedSearch, loadUserPage]);
+    if (silent) {
+      setBackgroundRefreshing(true);
+      try {
+        const refreshedUsers = [];
+        let refreshedTotal = totalUsers;
+        let refreshedLastPage = lastPage;
+        const pagesToLoad = Math.min(pagesToRefresh, refreshedLastPage);
+
+        for (let page = 1; page <= pagesToLoad; page += 1) {
+          const response = await fetchUsers({ page, per_page: 15, search: debouncedSearch }).unwrap();
+          if (version !== requestVersion.current) return;
+          const pageUsers = response?.data ?? response ?? [];
+          refreshedUsers.push(...pageUsers);
+          refreshedTotal = Number(response?.meta?.total ?? refreshedTotal);
+          refreshedLastPage = Number(response?.meta?.last_page ?? refreshedLastPage);
+        }
+
+        if (version !== requestVersion.current) return;
+        setLoadedUsers(refreshedUsers);
+        setTotalUsers(refreshedTotal);
+        setLastPage(refreshedLastPage);
+        setCurrentPage(Math.min(pagesToLoad, refreshedLastPage));
+      } catch {
+        if (version === requestVersion.current) setHasLoadError(true);
+      } finally {
+        if (version === requestVersion.current) setBackgroundRefreshing(false);
+      }
+      return;
+    }
+
+    for (let page = 1; page <= pagesToRefresh; page += 1) {
+      await loadUserPage(page, debouncedSearch, page === 1, version);
+    }
+  }, [currentPage, debouncedSearch, fetchUsers, lastPage, loadUserPage, totalUsers]);
+  useRefreshOnFocus(refreshUsers);
 
   useEffect(() => {
     const initialLoad = window.setTimeout(() => loadUserPage(1, '', true), 0);
@@ -233,6 +266,7 @@ const Users = () => {
     setCurrentPage(0);
     setLastPage(1);
     setHasLoadError(false);
+    setBackgroundRefreshing(false);
     window.clearTimeout(searchTimeout.current);
     searchTimeout.current = window.setTimeout(() => {
       setDebouncedSearch(query);
@@ -253,7 +287,7 @@ const Users = () => {
   };
 
   const isSearchPending = debouncedSearch !== search.trim();
-  const isUserLoading = isSearchPending || isLoading || isFetching;
+  const isUserLoading = isSearchPending || isLoading || (isFetching && !backgroundRefreshing);
 
   const openAdd = useCallback(() => {
     setErrors({});

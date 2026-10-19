@@ -27,8 +27,16 @@ export const SearchProvider = ({ children }) => {
       .slice(0, 8);
   }, [searchQuery, can]);
   // }, [searchQuery, can, isSuperAdmin]);
+  const value = useMemo(() => ({
+    searchQuery,
+    setSearchQuery,
+    isSearchOpen,
+    setIsSearchOpen,
+    searchResults,
+  }), [searchQuery, isSearchOpen, searchResults]);
+
   return (
-    <SearchContext.Provider value={{ searchQuery, setSearchQuery, isSearchOpen, setIsSearchOpen, searchResults }}>
+    <SearchContext.Provider value={value}>
       {children}
     </SearchContext.Provider>
   );

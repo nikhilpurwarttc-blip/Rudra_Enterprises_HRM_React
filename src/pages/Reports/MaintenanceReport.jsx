@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Download, Filter, Search } from 'lucide-react';
 import AccessDenied from '../../components/AccessDenied';
 import Badge from '../../components/Badge';
@@ -16,6 +16,7 @@ import {
   useLazyExportMaintenanceRecordsQuery,
 } from '../../store/api';
 import GlassCard from '../../components/GlassCard';
+import useDebouncedValue from '../../hooks/useDebouncedValue';
 
 const PAGE_SIZE = 15;
 
@@ -63,7 +64,7 @@ const MaintenanceReport = () => {
 
   const activeReport = canViewMaintenance ? 'maintenance' : 'powercut';
   const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search.trim(), 250);
   const [plantIds, setPlantIds] = useState([]);
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
@@ -75,11 +76,6 @@ const MaintenanceReport = () => {
   const visibleActiveReport = activeReport === 'powercut' && !canViewPowercuts
     ? 'maintenance'
     : activeReport;
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 250);
-    return () => window.clearTimeout(timer);
-  }, [search]);
 
   const plantsQuery = useGetPlantsQuery({ per_page: 100 }, { skip: !canViewPlants });
   const plants = unwrapList(plantsQuery.data);
@@ -423,7 +419,6 @@ const MaintenanceReport = () => {
             }
           </div>
 
-          {selectedQuery.isFetching && <p role="status" className="text-xs text-(--color-text-muted)">Updating report…</p>}
           {/* <div className="overflow-x-auto"> */}
           <PageTable
             // className={`max-h-[65vh] ${isMaintenance ? 'min-w-[1050px]' : 'min-w-[1000px]'}`}
@@ -432,7 +427,7 @@ const MaintenanceReport = () => {
             total={total}
             label={isMaintenance ? 'maintenance records' : 'shutdown periods'}
             emptyText={isMaintenance ? 'No maintenance records match these filters.' : 'No shutdown periods match these filters.'}
-            isLoading={selectedQuery.isFetching}
+            isLoading={selectedQuery.isLoading}
           />
           {/* </div> */}
           <Pagination page={page} lastPage={lastPage} onPageChange={setPage} />

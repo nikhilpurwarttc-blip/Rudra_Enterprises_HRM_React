@@ -3,7 +3,7 @@ import { Eye, EyeOff, LockKeyhole, UserRound } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { setCredentials, selectIsAuthenticated } from '../../store/authSlice';
-import { api, useLoginMutation } from '../../store/api';
+import { useLoginMutation } from '../../store/api';
 import InputField from '../../components/InputField';
 import Button from '../../components/Button';
 import GlassCard from '../../components/GlassCard';
@@ -48,7 +48,6 @@ const Login = () => {
     try {
       await fetch(CSRF_URL, { credentials: 'include' });
       const response = await login(form).unwrap();
-      dispatch(api.util.resetApiState());
       dispatch(setCredentials({ user: response.user }));
       navigate(location.state?.from || '/', { replace: true });
     } catch {

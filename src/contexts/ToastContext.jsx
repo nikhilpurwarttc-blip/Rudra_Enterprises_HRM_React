@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useCallback, useContext, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CheckCircle, XCircle, AlertCircle, Info, X } from 'lucide-react';
 
@@ -23,14 +23,23 @@ let id = 0;
 
 export const ToastProvider = ({ children }) => {
   const [toasts, setToasts] = useState([]);
+  const timers = useRef(new Map());
 
-  const dismiss = useCallback((tid) =>
-    setToasts((t) => t.filter((x) => x.id !== tid)), []);
+  const dismiss = useCallback((tid) => {
+    window.clearTimeout(timers.current.get(tid));
+    timers.current.delete(tid);
+    setToasts((current) => current.filter((toast) => toast.id !== tid));
+  }, []);
+
+  useEffect(() => () => {
+    timers.current.forEach((timer) => window.clearTimeout(timer));
+    timers.current.clear();
+  }, []);
 
   const toast = useCallback((message, type = 'info', duration = 7000) => {
     const tid = ++id;
     setToasts((t) => [...t, { id: tid, message, type }]);
-    setTimeout(() => dismiss(tid), duration);
+    timers.current.set(tid, window.setTimeout(() => dismiss(tid), duration));
   }, [dismiss]);
 
   return (

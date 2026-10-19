@@ -1,7 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
-import { CalendarDays, CalendarOff, ChevronLeft, ChevronRight, CircleCheck, CircleX, Clock3, Info, Plane, RefreshCw, Sun, UserRoundX } from 'lucide-react';
+import { CalendarDays, CalendarOff, ChevronLeft, ChevronRight, CircleCheck, CircleX, Clock3, Info, Plane, RefreshCw, Sun, UserRoundX, Wrench, Zap } from 'lucide-react';
 import { createPortal } from 'react-dom';
-import Badge from '../../components/Badge';
 import { Feedback, LoadingState } from '../../components/Feedback';
 import SearchableSelect from '../../components/SearchableSelect';
 import { formatHours } from '../../utils/formatHours';
@@ -73,7 +72,7 @@ const RemarkTooltip = ({ remark }) => {
 	);
 };
 
-const AttendanceCalender = ({ month, joiningDate, onMonthChange, onYearChange, records = [], isLoading = false, error = false, onRetry }) => {
+const AttendanceCalender = ({ month, joiningDate, onMonthChange, onYearChange, records = [], shutdowns = [], maintenanceRecords = [], isLoading = false, error = false, onRetry }) => {
 	const { dailyRecords, summary } = useMemo(() => {
 		const grouped = new Map();
 
@@ -111,6 +110,29 @@ const AttendanceCalender = ({ month, joiningDate, onMonthChange, onYearChange, r
 			return date;
 		});
 	}, [month]);
+	const eventDates = useMemo(() => {
+		const dates = new Map();
+		const addEvent = (key, event) => {
+			if (!key) return;
+			const existing = dates.get(key) ?? { shutdown: false, maintenance: false };
+			existing[event] = true;
+			dates.set(key, existing);
+		};
+
+		shutdowns.forEach((shutdown) => {
+			const start = String(shutdown.shutdown_start_date ?? '').slice(0, 10);
+			const end = String(shutdown.shutdown_end_date ?? shutdown.shutdown_start_date ?? '').slice(0, 10);
+			if (!start || !end) return;
+			calendarDays.forEach((date) => {
+				const key = dateKey(date);
+				if (key >= start && key <= end) addEvent(key, 'shutdown');
+			});
+		});
+		maintenanceRecords.forEach((record) => {
+			addEvent(String(record.maintenance_date ?? '').slice(0, 10), 'maintenance');
+		});
+		return dates;
+	}, [calendarDays, maintenanceRecords, shutdowns]);
 
 	const monthLabel = new Intl.DateTimeFormat('en', { month: 'long', year: 'numeric' }).format(month);
 	const today = new Date();
@@ -173,6 +195,8 @@ const AttendanceCalender = ({ month, joiningDate, onMonthChange, onYearChange, r
 
 			<div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-(--color-text-muted)" aria-label="Attendance status legend">
 				{Object.entries(STATUS).map(([key, value]) => <span key={key} className="inline-flex items-center gap-1.5"><span className={`h-2.5 w-2.5 rounded-full ${value.dotClass}`} />{value.label}</span>)}
+				<span className="inline-flex items-center gap-1.5"><Zap size={12} className="text-amber-600" />Plant shutdown</span>
+				<span className="inline-flex items-center gap-1.5"><Wrench size={12} className="text-blue-600" />Maintenance</span>
 			</div>
 
 			{error ? (
@@ -192,6 +216,7 @@ const AttendanceCalender = ({ month, joiningDate, onMonthChange, onYearChange, r
 								const afterToday = date > today;
 								const inEmploymentRange = !beforeJoining && !afterToday;
 								const day = inEmploymentRange ? (dailyRecords.get(key) ?? null) : null;
+								const events = inEmploymentRange ? eventDates.get(key) : null;
 								const isCurrentMonth = date.getMonth() === month.getMonth();
 								const statuses = day?.records.map((record) => Number(record.status)) ?? [];
 								const statusRecords = day ? [...new Map(day.records.map((record) => [Number(record.status), record])).values()] : [];
@@ -199,21 +224,40 @@ const AttendanceCalender = ({ month, joiningDate, onMonthChange, onYearChange, r
 								const status = statusKey === undefined ? null : STATUS[statusKey] ?? { label: 'Recorded', cellClass: 'bg-(--color-accent-soft)', dotClass: 'bg-(--color-accent)' };
 								const cellBackground = status?.cellClass ?? (isCurrentMonth ? 'bg-(--color-surface)' : 'bg-(--color-bg-elevated)');
 
+								const eventLabels = [
+									events?.shutdown && 'shutdown',
+									events?.maintenance && 'maintenance',
+								].filter(Boolean);
 								return (
-									<article key={key} role="gridcell" aria-label={`${key}${status ? `, ${status.label}` : beforeJoining ? ', before joining date' : afterToday ? ', upcoming date' : ', no record'}`} className={`min-h-36 border-b border-r border-(--color-border) p-2 ${cellBackground} ${isCurrentMonth ? '' : 'text-(--color-text-muted)'} ${inEmploymentRange ? '' : 'opacity-40'}`}>
+									<article key={key} role="gridcell" aria-label={`${key}${status ? `, ${status.label}` : beforeJoining ? ', before joining date' : afterToday ? ', upcoming date' : ', no record'}${eventLabels.length ? `, ${eventLabels.join(' and ')}` : ''}`} className={`min-h-36 border-b border-r border-(--color-border) p-2 ${cellBackground} ${isCurrentMonth ? '' : 'text-(--color-text-muted)'} ${inEmploymentRange ? '' : 'opacity-40'}`}>
 										{/* Date number */}
 										<div className="mb-1.5 flex items-center justify-between gap-1">
 											<time dateTime={key} className={`flex h-7 w-7 items-center justify-center rounded-full text-sm ${key === dateKey(new Date()) ? 'bg-(--color-accent) font-semibold text-white' : 'font-medium'}`}>{date.getDate()}</time>
 											<div className="flex flex-wrap gap-1">
+												{events?.shutdown && (
+													<span title="Plant shutdown" aria-label="Plant shutdown" className="animate-bounce inline-flex h-5 w-5 items-center justify-center rounded-full border border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300">
+														<Zap size={11} aria-hidden="true" />
+													</span>
+												)}
+												{events?.maintenance && (
+													<span title="Maintenance scheduled" aria-label="Maintenance scheduled" className="animate-bounce transform-3d inline-flex h-5 w-5 items-center justify-center rounded-full border border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-300">
+														<Wrench size={10} aria-hidden="true" />
+													</span>
+												)}
 												{statusRecords.map((record) => {
 													const statusInfo = STATUS[Number(record.status)] ?? { label: 'Recorded', color: 'gray', icon: Info };
 													const Icon = statusInfo.icon;
 													const label = record.status_label ?? statusInfo.label;
+													const color = statusInfo.color; // e.g., 'amber', 'green', 'red', 'blue', etc.
+
 													return (
-														<Badge key={String(record.status ?? 'unknown')} color={statusInfo.color} title={label} className="!gap-1 !rounded-full !px-1.5 !py-0.5 !text-[10px] !normal-case">
-															<Icon size={11} aria-hidden="true" />
-															{label}
-														</Badge>
+														<span
+															key={String(record.status ?? 'unknown')}
+															title={label}
+															className={`flex h-5 w-5 items-center justify-center rounded-full border border-${color}-500/20 bg-${color}-500/10 text-${color}-700 dark:text-${color}-300`}
+														>
+															<Icon size={16} aria-hidden="true" />
+														</span>
 													);
 												})}
 											</div>

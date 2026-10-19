@@ -102,7 +102,7 @@ const RightModal = ({ isOpen, onClose, onSubmit, title, children, showCancel = t
       />
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-300 dark:border-gray-800">
-        <h2 className="text-lg md:text-xl font-semibold dark:text-white truncate">{title}</h2>
+        <h2 className="capitalize text-lg md:text-xl font-semibold dark:text-white truncate">{title}</h2>
         <button
           onClick={saving ? undefined : onClose}
           disabled={saving}

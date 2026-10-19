@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Menu, LogOut, Search, X, ChevronLeft, ChevronRight, Bell } from "lucide-react";
+import { Menu, LogOut, Search, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { useSelector, useDispatch } from "react-redux";
 import { selectUser, selectRole, clearCredentials } from "../store/authSlice";
-import { api, useLogoutMutation } from "../store/api";
+import { useLogoutMutation } from "../store/api";
 import { useNavigate } from "react-router-dom";
 import ThemeToggle from "../components/ThemeToggle";
 import Breadcrumb from "../components/Breadcrumb";
 import { useSearch } from "../contexts/SearchContext";
 import UserProfilePanel from "./UserProfilePanel";
 import NotificationModal from "./NotifiModal";
+import AppDownloadButton from "./AppDownload";
 import EmployeeAvatar from "../pages/Employee/components/EmployeeAvatar";
 
 const Header = ({ onToggleSidebar }) => {
@@ -29,7 +30,6 @@ const Header = ({ onToggleSidebar }) => {
 
   const handleLogout = async () => {
     try { await logout().unwrap(); } catch { /* ignore */ }
-    dispatch(api.util.resetApiState());
     dispatch(clearCredentials());
     navigate("/login", { replace: true });
   };
@@ -162,13 +162,15 @@ const Header = ({ onToggleSidebar }) => {
 
         <ThemeToggle />
 
-        <button
+        <AppDownloadButton />
+
+        {/* <button
           onClick={() => setIsNotificationOpen(true)}
           className="relative p-2 rounded-md hover:bg-[var(--color-border)] transition-colors"
         >
           <Bell size={16} className="text-gray-600 dark:text-gray-200" />
           <span className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-red-500" />
-        </button>
+        </button> */}
 
         {/* User Info */}
         <button

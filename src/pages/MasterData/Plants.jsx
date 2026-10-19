@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
-import { Building2, CalendarDays, Check, ChevronLeft, ChevronRight, Hammer, LoaderCircle, Pencil, Plus, Power, Search, Trash2, XCircle } from 'lucide-react';
+import { Building2, CalendarDays, Check, ChevronLeft, ChevronRight, Hammer, LoaderCircle, Pencil, Plus, Power, RefreshCw, Search, Trash2, XCircle } from 'lucide-react';
 import {
   useApprovePlantShutdownMutation,
   useCreateMaintenanceRecordMutation,
@@ -8,10 +8,12 @@ import {
   useCreatePlantShutdownMutation,
   useDeletePlantMutation,
   useGetMaintenanceRecordsQuery,
+  useLazyGetEmployeeAttendanceQuery,
   useGetPlantShutdownsQuery,
   useGetPlantsQuery,
   useRejectPlantShutdownMutation,
   useUpdatePlantMutation,
+  useMarkShutdownPresentMutation,
 } from '../../store/api';
 import usePermission from '../../hooks/usePermission';
 import { useToast } from '../../contexts/ToastContext';
@@ -22,6 +24,7 @@ import Button from '../../components/Button';
 import { Feedback } from '../../components/Feedback';
 import { getApiErrorMessage } from '../../components/feedbackUtils';
 import { useRenderPerformance } from '../../utils/performance';
+import { markShutdownAttendees } from '../../utils/markShutdownAttendees';
 import { selectUser } from '../../store/authSlice';
 import PlantShutdownForm from '../components/PlantShutdownForm';
 import PlantMaintenanceForm from '../components/PlantMaintenanceForm';
@@ -75,6 +78,8 @@ const Plants = () => {
   const [updatePlant, { isLoading: updating }] = useUpdatePlantMutation();
   const [deletePlant] = useDeletePlantMutation();
   const [createPlantShutdown, { isLoading: submittingShutdown }] = useCreatePlantShutdownMutation();
+  const [markShutdownPresent, { isLoading: markingShutdownAttendees }] = useMarkShutdownPresentMutation();
+  const [getEmployeeAttendance] = useLazyGetEmployeeAttendanceQuery();
   const [createMaintenanceRecord, { isLoading: submittingMaintenance }] = useCreateMaintenanceRecordMutation();
   const [approvePlantShutdown, { isLoading: approvingShutdown }] = useApprovePlantShutdownMutation();
   const [rejectPlantShutdown, { isLoading: rejectingShutdown }] = useRejectPlantShutdownMutation();
@@ -189,6 +194,11 @@ const Plants = () => {
       : new Date(current.getFullYear(), current.getMonth() + offset, 1));
   };
 
+  const refreshCalendar = () => {
+    shutdownQuery.refetch();
+    if (canViewMaintenanceCalendar) maintenanceQuery.refetch();
+  };
+
   useEffect(() => {
     if (!calendarContextMenu) return undefined;
     const dismissMenu = (event) => {
@@ -211,19 +221,27 @@ const Plants = () => {
   }, [calendarContextMenu]);
 
   const selectCalendarDate = (date, additive) => {
-    setSelectedCalendarDates((current) => {
-      if (!additive) return [date];
-      return current.includes(date)
-        ? current.filter((selectedDate) => selectedDate !== date)
-        : [...current, date].sort();
-    });
+    if (date < todayKey) return;
+    const dates = !additive
+      ? [date]
+      : selectedCalendarDates.includes(date)
+        ? selectedCalendarDates.filter((selectedDate) => selectedDate !== date)
+        : [...selectedCalendarDates, date].sort();
+    setSelectedCalendarDates(dates);
+    if (shutdownRequestOpen) setShutdownRequestDates(dates);
   };
 
   const handleCalendarCellClick = (event, date) => {
+    if (date < todayKey) return;
     selectCalendarDate(date, event.ctrlKey || event.metaKey);
   };
 
   const handleCalendarCellContextMenu = (event, date) => {
+    if (date < todayKey) {
+      event.preventDefault();
+      setCalendarContextMenu(null);
+      return;
+    }
     const dates = selectedCalendarDates.includes(date)
       ? selectedCalendarDates
       : [date];
@@ -244,6 +262,7 @@ const Plants = () => {
   const handleCalendarCellKeyDown = (event, date) => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
     event.preventDefault();
+    if (date < todayKey) return;
     selectCalendarDate(date, event.ctrlKey || event.metaKey);
   };
 
@@ -290,7 +309,7 @@ const Plants = () => {
     }
   };
 
-  const handleRequestShutdown = async (form) => {
+  const handleRequestShutdown = async ({ attendees = [], markAttendees = false, ...form }) => {
     if (!selectedPlant) return;
     try {
       await createPlantShutdown({
@@ -299,10 +318,40 @@ const Plants = () => {
         reason: form.reason.trim(),
         shutdown_type: 'Plant shutdown',
       }).unwrap();
+
+      let attendanceResult;
+      if (markAttendees) {
+        attendanceResult = await markShutdownAttendees({
+          attendees,
+          date: form.shutdown_start_date,
+          getAttendance: async (employeeId, date) => unwrap(await getEmployeeAttendance({
+              employeeId,
+              date_from: date,
+              date_to: date,
+              per_page: 100,
+            }).unwrap()),
+          markPresent: (employeeId, date) => markShutdownPresent({
+            employee_id: employeeId,
+            attendance_date: date,
+          }).unwrap(),
+        });
+      }
+
       setShutdownRequestOpen(false);
       setShutdownRequestDates([]);
       setSelectedCalendarDates([]);
       toast('Plant shutdown request submitted for approval.', 'success');
+      if (attendanceResult?.failures.length > 0) {
+        toast(
+          `Marked ${attendanceResult.markedCount}; skipped ${attendanceResult.skippedCount} already present or punched in. Unable to verify or mark: ${attendanceResult.failures.map(({ attendee }) => attendee.name).join(', ')}. ${getApiErrorMessage(attendanceResult.failures[0].error, 'Please review attendance and retry if needed.')}`,
+          'error',
+        );
+      } else if (markAttendees) {
+        toast(
+          `${attendanceResult.markedCount} employee${attendanceResult.markedCount === 1 ? '' : 's'} marked present${attendanceResult.skippedCount ? `; ${attendanceResult.skippedCount} already present or punched in and skipped` : ''}.`,
+          'success',
+        );
+      }
     } catch (error) {
       toast(getApiErrorMessage(error, 'Unable to submit plant shutdown request.'), 'error');
     }
@@ -468,6 +517,9 @@ const Plants = () => {
                 <span className="min-w-32 text-center text-sm font-semibold text-(--color-text)">{monthLabel}</span>
                 <button type="button" aria-label="Next month" onClick={() => changeMonth(1)} className="flex h-9 w-9 items-center justify-center rounded-md border border-(--color-border) text-(--color-text-muted) hover:bg-(--color-accent-soft)"><ChevronRight size={17} /></button>
                 <button type="button" onClick={() => changeMonth(0)} className="h-9 rounded-md border border-(--color-border) px-3 text-sm font-medium text-(--color-text) hover:bg-(--color-accent-soft)">Today</button>
+                <button type="button" aria-label="Refresh calendar" title="Refresh calendar" onClick={refreshCalendar} disabled={shutdownQuery.isFetching || maintenanceQuery.isFetching} className="flex h-9 w-9 items-center justify-center rounded-md border border-(--color-border) text-(--color-text-muted) hover:bg-(--color-accent-soft) disabled:cursor-wait disabled:opacity-60">
+                  <RefreshCw size={15} className={(shutdownQuery.isFetching || maintenanceQuery.isFetching) ? 'animate-spin motion-reduce:animate-none' : ''} aria-hidden="true" />
+                </button>
                 {/* {canRequestShutdown && <Button type="button" onClick={() => openShutdownRequest([])} disabled={submittingShutdown} className="inline-flex items-center gap-2 whitespace-nowrap bg-amber-700 hover:bg-amber-800"><Power size={15} />Request shutdown</Button>} */}
               </div>
             </header>
@@ -493,6 +545,7 @@ const Plants = () => {
                       const dayShutdowns = shutdownsByDate.get(key) ?? [];
                       const dayMaintenance = maintenanceByDate.get(key) ?? [];
                       const isCurrentMonth = date.getMonth() === month.getMonth();
+                      const isPastDate = key < todayKey;
                       const isSelected = selectedCalendarDates.includes(key);
                       const hasApprovedShutdown = dayShutdowns.some((shutdown) => Number(shutdown.status) === 2);
                       const hasPendingShutdown = dayShutdowns.some((shutdown) => Number(shutdown.status) === 1);
@@ -507,7 +560,7 @@ const Plants = () => {
                         ...dayMaintenance.map((record) => `Scheduled maintenance${record.employee?.name ? ` · ${record.employee.name}` : ''}${record.status_label ? ` · ${record.status_label}` : ''}${record.remarks ? `: ${record.remarks}` : ''}`),
                       ].join('\n');
                       return (
-                        <div key={key} title={eventTitle} role="button" tabIndex={0} aria-pressed={isSelected} aria-label={`${date.toLocaleDateString()}${dayShutdowns.length ? `, ${dayShutdowns.length} shutdown${dayShutdowns.length === 1 ? '' : 's'}` : ''}${hasMaintenance ? `, ${dayMaintenance.length} maintenance record${dayMaintenance.length === 1 ? '' : 's'}` : ''}${isSelected ? ', selected' : ''}`} onClick={(event) => handleCalendarCellClick(event, key)} onContextMenu={(event) => handleCalendarCellContextMenu(event, key)} onKeyDown={(event) => handleCalendarCellKeyDown(event, key)} className={`min-h-16 cursor-pointer border-b border-r [&:nth-child(7n+1)]:border-l border-(--color-border) p-1.5 text-left transition-colors sm:min-h-24 sm:p-2 ${hasApprovedShutdown ? 'bg-red-500/10' : hasPendingShutdown ? 'bg-amber-500/10' : hasRejectedShutdown ? 'bg-slate-500/10' : hasMaintenance ? 'bg-violet-500/10' : ''} ${hasMaintenance ? 'border-t-4 border-t-violet-600' : ''} ${isSelected ? 'relative z-1 bg-(--color-accent-soft) ring-2 ring-inset ring-(--color-accent)' : 'hover:bg-(--color-accent-soft)/50'} ${!isCurrentMonth ? 'opacity-40' : ''}`}>
+                        <div key={key} title={eventTitle} role="button" tabIndex={isPastDate ? -1 : 0} aria-disabled={isPastDate} aria-pressed={isSelected} aria-label={`${date.toLocaleDateString()}${isPastDate ? ', past date, selection disabled' : ''}${dayShutdowns.length ? `, ${dayShutdowns.length} shutdown${dayShutdowns.length === 1 ? '' : 's'}` : ''}${hasMaintenance ? `, ${dayMaintenance.length} maintenance record${dayMaintenance.length === 1 ? '' : 's'}` : ''}${isSelected ? ', selected' : ''}`} onClick={(event) => handleCalendarCellClick(event, key)} onContextMenu={(event) => handleCalendarCellContextMenu(event, key)} onKeyDown={(event) => handleCalendarCellKeyDown(event, key)} className={`min-h-16 ${isPastDate ? 'cursor-not-allowed' : 'cursor-pointer'} border-b border-r [&:nth-child(7n+1)]:border-l border-(--color-border) p-1.5 text-left transition-colors sm:min-h-24 sm:p-2 ${hasApprovedShutdown ? 'bg-red-500/10' : hasPendingShutdown ? 'bg-amber-500/10' : hasRejectedShutdown ? 'bg-slate-500/10' : hasMaintenance ? 'bg-violet-500/10' : ''} ${hasMaintenance ? 'border-t-4 border-t-violet-600' : ''} ${isSelected ? 'relative z-1 bg-(--color-accent-soft) ring-2 ring-inset ring-(--color-accent)' : isPastDate ? '' : 'hover:bg-(--color-accent-soft)/50'} ${!isCurrentMonth ? 'opacity-40' : isPastDate ? 'opacity-60' : ''}`}>
                           <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-sm ${key === todayKey ? 'bg-(--color-accent) font-semibold text-white' : hasApprovedShutdown ? 'font-semibold text-red-700 dark:text-red-300' : hasPendingShutdown ? 'font-semibold text-amber-800 dark:text-amber-200' : hasRejectedShutdown ? 'font-semibold text-slate-700 dark:text-slate-300' : 'text-(--color-text)'}`}>{date.getDate()}</span>
                           {dayShutdowns.map((shutdown, index) => {
                             const status = getShutdownStatus(shutdown);
@@ -636,9 +689,10 @@ const Plants = () => {
           key={`request-shutdown-${selectedPlant?.id}`}
           isOpen={shutdownRequestOpen}
           mode="request"
+          plantId={selectedPlant?.id}
           initialValues={getShutdownDefaults(shutdownRequestDates)}
           hasSelectedDateGaps={hasDateGaps(shutdownRequestDates)}
-          saving={submittingShutdown}
+          saving={submittingShutdown || markingShutdownAttendees}
           onClose={() => { setShutdownRequestOpen(false); setShutdownRequestDates([]); }}
           onSubmit={handleRequestShutdown}
         />

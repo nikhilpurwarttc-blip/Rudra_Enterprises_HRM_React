@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from 'react';
-import { CalendarDays, LoaderCircle, MoreVertical, Pencil, Plus, RefreshCw, Search, UserRound, IdCard, WalletCards, Trash2 } from 'lucide-react';
+import { CalendarDays, Download, Filter, LoaderCircle, MoreVertical, Pencil, Plus, Printer, RefreshCw, Search, UserRound, IdCard, WalletCards, Trash2 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
@@ -37,6 +37,7 @@ import EmployeeAvatar from './components/EmployeeAvatar';
 import { getApiErrorMessage } from '../../components/feedbackUtils';
 import { useRenderPerformance } from '../../utils/performance';
 import { selectRole } from '../../store/authSlice';
+import useRefreshOnFocus from '../../hooks/useRefreshOnFocus';
 
 const unwrap = (value) => Array.isArray(value) ? value : value?.data ?? [];
 const isSafeUrl = (url) => /^https?:\/\//i.test(String(url ?? ''));
@@ -50,12 +51,18 @@ const matchesEmployeeSearch = (employee, query) => {
     employee.mobile_number,
   ].some((value) => String(value ?? '').toLocaleLowerCase().includes(normalizedQuery));
 };
+const csvCell = (value) => {
+  const text = String(value ?? '');
+  const safeText = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+  return `"${safeText.replace(/"/g, '""')}"`;
+};
 const getEmployeeWorkflowStatus = (employee) => {
   const status = String(employee.approval_status_label ?? employee.approval_status ?? '').toLowerCase();
   if (status.includes('approv') || status === '1') return 'approved';
   if (status.includes('reject') || status === '2') return 'rejected';
   return 'pending';
 };
+
 const matchesEmployeeFilters = (employee, filters) => {
   const plantId = String(employee.plant_id ?? employee.plant?.id ?? '');
   const departmentId = String(employee.department_id ?? employee.department?.id ?? '');
@@ -86,7 +93,7 @@ const Employees = () => {
   const [cachedIds, setCachedIds] = useState(() => new Set());
   const [totalEmployees, setTotalEmployees] = useState(0);
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [fetchEmployees, { isLoading, isFetching }] = useLazyGetEmployeesQuery();
+  const [fetchEmployees, { isLoading, isFetching }] = useLazyGetEmployeesQuery({ refetchOnFocus: false });
   const requestVersion = useRef(0);
   const loadingEmployees = useRef(false);
   const searchTimeout = useRef(null);
@@ -124,13 +131,17 @@ const Employees = () => {
   const plantFilter = employeeFilters.plants;
   const [menuEmployeeId, setMenuEmployeeId] = useState(null);
   const [menuPosition, setMenuPosition] = useState(null); // { x, y, fromButton: bool }
+  const [pageMenuPosition, setPageMenuPosition] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [statusTarget, setStatusTarget] = useState(null);
   const [relievingDate, setRelievingDate] = useState('');
   const menuRef = useRef(null);
+  const pageMenuRef = useRef(null);
+  const filterTriggerRef = useRef(null);
   const [savingStatusIds, setSavingStatusIds] = useState({});
   const [errors, setErrors] = useState({});
   const [hasLoadError, setHasLoadError] = useState(false);
+  const [backgroundRefreshing, setBackgroundRefreshing] = useState(false);
 
   const plants       = unwrap(plantsData).length      ? unwrap(plantsData)      : unwrap(attendanceFilters?.plants);
   const departments  = unwrap(departmentsData).length  ? unwrap(departmentsData)  : unwrap(attendanceFilters?.departments);
@@ -149,11 +160,11 @@ const Employees = () => {
       && (!searchQuery || matchesEmployeeSearch(employee, searchQuery));
   }), [cachedEmployees, employeeFilters, searchQuery]);
   const hasLocalSearchResults = Boolean(searchQuery) && localEmployees.length > 0;
-  const employeesData = cachedEmployees.length > 0 && (!searchQuery || hasLocalSearchResults)
-    ? localEmployees
-    : searchQuery && debouncedSearch !== searchQuery
-      ? []
-      : loadedEmployees;
+  const employeesData = useMemo(() => {
+    if (cachedEmployees.length > 0 && (!searchQuery || hasLocalSearchResults)) return localEmployees;
+    if (searchQuery && debouncedSearch !== searchQuery) return [];
+    return loadedEmployees;
+  }, [cachedEmployees.length, debouncedSearch, hasLocalSearchResults, loadedEmployees, localEmployees, searchQuery]);
   const hasAppliedEmployeeFilters = Object.values(employeeFilters).some((value) =>
     Array.isArray(value) ? value.length > 0 : value !== '',
   );
@@ -216,12 +227,13 @@ const Employees = () => {
     }
   }, []);
 
-  const loadEmployeePages = useCallback(async (startPage, query, plantIds, replace = false, version = requestVersion.current) => {
+  const loadEmployeePages = useCallback(async (startPage, query, plantIds, replace = false, version = requestVersion.current, { silent = false } = {}) => {
     if (loadingEmployees.current) return;
 
     loadingEmployees.current = true;
     let shouldReplace = replace;
     let loadedTotal = 0;
+    const refreshedEmployees = [];
     const requestedPlantIds = plantIds.length > 0 ? plantIds : [''];
     const isUnfiltered = !query && plantIds.length === 0;
 
@@ -234,7 +246,8 @@ const Employees = () => {
           if (version !== requestVersion.current) break;
 
           const pageEmployees = unwrap(response);
-          mergeEmployees(pageEmployees, replacePage, isUnfiltered);
+          if (silent) refreshedEmployees.push(...pageEmployees);
+          else mergeEmployees(pageEmployees, replacePage, isUnfiltered);
           replacePage = false;
           shouldReplace = false;
           const currentPage = Number(response.meta?.current_page ?? page);
@@ -242,14 +255,18 @@ const Employees = () => {
           if (currentPage === startPage) {
             loadedTotal += Number(response.meta?.total ?? pageEmployees.length);
           }
-          setHasLoadError(false);
+          if (!silent) setHasLoadError(false);
 
           if (currentPage >= lastPage) break;
           page = currentPage + 1;
         }
         if (version !== requestVersion.current) break;
       }
-      if (version === requestVersion.current) setTotalEmployees(loadedTotal);
+      if (version === requestVersion.current) {
+        if (silent) mergeEmployees(refreshedEmployees, true, isUnfiltered);
+        setTotalEmployees(loadedTotal);
+        setHasLoadError(false);
+      }
     } catch {
       if (version === requestVersion.current) setHasLoadError(true);
     } finally {
@@ -258,8 +275,9 @@ const Employees = () => {
   }, [fetchEmployees, mergeEmployees]);
 
   useEffect(() => {
-    loadEmployeePages(1, '', [], true);
+    const initialLoad = window.setTimeout(() => loadEmployeePages(1, '', [], true), 0);
     return () => {
+      window.clearTimeout(initialLoad);
       window.clearTimeout(searchTimeout.current);
       requestVersion.current += 1;
       loadingEmployees.current = false;
@@ -273,6 +291,7 @@ const Employees = () => {
     loadingEmployees.current = false;
     setSearch(value);
     setHasLoadError(false);
+    setBackgroundRefreshing(false);
     window.clearTimeout(searchTimeout.current);
     if (query && cachedEmployees.some((employee) =>
       matchesEmployeeFilters(employee, employeeFilters) && matchesEmployeeSearch(employee, query)
@@ -299,6 +318,7 @@ const Employees = () => {
     window.clearTimeout(searchTimeout.current);
     setEmployeeFilters(nextFilters);
     setHasLoadError(false);
+    setBackgroundRefreshing(false);
     if (query && cachedEmployees.some((employee) =>
       matchesEmployeeFilters(employee, nextFilters) && matchesEmployeeSearch(employee, query)
     )) {
@@ -309,18 +329,24 @@ const Employees = () => {
     loadEmployeePages(1, query, plantIds, true, version);
   };
 
-  const handleRefreshEmployees = () => {
+  const handleRefreshEmployees = useCallback(({ silent = false } = {}) => {
     const query = search.trim();
     const version = ++requestVersion.current;
     loadingEmployees.current = false;
     window.clearTimeout(searchTimeout.current);
-    setDebouncedSearch(query);
+    if (!silent) setDebouncedSearch(query);
+    if (!silent) setBackgroundRefreshing(false);
     setHasLoadError(false);
-    loadEmployeePages(1, query, plantFilter, true, version);
-  };
+    if (silent) setBackgroundRefreshing(true);
+    loadEmployeePages(1, query, plantFilter, true, version, { silent })
+      .finally(() => {
+        if (silent && version === requestVersion.current) setBackgroundRefreshing(false);
+      });
+  }, [loadEmployeePages, plantFilter, search]);
+  useRefreshOnFocus(handleRefreshEmployees);
 
   const isSearchPending = debouncedSearch !== search.trim();
-  const isEmployeeLoading = isSearchPending || isLoading || isFetching;
+  const isEmployeeLoading = isSearchPending || isLoading || (isFetching && !backgroundRefreshing);
 
   const openEmployeeView = (employee, view = 'profile') => {
     setMenuEmployeeId(null);
@@ -416,6 +442,32 @@ const Employees = () => {
     }
   };
 
+  const exportEmployeesCsv = () => {
+    const headers = ['Employee code', 'Employee name', 'Email', 'Mobile number', 'Plant', 'Department', 'Designation', 'Status'];
+    const rows = displayEmployeesData.map((employee) => [
+      employee.employee_code,
+      employee.name,
+      employee.email,
+      employee.mobile_number,
+      employee.plant?.name,
+      employee.department?.name,
+      employee.designation?.name,
+      employee.status === true || Number(employee.status) === 1 || String(employee.status).toLowerCase() === 'active'
+        ? 'Active'
+        : 'Inactive',
+    ]);
+    const csv = [headers, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');
+    const objectUrl = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }));
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = `employees-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    setPageMenuPosition(null);
+  };
+
   // Use a ref to avoid stale closure over menuEmployeeId
   const menuEmployeeIdRef = useRef(null);
   useEffect(() => { menuEmployeeIdRef.current = menuEmployeeId; }, [menuEmployeeId]);
@@ -447,14 +499,32 @@ const Employees = () => {
   }, [menuPosition, menuEmployeeId]);
 
   useEffect(() => {
+    if (!pageMenuPosition || !pageMenuRef.current) return;
+    const menu = pageMenuRef.current;
+    const { width, height } = menu.getBoundingClientRect();
+    const margin = 6;
+    menu.style.left = `${Math.max(margin, Math.min(pageMenuPosition.x + 4, window.innerWidth - width - margin))}px`;
+    menu.style.top = `${Math.max(margin, Math.min(pageMenuPosition.y + 4, window.innerHeight - height - margin))}px`;
+    menu.style.visibility = 'visible';
+  }, [pageMenuPosition]);
+
+  useEffect(() => {
     const closeMenuWhenClickingOutside = (event) => {
       if (menuEmployeeIdRef.current && !event.target.closest('[data-employee-menu]')) {
         setMenuEmployeeId(null);
         setMenuPosition(null);
       }
+      if (!event.target.closest('[data-page-context-menu]')) setPageMenuPosition(null);
+    };
+    const closePageMenuOnEscape = (event) => {
+      if (event.key === 'Escape') setPageMenuPosition(null);
     };
     document.addEventListener('mousedown', closeMenuWhenClickingOutside);
-    return () => document.removeEventListener('mousedown', closeMenuWhenClickingOutside);
+    document.addEventListener('keydown', closePageMenuOnEscape);
+    return () => {
+      document.removeEventListener('mousedown', closeMenuWhenClickingOutside);
+      document.removeEventListener('keydown', closePageMenuOnEscape);
+    };
   }, []);
 
   const handleSave = async (payload) => {
@@ -466,6 +536,12 @@ const Employees = () => {
       setCreatedEmployee(employeeRecord);
       if (payload.id) {
         patchEmployee(employeeRecord.id, employeeRecord);
+      } else if (employeeRecord?.id) {
+        setEmployeeMap((current) => new Map(current).set(employeeRecord.id, employeeRecord));
+        setCachedIds((current) => new Set(current).add(employeeRecord.id));
+        const matchesCurrentList = matchesEmployeeFilters(employeeRecord, employeeFilters)
+          && (!search.trim() || matchesEmployeeSearch(employeeRecord, search.trim()));
+        if (matchesCurrentList) setTotalEmployees((current) => current + 1);
       }
       const createdStatus = employeeRecord?.approval_status_label ?? 'Pending';
       toast(
@@ -526,7 +602,57 @@ const Employees = () => {
   };
 
   return (
-    <div className="flex h-full min-h-0 overflow-hidden">
+    <div
+      className="flex h-full min-h-0 overflow-hidden"
+      onContextMenu={(event) => {
+        if (event.target.closest('[data-page-context-menu]')) return;
+        event.preventDefault();
+        setMenuEmployeeId(null);
+        setMenuPosition(null);
+        setPageMenuPosition({ x: event.clientX, y: event.clientY });
+      }}
+    >
+      {pageMenuPosition && (
+        <div
+          ref={pageMenuRef}
+          data-page-context-menu
+          role="menu"
+          aria-label="Employee list actions"
+          className="fixed z-50 w-60 rounded-lg border border-(--color-border) bg-(--color-surface-strong) p-1.5 shadow-xl"
+          style={{ left: pageMenuPosition.x, top: pageMenuPosition.y, visibility: 'hidden' }}
+          onContextMenu={(event) => event.preventDefault()}
+        >
+          <label className="mb-1 flex items-center gap-2 rounded-md border border-(--color-border) px-2.5 py-2">
+            <Search size={15} className="shrink-0 text-(--color-text-muted)" />
+            <input
+              autoFocus
+              type="search"
+              value={search}
+              onChange={handleSearchChange}
+              placeholder="Search employees"
+              aria-label="Search employees"
+              className="min-w-0 flex-1 bg-transparent text-sm text-(--color-text) outline-none placeholder:text-(--color-text-muted)"
+            />
+          </label>
+          {canCreate && !isReadOnly && (
+            <button type="button" role="menuitem" onClick={() => { setPageMenuPosition(null); setCreatedEmployee(null); setAddSessionKey((key) => key + 1); navigate('/employees/add'); }} className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-sm text-(--color-text) hover:bg-(--color-accent-soft)">
+              <Plus size={15} /> Add Employee
+            </button>
+          )}
+          <button type="button" role="menuitem" onClick={() => { setPageMenuPosition(null); handleRefreshEmployees(); }} className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-sm text-(--color-text) hover:bg-(--color-accent-soft)">
+            <RefreshCw size={15} /> Refresh
+          </button>
+          <button type="button" role="menuitem" onClick={() => { setPageMenuPosition(null); filterTriggerRef.current?.click(); }} className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-sm text-(--color-text) hover:bg-(--color-accent-soft)">
+            <Filter size={15} /> Filters
+          </button>
+          <button type="button" role="menuitem" onClick={exportEmployeesCsv} disabled={displayEmployeesData.length === 0} className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-sm text-(--color-text) hover:bg-(--color-accent-soft) disabled:cursor-not-allowed disabled:opacity-50">
+            <Download size={15} /> Export As CSV
+          </button>
+          <button type="button" role="menuitem" onClick={() => { setPageMenuPosition(null); navigate('/employees/barcodes'); }} className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-sm text-(--color-text) hover:bg-(--color-accent-soft)">
+            <Printer size={15} /> Print Barcodes
+          </button>
+        </div>
+      )}
       <aside className="flex w-full max-w-sm shrink-0 flex-col border-r border-(--color-border) bg-(--color-bg-elevated) lg:w-92">
         {/* Header */}
         <div className="border-b border-(--color-border) px-4 py-4">
@@ -555,6 +681,7 @@ const Employees = () => {
           <div className="mt-4 flex items-center justify-between gap-2">
             <InputField className="min-w-0 flex-1" value={search} onChange={handleSearchChange} placeholder="Search employees" leftIcon={<Search size={16} />} rightIcon={isEmployeeLoading && <LoaderCircle size={15} className="animate-spin" />} />
             <FilterModal
+              buttonRef={filterTriggerRef}
               title="Filter employees"
               values={employeeFilters}
               onApply={handleFilterApply}

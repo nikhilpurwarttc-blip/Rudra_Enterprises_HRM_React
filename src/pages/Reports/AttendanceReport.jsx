@@ -1,15 +1,19 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Clock, Clock3, LoaderCircle, Search, UserCheck, UserRound, UserX } from 'lucide-react';
 import {
 	useGetAttendanceReportFiltersQuery,
 	useGetEmployeeAttendanceQuery,
 	useGetEmployeesQuery,
+	useGetMaintenanceRecordsQuery,
+	useGetPlantShutdownsQuery,
 	useGetPlantsQuery,
 } from '../../store/api';
 import { Feedback } from '../../components/Feedback';
 import InputField from '../../components/InputField';
-import SearchableSelect from '../../components/SearchableSelect';
+import FilterModal from '../../components/FilterModal';
 import AttendanceCalender from '../components/AttendanceCalender';
+import useDebouncedValue from '../../hooks/useDebouncedValue';
+import usePermission from '../../hooks/usePermission';
 
 const unwrap = (value) => Array.isArray(value) ? value : value?.data ?? [];
 
@@ -26,22 +30,22 @@ const StatCard = ({ icon: Icon, label, value, colorClass }) => (
 );
 
 const AttendanceReport = () => {
+	const { can } = usePermission();
+	const canViewShutdowns = can('plant-shutdowns', 'view');
+	const canViewMaintenance = can('maintenance', 'view')
+		|| can('maintenance-records', 'view')
+		|| can('maintenance-report', 'view');
 	const [selectedEmployee, setSelectedEmployee] = useState('');
 	const [selectedEmployeeInfo, setSelectedEmployeeInfo] = useState(null);
 	const [plantId, setPlantId] = useState('');
 	const [departmentId, setDepartmentId] = useState('');
 	const [shiftId, setShiftId] = useState('');
 	const [employeeSearch, setEmployeeSearch] = useState('');
-	const [debouncedEmployeeSearch, setDebouncedEmployeeSearch] = useState('');
+	const debouncedEmployeeSearch = useDebouncedValue(employeeSearch.trim(), 250);
 	const [month, setMonth] = useState(() => {
 		const today = new Date();
 		return new Date(today.getFullYear(), today.getMonth(), 1);
 	});
-
-	useEffect(() => {
-		const timer = window.setTimeout(() => setDebouncedEmployeeSearch(employeeSearch.trim()), 250);
-		return () => window.clearTimeout(timer);
-	}, [employeeSearch]);
 
 	const filtersQuery = useGetAttendanceReportFiltersQuery();
 	const plantsQuery = useGetPlantsQuery();
@@ -72,6 +76,21 @@ const AttendanceReport = () => {
 	gridEnd.setDate(gridStart.getDate() + 41);
 	const dateFrom = formatDate(gridStart);
 	const dateTo = formatDate(gridEnd);
+	const selectedPlantId = selectedEmployeeRecord?.plant_id ?? selectedEmployeeRecord?.plant?.id;
+	const shutdownsQuery = useGetPlantShutdownsQuery({
+		plant_id: selectedPlantId,
+		start_date: dateFrom,
+		end_date: dateTo,
+		per_page: 100,
+	}, { skip: !selectedEmployee || !selectedPlantId || !canViewShutdowns });
+	const maintenanceRecordsQuery = useGetMaintenanceRecordsQuery({
+		plant_id: selectedPlantId,
+		from_date: dateFrom,
+		to_date: dateTo,
+		per_page: 100,
+	}, { skip: !selectedEmployee || !selectedPlantId || !canViewMaintenance });
+	const shutdowns = unwrap(shutdownsQuery.data);
+	const maintenanceRecords = unwrap(maintenanceRecordsQuery.data);
 
 	const attendanceQuery = useGetEmployeeAttendanceQuery(
 		{ employeeId: selectedEmployee, date_from: dateFrom, date_to: dateTo, per_page: 100 },
@@ -113,6 +132,14 @@ const AttendanceReport = () => {
 		setMonth((current) => new Date(year, current.getMonth(), 1));
 	};
 
+	const handleFilterApply = (nextFilters) => {
+		setPlantId(nextFilters.plant || '');
+		setDepartmentId(nextFilters.department || '');
+		setShiftId(nextFilters.shift || '');
+		setSelectedEmployee('');
+		setSelectedEmployeeInfo(null);
+	};
+
 	if (filtersQuery.isError) {
 		return <div className="p-4 sm:p-6"><Feedback type="error" title="Unable to load filters" message="Please refresh the page." /></div>;
 	}
@@ -123,8 +150,9 @@ const AttendanceReport = () => {
 				<div className="border-b border-(--color-border) px-4 py-4">
 					<p className="text-xs font-semibold uppercase tracking-wider text-(--color-text-muted)">Attendance Report</p>
 					<h1 className="mt-1 text-lg font-semibold text-(--color-text)">Employees <span className="ml-1 text-xs font-normal text-(--color-text-muted)">{filteredEmployees.length}</span></h1>
-					<div className="mt-4 space-y-3">
+					<div className="mt-4 flex items-center gap-2">
 						<InputField
+							className="min-w-0 flex-1"
 							aria-label="Search employees"
 							value={employeeSearch}
 							onChange={(event) => setEmployeeSearch(event.target.value)}
@@ -132,35 +160,41 @@ const AttendanceReport = () => {
 							leftIcon={<Search size={16} />}
 							rightIcon={(employeeSearch.trim() !== debouncedEmployeeSearch || employeesQuery.isFetching) && <LoaderCircle size={15} className="animate-spin" />}
 						/>
-						<SearchableSelect
-							ariaLabel="Filter employees by plant"
-							options={[{ value: '', label: 'All Plants' }, ...plants.map((plant) => ({ value: String(plant.id), label: plant.name }))]}
-							value={plantId}
-							onChange={(value) => { setPlantId(value); setDepartmentId(''); setShiftId(''); setSelectedEmployee(''); setSelectedEmployeeInfo(null); }}
-							placeholder="All Plants"
-							isLoading={plantsQuery.isLoading}
-							showSearch={false}
+						<FilterModal
+							title="Filter attendance employees"
+							buttonLabel="Filter employees"
+							values={{ plant: plantId, department: departmentId, shift: shiftId }}
+							onApply={handleFilterApply}
+							fields={[
+								{
+									key: 'plant',
+									label: 'Plant',
+									type: 'select',
+									options: plants.map((plant) => ({ value: String(plant.id), label: plant.name })),
+									placeholder: 'All plants',
+									isLoading: plantsQuery.isLoading,
+									showSearch: false,
+								},
+								{
+									key: 'department',
+									label: 'Department',
+									type: 'select',
+									options: unwrap(filtersQuery.data?.departments).map((department) => ({ value: String(department.id), label: department.name })),
+									placeholder: 'All departments',
+									isLoading: filtersQuery.isLoading,
+									showSearch: false,
+								},
+								{
+									key: 'shift',
+									label: 'Shift',
+									type: 'select',
+									options: unwrap(filtersQuery.data?.shifts).map((shift) => ({ value: String(shift.id), label: shift.name })),
+									placeholder: 'All shifts',
+									isLoading: filtersQuery.isLoading,
+									showSearch: false,
+								},
+							]}
 						/>
-						{/*
-						<SearchableSelect
-							ariaLabel="Filter by department"
-							options={[{ value: '', label: 'All departments' }, ...unwrap(filtersQuery.data?.departments).map((department) => ({ value: String(department.id), label: department.name }))]}
-							value={departmentId}
-							onChange={(value) => { setDepartmentId(value); setSelectedEmployee(''); setSelectedEmployeeInfo(null); }}
-							placeholder="All departments"
-							isLoading={filtersQuery.isLoading}
-							showSearch={false}
-						/>
-						<SearchableSelect
-							ariaLabel="Filter by shift"
-							options={[{ value: '', label: 'All shifts' }, ...unwrap(filtersQuery.data?.shifts).map((shift) => ({ value: String(shift.id), label: shift.name }))]}
-							value={shiftId}
-							onChange={(value) => { setShiftId(value); setSelectedEmployee(''); setSelectedEmployeeInfo(null); }}
-							placeholder="All shifts"
-							isLoading={filtersQuery.isLoading}
-							showSearch={false}
-						/>
-						*/}
 					</div>
 				</div>
 				<div className="min-h-0 flex-1 overflow-y-auto p-2">
@@ -212,7 +246,9 @@ const AttendanceReport = () => {
 							onMonthChange={handleMonthChange}
 							onYearChange={handleYearChange}
 							records={records}
-							isLoading={attendanceQuery.isLoading || attendanceQuery.isFetching}
+							shutdowns={shutdowns}
+							maintenanceRecords={maintenanceRecords}
+							isLoading={attendanceQuery.isLoading}
 							error={attendanceQuery.isError}
 							onRetry={attendanceQuery.refetch}
 						/>

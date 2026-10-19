@@ -1,16 +1,13 @@
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useMemo } from 'react';
 
 const RightPanelContext = createContext(null);
 
 export const RightPanelProvider = ({ children }) => {
-  const [panel, setPanel] = useState(null); // { title, content, onSubmit }
   const [activePanel, setActivePanel] = useState(null); // single active panel key
-
-  const openPanel  = useCallback((config) => setPanel(config), []);
-  const closePanel = useCallback(() => setPanel(null), []);
+  const value = useMemo(() => ({ activePanel, setActivePanel }), [activePanel]);
 
   return (
-    <RightPanelContext.Provider value={{ panel, openPanel, closePanel, activePanel, setActivePanel }}>
+    <RightPanelContext.Provider value={value}>
       {children}
     </RightPanelContext.Provider>
   );

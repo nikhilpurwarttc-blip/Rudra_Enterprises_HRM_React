@@ -2,7 +2,7 @@ import { lazy, memo, Suspense, useEffect, useMemo, useTransition } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { clearCredentials, selectIsAuthenticated, selectUser, setUser } from './store/authSlice';
-import { api, useGetUserQuery, useLogoutMutation } from './store/api';
+import { useGetUserQuery, useLogoutMutation } from './store/api';
 import Login from './pages/Auth/Login';
 import MainLayout from './layout/MainLayout';
 import usePermission from './hooks/usePermission';
@@ -19,6 +19,7 @@ const Festivals         = lazy(() => import('./pages/MasterData/Festivals'));
 const Charges           = lazy(() => import('./pages/MasterData/Charges'));
 const Designations      = lazy(() => import('./pages/MasterData/Designations'));
 const Employees         = lazy(() => import('./pages/Employee/Employees'));
+const EmployeeBarcodes  = lazy(() => import('./pages/Employee/EmployeeBarcodes'));
 const Attendance        = lazy(() => import('./pages/Attendance/Marking'));
 const Advances          = lazy(() => import('./pages/Payroll/Advances'));
 const AttendanceReport  = lazy(() => import('./pages/Reports/AttendanceReport'));
@@ -89,7 +90,6 @@ const Logout = () => {
 
   useEffect(() => {
     logout().finally(() => {
-      dispatch(api.util.resetApiState());
       dispatch(clearCredentials());
       navigate('/login', { replace: true });
     });
@@ -125,6 +125,7 @@ const ProtectedRoutes = () => {
             <Route path="/employees/:id/edit"       element={<PermissionRoute path="/employees/:id/edit" action="edit"><Employees /></PermissionRoute>} />
             <Route path="/employees/:id/attendance" element={<PermissionRoute path="/employees/:id/attendance"><Employees /></PermissionRoute>} />
             <Route path="/employees/:id/salary"     element={<PermissionRoute path="/employees/:id/salary"><Employees /></PermissionRoute>} />
+            <Route path="/employees/barcodes"       element={<PermissionRoute path="/employees/barcodes"><EmployeeBarcodes /></PermissionRoute>} />
             <Route path="/employees/:id"            element={<PermissionRoute path="/employees/:id"><Employees /></PermissionRoute>} />
             <Route path="/attendance"               element={<PermissionRoute path="/attendance"><Attendance /></PermissionRoute>} />
             <Route path="/advances"                 element={<PermissionRoute path="/advances"><Advances /></PermissionRoute>} />

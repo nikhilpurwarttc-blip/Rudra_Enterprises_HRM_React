@@ -64,7 +64,7 @@ const SalaryReport = () => {
   const [activeReport, setActiveReport] = useState('monthly');
   const [payrollMonth, setPayrollMonth] = useState(currentMonth);
   const [year, setYear] = useState(() => String(new Date().getFullYear()));
-  const [statutoryType, setStatutoryType] = useState('esi');
+  const [deductionTypeIds, setDeductionTypeIds] = useState([]);
   const [plantIds, setPlantIds] = useState([]);
   const [departmentId, setDepartmentId] = useState('');
   const [designationId, setDesignationId] = useState('');
@@ -80,6 +80,7 @@ const SalaryReport = () => {
   const [paymentError, setPaymentError] = useState('');
   const [loadingPaymentAccounts, setLoadingPaymentAccounts] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [manualRefreshing, setManualRefreshing] = useState(false);
 
   const canViewPlants = canModule('plants', 'view');
   const canViewDepartments = canModule('departments', 'view');
@@ -128,13 +129,12 @@ const SalaryReport = () => {
     { ...reportFilters, month: reportMonth, year: reportYear },
     { skip: activeReport !== 'monthly' || !validPayrollMonth },
   );
-  console.log('monthlyQuery', monthlyQuery);
   const yearlyQuery = useGetYearlySalaryReportQuery(
     { ...reportFilters, year: Number(year) },
     { skip: activeReport !== 'yearly' || !validYear },
   );
   const statutoryQuery = useGetStatutorySalaryReportQuery(
-    { ...reportFilters, type: statutoryType, payroll_month: payrollMonth },
+    { ...reportFilters, type: 'all', payroll_month: payrollMonth },
     { skip: activeReport !== 'statutory' || !validPayrollMonth },
   );
   const [generateEmployeePayroll, { isLoading: generatingPayroll }] = useGenerateEmployeePayrollMutation();
@@ -153,13 +153,66 @@ const SalaryReport = () => {
     yearly: yearlyQuery,
     statutory: statutoryQuery,
   }[activeReport];
+  const refreshReport = async () => {
+    setManualRefreshing(true);
+    try {
+      await selectedQuery.refetch();
+    } finally {
+      setManualRefreshing(false);
+    }
+  };
   const response = selectedQuery.data?.data;
-  const rows = activeReport === 'monthly'
+  const reportRows = activeReport === 'monthly'
     ? response?.items ?? []
     : activeReport === 'yearly'
       ? response?.employees ?? []
       : response?.items ?? [];
-  const summary = activeReport === 'statutory' ? response?.summary : response?.totals;
+  const statutoryDeductionTypes = response?.deduction_types ?? [];
+  const visibleDeductionTypes = deductionTypeIds.length
+    ? statutoryDeductionTypes.filter((type) => deductionTypeIds.includes(String(type.id)))
+    : statutoryDeductionTypes;
+  const rows = activeReport === 'statutory' && statutoryDeductionTypes.length
+    ? reportRows.map((row) => {
+      const deductions = Object.fromEntries(
+        visibleDeductionTypes
+          .filter((type) => row.deductions?.[type.id])
+          .map((type) => [type.id, row.deductions[type.id]]),
+      );
+      const employeeShare = Object.values(deductions)
+        .reduce((total, contribution) => total + (Number(contribution.employee_share) || 0), 0);
+      const employerShare = Object.values(deductions)
+        .reduce((total, contribution) => total + (Number(contribution.employer_share) || 0), 0);
+      return {
+        ...row,
+        deductions,
+        employee_share: employeeShare,
+        employer_share: employerShare,
+        total_contribution: employeeShare + employerShare,
+      };
+    }).filter((row) => row.employee_share > 0 || row.employer_share > 0)
+    : reportRows;
+  const statutorySummary = activeReport === 'statutory' && response?.summary && statutoryDeductionTypes.length
+    ? visibleDeductionTypes.reduce((totals, type) => {
+      const categoryTotals = response.deduction_totals?.[type.id] ?? {};
+      totals.total_employee_contribution += Number(categoryTotals.employee_share) || 0;
+      totals.total_employer_contribution += Number(categoryTotals.employer_share) || 0;
+      return totals;
+    }, {
+      ...response.summary,
+      total_employees: rows.length,
+      total_basic_pay: rows.reduce((total, row) => total + (Number(row.basic_pay) || 0), 0),
+      total_wages: rows.reduce((total, row) => total + (Number(row.basic_pay) || 0), 0),
+      total_employee_contribution: 0,
+      total_employer_contribution: 0,
+      grand_total: 0,
+    })
+    : null;
+  const displayedStatutorySummary = statutorySummary ?? (activeReport === 'statutory' ? response?.summary : null);
+  if (displayedStatutorySummary && statutorySummary) {
+    displayedStatutorySummary.grand_total = displayedStatutorySummary.total_employee_contribution
+      + displayedStatutorySummary.total_employer_contribution;
+  }
+  const summary = activeReport === 'statutory' ? displayedStatutorySummary : response?.totals;
   const handleExport = async () => {
     setExportError('');
     setExporting(true);
@@ -365,7 +418,7 @@ const SalaryReport = () => {
             values={{
               payrollMonth,
               year,
-              statutoryType,
+              deductionTypeIds,
               plants: plantIds.map(String),
               department: departmentId,
               designation: designationId,
@@ -373,7 +426,7 @@ const SalaryReport = () => {
             onApply={(nextFilters) => {
               setPayrollMonth(nextFilters.payrollMonth || currentMonth());
               setYear(nextFilters.year || String(new Date().getFullYear()));
-              setStatutoryType(nextFilters.statutoryType || 'esi');
+              setDeductionTypeIds((nextFilters.deductionTypeIds ?? []).map(String));
               setPlantIds((nextFilters.plants ?? []).map(Number).filter(Number.isFinite));
               setDepartmentId(nextFilters.department || '');
               setDesignationId(nextFilters.designation || '');
@@ -396,13 +449,15 @@ const SalaryReport = () => {
                 visible: activeReport === 'yearly',
               },
               {
-                key: 'statutoryType',
-                label: 'Contribution type',
-                type: 'select',
-                options: [
-                  { value: 'esi', label: 'ESI' },
-                  { value: 'pf', label: 'PF' },
-                ],
+                key: 'deductionTypeIds',
+                label: 'Deduction types',
+                type: 'multiselect',
+                options: statutoryDeductionTypes.map((type) => ({
+                  value: String(type.id),
+                  label: type.code ? `${type.name} (${type.code})` : type.name,
+                })),
+                placeholder: 'All deduction types',
+                isLoading: statutoryQuery.isLoading,
                 visible: activeReport === 'statutory',
               },
               {
@@ -437,12 +492,12 @@ const SalaryReport = () => {
           <Button
             type="button"
             variant='ghost'
-            onClick={() => selectedQuery.refetch()}
-            disabled={selectedQuery.isFetching || (activeReport === 'yearly' ? !validYear : !validPayrollMonth)}
+            onClick={refreshReport}
+            disabled={manualRefreshing || selectedQuery.isLoading || (activeReport === 'yearly' ? !validYear : !validPayrollMonth)}
             aria-label="Refresh salary report"
           // className="flex items-center gap-2"
           >
-            <RefreshCw size={16} className={selectedQuery.isFetching ? 'animate-spin' : ''} aria-hidden="true" />
+            <RefreshCw size={16} className={manualRefreshing ? 'animate-spin' : ''} aria-hidden="true" />
             {/* {selectedQuery.isFetching ? 'Refreshing…' : 'Refresh'} */}
           </Button>
           {can('export') && activeReport !== 'statutory' && (
@@ -483,21 +538,19 @@ const SalaryReport = () => {
             </p>
           )}
           <SalaryReportSummary activeReport={activeReport} summary={summary} />
-          {selectedQuery.isFetching && (
-            <p role="status" className="text-xs text-(--color-text-muted)">Updating report…</p>
-          )}
           <SalaryReportTable
             activeReport={activeReport}
             rows={rows}
-            isLoading={selectedQuery.isFetching}
+            isLoading={selectedQuery.isLoading}
             payrollMonth={payrollMonth}
             chargeColumns={response?.charge_columns ?? []}
+            deductionTypes={visibleDeductionTypes}
             onPayEmployee={handlePayEmployee}
             payingEmployeeId={lockingEmployeeId}
             canPayEmployees={canPayEmployees}
             isPaying={generatingPayroll || lockingPayrollEmployee || recordingPayment || Boolean(lockingEmployeeId)}
-            refreshReport={() => selectedQuery.refetch()}
-            isRefreshing={selectedQuery.isFetching}
+            refreshReport={refreshReport}
+            isRefreshing={manualRefreshing}
           />
         </div>
       )}

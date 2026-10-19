@@ -115,6 +115,17 @@ export const ROUTES = [
     group: 'Employee Management',
   },
   {
+    key: 'employee-barcodes',
+    path: '/employees/barcodes',
+    name: 'Employee Barcodes',
+    breadcrumbs: ['Employee Management', 'Employee Barcodes'],
+    keywords: ['employee barcodes', 'print barcodes', 'download barcode'],
+    permission: true,
+    permissionKey: 'employees',
+    permissionAction: 'view',
+    group: 'Employee Management',
+  },
+  {
     key: 'employee-view',
     path: '/employees/:id',
     name: 'Employee Profile',

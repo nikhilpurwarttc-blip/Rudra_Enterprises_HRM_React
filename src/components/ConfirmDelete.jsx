@@ -18,6 +18,7 @@ const ConfirmDelete = ({
   children,
   confirmLoadingLabel,
   confirmDisabled = false,
+  className = '',
 }) => {
   const [loading, setLoading] = useState(false);
 
@@ -38,7 +39,7 @@ const ConfirmDelete = ({
   return createPortal(
     <div className="fixed top-[6%] sm:left-[3.1%] right-[0.55%] bottom-[2.7%] inset-0 z-9991 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-xs rounded-2xl" onClick={loading ? undefined : onCancel} />
-      <div className="glass-card relative mx-4 w-full max-w-sm rounded-2xl border-(--color-border) bg-(--color-surface-strong) shadow-(--shadow-card)">
+      <div className={cn('glass-card relative mx-4 w-full max-w-sm rounded-2xl border-(--color-border) bg-(--color-surface-strong) shadow-(--shadow-card)', className)}>
         <div className="flex items-center justify-between px-5 pt-5 pb-3">
           <div className="flex items-center gap-3">
             <div className={`rounded-full p-2 ${isDelete ? 'bg-red-500/10 text-red-600 dark:text-red-300' : 'bg-green-500/10 text-green-600 dark:text-green-300'}`}>

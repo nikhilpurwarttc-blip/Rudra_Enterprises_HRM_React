@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BadgeCheck, CalendarDays, CheckCheck, Clock3, LoaderCircle, LogIn, LogOut, Power, RefreshCw, RotateCcw, Search, UserRoundCheck, UserRoundX, Users, XCircle } from 'lucide-react';
+import { BadgeCheck, CheckCheck, Clock3, LoaderCircle, LogIn, LogOut, Power, RefreshCw, RotateCcw, Search, UserRoundCheck, UserRoundX, Users, XCircle } from 'lucide-react';
 import {
   useApproveAllAttendanceMutation,
   useCheckInAttendanceMutation,
@@ -8,6 +8,7 @@ import {
   useDeleteAttendanceMutation,
   useGetAttendanceFiltersQuery,
   useGetAttendanceRosterQuery,
+  useLazyGetEmployeeAttendanceQuery,
   useGetPlantShutdownsQuery,
   useGetShiftsQuery,
   useMarkAttendanceAbsentMutation,
@@ -26,6 +27,8 @@ import FilterModal from '../../components/FilterModal';
 import { getApiErrorMessage } from '../../components/feedbackUtils';
 import usePermission from '../../hooks/usePermission';
 import Button from '../../components/Button';
+import { markShutdownAttendees } from '../../utils/markShutdownAttendees';
+import useDebouncedValue from '../../hooks/useDebouncedValue';
 
 const unwrap = (value) => (Array.isArray(value) ? value : value?.data ?? []);
 const matchesEmployeeSearch = (employee, query) => {
@@ -53,12 +56,6 @@ const getShutdownDefaults = () => {
     end_time: '23:59',
   };
 };
-const todayLabel = new Intl.DateTimeFormat('en-IN', {
-  weekday: 'long',
-  day: 'numeric',
-  month: 'long',
-  year: 'numeric',
-}).format(new Date());
 
 const initials = (name) => String(name ?? '?')
   .split(/\s+/)
@@ -82,6 +79,17 @@ const getShiftTime = (shift) => {
   return start && end ? `${start} - ${end}` : shift.name;
 };
 
+const getAttendanceFilterStatus = (employee) => {
+  const attendance = employee.attendance;
+  if (attendance?.shutdown_present) return 'shutdown_present';
+  if (Number(attendance?.status) === 0) return 'absent';
+  if (Number(attendance?.workflow_status) === 1) return 'pending_review';
+  if (Number(attendance?.workflow_status) === 3) return 'rejected';
+  const punch = employee.open_attendance ?? attendance;
+  if (!punch) return 'not_started';
+  return punch.check_out ? 'completed' : 'punched_in';
+};
+
 const Marking = () => {
   const toast = useToast();
   const { can, isReadOnly } = usePermission();
@@ -89,9 +97,9 @@ const Marking = () => {
   const canApproveAttendance = !isReadOnly && can('attendance', 'approve');
   const canRejectAttendance = !isReadOnly && can('attendance', 'reject');
   const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search.trim(), 300);
   const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState({ plant: '', department: '', shift: '' });
+  const [filters, setFilters] = useState({ plant: '', department: '', shift: '', status: '' });
   const [busyEmployeeActions, setBusyEmployeeActions] = useState({});
   const [shutdownDialogOpen, setShutdownDialogOpen] = useState(false);
   const [shutdownForm, setShutdownForm] = useState(getShutdownDefaults);
@@ -101,20 +109,17 @@ const Marking = () => {
   const [rejectAllReason, setRejectAllReason] = useState('');
   const [pendingAbsentEmployee, setPendingAbsentEmployee] = useState(null);
   const [absentReason, setAbsentReason] = useState('');
+  
   const [checkIn] = useCheckInAttendanceMutation();
   const [checkOut] = useCheckOutAttendanceMutation();
-  const [markShutdownPresent] = useMarkShutdownPresentMutation();
+  const [markShutdownPresent, { isLoading: markingShutdownAttendees }] = useMarkShutdownPresentMutation();
+  const [getEmployeeAttendance] = useLazyGetEmployeeAttendanceQuery();
   const [verifyAttendance] = useVerifyAttendanceMutation();
   const [approveAllAttendance, { isLoading: approvingAll }] = useApproveAllAttendanceMutation();
   const [rejectAllAttendance, { isLoading: rejectingAll }] = useRejectAllAttendanceMutation();
   const [markAttendanceAbsent] = useMarkAttendanceAbsentMutation();
   const [deleteAttendance] = useDeleteAttendanceMutation();
   const [createPlantShutdown, { isLoading: submittingShutdown }] = useCreatePlantShutdownMutation();
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
-    return () => window.clearTimeout(timer);
-  }, [search]);
 
   const filtersQuery = useGetAttendanceFiltersQuery();
   const shiftsQuery = useGetShiftsQuery({ all: true, per_page: 100 });
@@ -130,6 +135,7 @@ const Marking = () => {
     : '';
   const effectivePlant = singleAssignedPlant || filters.plant;
   const today = getLocalDate();
+  
   const shutdownQuery = useGetPlantShutdownsQuery({
     ...(effectivePlant ? { plant_id: effectivePlant } : {}),
     start_date: today,
@@ -140,12 +146,14 @@ const Marking = () => {
     effectivePlant ? { plant_id: effectivePlant, status: 3, per_page: 1 } : undefined,
     { skip: !effectivePlant },
   );
+
   const todayShutdowns = useMemo(
     () => unwrap(shutdownQuery.currentData ?? shutdownQuery.data)
       .filter((shutdown) => String(shutdown.shutdown_start_date ?? '').slice(0, 10) <= today
         && String(shutdown.shutdown_end_date ?? shutdown.shutdown_start_date ?? '').slice(0, 10) >= today),
     [shutdownQuery.currentData, shutdownQuery.data, today],
   );
+  
   const activeShutdowns = useMemo(
     () => todayShutdowns.filter((shutdown) => Number(shutdown.status) === 2),
     [todayShutdowns],
@@ -158,10 +166,12 @@ const Marking = () => {
     .find((shutdown) => Number(shutdown.status) === 3) ?? null;
   const activeShutdown = activeShutdowns.find((shutdown) => String(shutdown.plant_id) === String(effectivePlant)) ?? null;
   const pendingShutdown = pendingShutdowns.find((shutdown) => String(shutdown.plant_id) === String(effectivePlant)) ?? null;
+  
   const hasPendingShutdown = useCallback(
     (employee) => pendingShutdowns.some((shutdown) => String(shutdown.plant_id) === String(employee.working_plant_id ?? employee.plant_id)),
     [pendingShutdowns],
   );
+
   const employeeQuery = useGetAttendanceRosterQuery({
     page,
     per_page: 15,
@@ -171,6 +181,8 @@ const Marking = () => {
     ...(filters.shift ? { shift_id: filters.shift } : {}),
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
   });
+  
+  const refetchAttendanceRoster = employeeQuery.refetch;
   const isRefreshing = employeeQuery.isFetching
     || filtersQuery.isFetching
     || shiftsQuery.isFetching
@@ -185,13 +197,21 @@ const Marking = () => {
     && (!filters.shift || String(employee.shift_id) === String(filters.shift))
     && (!searchQuery || matchesEmployeeSearch(employee, searchQuery))
   )), [employees, effectivePlant, filters.department, filters.shift, searchQuery]);
+  
   const isSearchPending = searchQuery !== debouncedSearch;
-  const useCachedSearchResults = Boolean(searchQuery)
-    && (isSearchPending || !employeeQuery.currentData);
-  const displayedEmployees = useCachedSearchResults ? cachedEmployees : employees;
+  const useCachedSearchResults = Boolean(searchQuery) && (isSearchPending || !employeeQuery.currentData);
+  const pageEmployees = useCachedSearchResults ? cachedEmployees : employees;
+  const displayedEmployees = filters.status
+    ? pageEmployees.filter((employee) => (
+      filters.status === 'shutdown_pending'
+        ? hasPendingShutdown(employee)
+        : !hasPendingShutdown(employee) && getAttendanceFilterStatus(employee) === filters.status
+    ))
+    : pageEmployees;
   const meta = (useCachedSearchResults ? undefined : employeeQuery.currentData ?? employeeQuery.data)?.meta ?? {};
   const currentPage = Number(meta.current_page ?? page);
   const lastPage = Number(meta.last_page ?? 1);
+  
   const plantMap = useMemo(() => new Map(plants.map((plant) => [String(plant.id), plant])), [plants]);
   const departmentMap = useMemo(() => new Map(departments.map((department) => [String(department.id), department])), [departments]);
   const shiftMap = useMemo(() => new Map(shifts.map((shift) => [String(shift.id), shift])), [shifts]);
@@ -209,7 +229,7 @@ const Marking = () => {
     ...shifts.map((shift) => ({ value: String(shift.id), label: shift.name })),
   ], [shifts]);
 
-  const pageCounts = useMemo(() => displayedEmployees.reduce((total, employee) => {
+  const pageCounts = useMemo(() => pageEmployees.reduce((total, employee) => {
     total.roster += 1;
     if (employee.attendance?.shutdown_present) {
       total.shutdownPresent += 1;
@@ -222,20 +242,35 @@ const Marking = () => {
     else if (punch.check_out) total.completed += 1;
     else total.punchedIn += 1;
     return total;
-  }, { roster: 0, notStarted: 0, punchedIn: 0, completed: 0, shutdownPresent: 0, pendingVerification: 0 }), [displayedEmployees]);
-  const counts = useCachedSearchResults ? pageCounts : employeeQuery.data?.summary ?? pageCounts;
+  }, { roster: 0, notStarted: 0, punchedIn: 0, completed: 0, shutdownPresent: 0, pendingVerification: 0 }), [pageEmployees]);
+  
+  const counts = useMemo(() => {
+    const summary = employeeQuery.currentData?.summary ?? employeeQuery.data?.summary ?? {};
+    if (useCachedSearchResults) return pageCounts;
+    return {
+      roster: Number(summary.roster ?? summary.total_roster ?? pageCounts.roster ?? 0),
+      notStarted: Number(summary.not_started ?? summary.notStarted ?? pageCounts.notStarted ?? 0),
+      punchedIn: Number(summary.punched_in ?? summary.punchedIn ?? pageCounts.punchedIn ?? 0),
+      completed: Number(summary.completed ?? pageCounts.completed ?? 0),
+      shutdownPresent: Number(summary.shutdown_present ?? summary.shutdownPresent ?? pageCounts.shutdownPresent ?? 0),
+      pendingVerification: Number(summary.pending_verification ?? summary.pendingVerification ?? pageCounts.pendingVerification ?? 0),
+    };
+  }, [employeeQuery.currentData, employeeQuery.data, pageCounts, useCachedSearchResults]);
+  
   const pendingApprovalCount = Number(
     employeeQuery.currentData?.summary?.pending_verification
     ?? employeeQuery.data?.summary?.pending_verification
     ?? pageCounts.pendingVerification,
   );
-  const bulkDecisionFilters = {
+  
+  const bulkDecisionFilters = useMemo(() => ({
     date: today,
     ...(effectivePlant ? { plant_id: effectivePlant } : {}),
     ...(filters.department ? { department_id: filters.department } : {}),
     ...(filters.shift ? { shift_id: filters.shift } : {}),
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
-  };
+  }), [today, effectivePlant, filters.department, filters.shift, debouncedSearch]);
+
   const isBulkActionDisabled = pendingApprovalCount < 1
     || employeeQuery.isFetching
     || isSearchPending
@@ -322,10 +357,6 @@ const Marking = () => {
       toast('Punching is unavailable while a plant shutdown request is pending approval.', 'error');
       return;
     }
-    if (action === 'in' && (shutdownQuery.isFetching || shutdownQuery.isError)) {
-      toast('Unable to confirm plant shutdown status. Refresh and try again.', 'error');
-      return;
-    }
     const employeeShutdown = activeShutdowns.find((shutdown) => String(employee.plant_id) === String(shutdown.plant_id));
     if (action === 'in' && employeeShutdown) {
       setPendingPresenceEmployee(employee);
@@ -343,9 +374,11 @@ const Marking = () => {
           shift_id: employee.shift_id,
           attendance_date: getLocalDate(),
         }).unwrap();
+        await refetchAttendanceRoster();
         toast(`${employee.name} checked in.`, 'success');
       } else {
         await checkOut({ attendance_id: employee.attendance.id }).unwrap();
+        await refetchAttendanceRoster();
         toast(`${employee.name} checked out.`, 'success');
       }
     } catch (error) {
@@ -357,7 +390,7 @@ const Marking = () => {
         return next;
       });
     }
-  }, [activeShutdowns, checkIn, checkOut, effectivePlant, hasPendingShutdown, shutdownQuery.isError, shutdownQuery.isFetching, toast]);
+  }, [activeShutdowns, checkIn, checkOut, effectivePlant, hasPendingShutdown, refetchAttendanceRoster, toast]);
 
   const confirmShutdownPresence = async () => {
     const employee = pendingPresenceEmployee;
@@ -396,7 +429,7 @@ const Marking = () => {
     }
   }, [deleteAttendance, toast]);
 
-  const declareShutdown = async (form) => {
+  const declareShutdown = async ({ attendees = [], markAttendees = false, ...form }) => {
     try {
       await createPlantShutdown({
         ...form,
@@ -404,15 +437,43 @@ const Marking = () => {
         reason: form.reason.trim(),
         shutdown_type: 'Plant shutdown',
       }).unwrap();
+
+      let attendanceResult;
+      if (markAttendees) {
+        attendanceResult = await markShutdownAttendees({
+          attendees,
+          date: form.shutdown_start_date,
+          getAttendance: async (employeeId, date) => unwrap(await getEmployeeAttendance({
+            employeeId,
+            date_from: date,
+            date_to: date,
+            per_page: 100,
+          }).unwrap()),
+          markPresent: (employeeId, date) => markShutdownPresent({
+            employee_id: employeeId,
+            attendance_date: date,
+          }).unwrap(),
+        });
+      }
+
       setShutdownDialogOpen(false);
       toast('Plant shutdown request submitted for approval.', 'success');
+      if (attendanceResult?.failures.length > 0) {
+        toast(
+          `Marked ${attendanceResult.markedCount}; skipped ${attendanceResult.skippedCount} already present or punched in. Unable to verify or mark: ${attendanceResult.failures.map(({ attendee }) => attendee.name).join(', ')}. ${getApiErrorMessage(attendanceResult.failures[0].error, 'Please review attendance and retry if needed.')}`,
+          'error',
+        );
+      } else if (markAttendees) {
+        toast(
+          `${attendanceResult.markedCount} employee${attendanceResult.markedCount === 1 ? '' : 's'} marked present${attendanceResult.skippedCount ? `; ${attendanceResult.skippedCount} already present or punched in and skipped` : ''}.`,
+          'success',
+        );
+      }
     } catch (error) {
       toast(getApiErrorMessage(error, 'Unable to declare plant shutdown.'), 'error');
     }
   };
 
-  // Stable badge helper — defined outside useMemo so column defs never rebuild
-  // when only busyEmployeeActions changes. The render fn closes over the ref below.
   const busyRef = useRef(busyEmployeeActions);
   useEffect(() => { busyRef.current = busyEmployeeActions; }, [busyEmployeeActions]);
 
@@ -509,9 +570,7 @@ const Marking = () => {
             <UserRoundCheck size={15} />
           </button>
         ) : null;
-        const absentAction = canRejectAttendance
-          && isPendingReview
-          && Number(punch?.status) !== 0 ? (
+        const absentAction = canRejectAttendance && isPendingReview && Number(punch?.status) !== 0 ? (
           <button
             type="button"
             onClick={() => {
@@ -562,9 +621,8 @@ const Marking = () => {
                 type="button"
                 onClick={() => recordPunch({ ...employee, attendance: activePunch }, 'out')}
                 aria-label={`Punch out ${employee.name}`}
-                disabled={shutdownQuery.isFetching || shutdownQuery.isError}
-                title={shutdownQuery.isFetching || shutdownQuery.isError ? 'Refresh to confirm this plant\'s shutdown status.' : 'Punch Out'}
-                className="inline-flex min-h-9 items-center gap-2 rounded-md bg-rose-600 px-3 text-sm font-semibold text-white transition-colors hover:bg-rose-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
+                title="Punch Out"
+                className="inline-flex min-h-9 items-center gap-2 rounded-md bg-rose-600 px-3 text-sm font-semibold text-white transition-colors hover:bg-rose-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-600"
               >
                 <LogOut size={16} />
               </button>
@@ -592,10 +650,10 @@ const Marking = () => {
             <button
               type="button"
               onClick={() => recordPunch(employee, 'in')}
-              disabled={!employee.department_id || !employee.designation_id || !employee.shift_id || shutdownQuery.isFetching || shutdownQuery.isError}
-              title={shutdownQuery.isFetching || shutdownQuery.isError ? 'Refresh to confirm this plant\'s shutdown status.' : !employee.department_id || !employee.designation_id || !employee.shift_id ? 'Assign department, designation, and shift before punching in.' : 'Punch In'}
+              disabled={!employee.department_id || !employee.designation_id || !employee.shift_id}
+              title={!employee.department_id || !employee.designation_id || !employee.shift_id ? 'Assign department, designation, and shift before punching in.' : 'Punch In'}
               aria-label={`Punch in ${employee.name}`}
-              className="inline-flex min-h-9 items-center gap-2 rounded-md bg-emerald-700 px-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+              className="inline-flex min-h-9 items-center gap-2 rounded-md bg-emerald-700 px-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <LogIn size={16} />
             </button>
@@ -603,13 +661,13 @@ const Marking = () => {
         );
       },
     },
-  ], [canApproveAttendance, canRejectAttendance, departmentMap, handleApproveAttendance, hasPendingShutdown, plantMap, recordPunch, shiftMap, shutdownQuery.isError, shutdownQuery.isFetching, undoShutdownPresence]);
+  ], [canApproveAttendance, canRejectAttendance, departmentMap, handleApproveAttendance, hasPendingShutdown, plantMap, recordPunch, shiftMap, undoShutdownPresence]);
 
   return (
     <div className="flex h-full flex-col gap-4 p-4 sm:p-6 overflow-y-auto">
       {/* ── Page header ── */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-52 max-w-80 flex-[2]">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="w-full sm:w-auto sm:min-w-52 sm:max-w-80 flex-1">
           <InputField
             aria-label="Search employees"
             value={search}
@@ -627,13 +685,6 @@ const Marking = () => {
               <CheckCheck size={14} /> Approve All{pendingApprovalCount > 0 ? ` (${pendingApprovalCount})` : ''}
             </button>
           )}
-          {/* {canRejectAttendance && (
-            <button type="button" onClick={() => setRejectAllOpen(true)} disabled={isBulkActionDisabled}
-              title="Reject all pending attendance matching the current filters"
-              className="inline-flex h-9 items-center gap-2 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 transition-colors">
-              <XCircle size={14} /> Reject All{pendingApprovalCount > 0 ? ` (${pendingApprovalCount})` : ''}
-            </button>
-          )} */}
           {canRequestShutdown && (
             pendingShutdown
               ? <span className="inline-flex h-9 items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 text-sm font-medium text-amber-800 dark:text-amber-200"><Power size={14} /> Shutdown pending</span>
@@ -696,15 +747,26 @@ const Marking = () => {
                   isLoading: filtersQuery.isLoading,
                   showSearch: false,
                 },
+                {
+                  key: 'status',
+                  label: 'Status',
+                  type: 'select',
+                  permission: 'attendance',
+                  options: [
+                    { value: 'pending_review', label: 'Pending review' },
+                    { value: 'completed', label: 'Completed' },
+                    { value: 'not_started', label: 'Not started' },
+                    { value: 'punched_in', label: 'Punched in' },
+                    { value: 'absent', label: 'Absent' },
+                    { value: 'rejected', label: 'Rejected' },
+                    { value: 'shutdown_present', label: 'Shutdown present' },
+                    { value: 'shutdown_pending', label: 'Shutdown pending approval' },
+                  ],
+                  placeholder: 'All statuses',
+                  showSearch: false,
+                },
               ]}
             />
-            {/* <button
-            type="button"
-            onClick={() => { setSearch(''); setDebouncedSearch(''); setFilters({ plant: '', department: '', shift: '' }); setPage(1); }}
-            className="inline-flex h-12 items-center justify-center gap-1.5 rounded-md border border-(--color-border-strong) px-3 text-sm font-medium text-(--color-text-muted) hover:bg-(--color-accent-soft) hover:text-(--color-text) transition-colors"
-          >
-            <RotateCcw size={14} /> Reset
-          </button> */}
             <Button
               type="button"
               variant='ghost'
@@ -720,30 +782,37 @@ const Marking = () => {
       </div>
 
       {/* ── Stats bar ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 overflow-hidden rounded-xl border border-(--color-border) divide-x divide-(--color-border) bg-(--color-surface)">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:flex lg:flex-wrap gap-3">
         {[
-          { label: 'Roster', value: counts.roster, color: 'text-(--color-accent)', icon: <Users size={15} /> },
+          { label: 'Employees', value: counts.roster, color: 'text-(--color-accent)', icon: <Users size={15} /> },
           { label: 'Not started', value: counts.notStarted, color: 'text-(--color-text)', icon: null },
           { label: 'Punched in', value: counts.punchedIn, color: 'text-emerald-600 dark:text-emerald-400', icon: null },
           { label: 'Completed', value: counts.completed, color: 'text-sky-600 dark:text-sky-400', icon: null },
-          { label: 'Shutdown present', value: counts.shutdown_present ?? counts.shutdownPresent ?? 0, color: 'text-amber-700 dark:text-amber-300', icon: null },
-        ].map(({ label, value, color, icon }) => (
-          <div key={label} className="flex flex-col gap-1 p-3 col-span-1 first:col-span-2 first:sm:col-span-1">
-            <p className="text-xs font-medium text-(--color-text-muted) truncate">{label}</p>
-            <p className={`text-xl font-bold tabular-nums flex items-center gap-1.5 ${color}`}>{icon}{value}</p>
-          </div>
-        ))}
+          { label: 'Pending review', value: counts.pendingVerification, color: 'text-amber-700 dark:text-amber-300', icon: <Clock3 size={15} /> },
+          counts.shutdownPresent
+            ? { label: 'Shutdown present', value: counts.shutdownPresent, color: 'text-amber-700 dark:text-amber-300', icon: null }
+            : null,
+        ]
+          .filter(Boolean)
+          .map(({ label, value, color, icon }) => (
+            <div
+              key={label}
+              className="flex-1 min-w-[140px] flex flex-col gap-1 p-3 rounded-xl border border-(--color-border) bg-(--color-surface)"
+            >
+              <p className="capitalize text-xs font-medium text-(--color-text-muted) truncate">{label}</p>
+              <p className={`text-xl font-bold tabular-nums flex items-center gap-1.5 ${color}`}>{icon}{value}</p>
+            </div>
+          ))}
       </div>
 
-      {/* ── Filters ── */}
-      {/* <div className="flex flex-wrap items-center justify-between gap-2">
-        
-        
-      </div> */}
-
       {/* ── Table card ── */}
-      <div className="">
-        {(filtersQuery.isError || (employeeQuery.isError && displayedEmployees.length === 0))
+      <div>
+        {filters.status && (
+          <p className="mb-2 text-xs text-(--color-text-muted)">
+            Status filtering applies to employees on the current page.
+          </p>
+        )}
+        {(filtersQuery.isError || (employeeQuery.isError && pageEmployees.length === 0))
           ? <Feedback type="error" title="Unable to load attendance roster" message="Please refresh the page and try again." />
           : <PageTable
             columns={columns}
@@ -761,8 +830,9 @@ const Marking = () => {
           key="new-shutdown-request"
           isOpen={shutdownDialogOpen}
           mode="request"
+          plantId={effectivePlant}
           initialValues={shutdownForm}
-          saving={submittingShutdown}
+          saving={submittingShutdown || markingShutdownAttendees}
           onClose={() => setShutdownDialogOpen(false)}
           onSubmit={declareShutdown}
         />

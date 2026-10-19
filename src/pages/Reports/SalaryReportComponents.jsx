@@ -11,8 +11,10 @@ import {
   LoaderCircle,
   RefreshCw,
   RotateCcw,
+  Search,
   ShieldCheck,
   Wallet,
+  X,
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
@@ -27,7 +29,7 @@ import { resolveApiAssetUrl } from '../../config/config';
 const REPORT_TABS = [
   { id: 'monthly', label: 'Monthly payroll', icon: Wallet },
   { id: 'yearly', label: 'Yearly summary', icon: FileSpreadsheet },
-  { id: 'statutory', label: 'Statutory (PF / ESI)', icon: ShieldCheck },
+  { id: 'statutory', label: 'Deductions & contributions', icon: ShieldCheck },
 ];
 
 const formatCurrency = (value) =>
@@ -129,8 +131,9 @@ const SalaryReportFilters = ({
   year,
   onYearChange,
   yearOptions,
-  statutoryType,
-  onStatutoryTypeChange,
+  deductionTypeIds,
+  onDeductionTypeIdsChange,
+  deductionTypes = [],
   plantIds,
   onPlantChange,
   plantOptions,
@@ -164,15 +167,16 @@ const SalaryReportFilters = ({
     {activeReport === 'statutory' && (
       <>
         <SearchableSelect
-          title="Select contribution type"
-          label="Contribution type"
-          options={[
-            { value: 'esi', label: 'ESI' },
-            { value: 'pf', label: 'PF' },
-          ]}
-          value={statutoryType}
-          onChange={onStatutoryTypeChange}
-          placeholder="Select contribution type"
+          title="Select deduction types"
+          label="Deduction types"
+          options={deductionTypes.map((type) => ({
+            value: String(type.id),
+            label: type.code ? `${type.name} (${type.code})` : type.name,
+          }))}
+          value={deductionTypeIds}
+          onChange={onDeductionTypeIdsChange}
+          placeholder="All deduction types"
+          multiSelect
         />
         <InputField label="Payroll month" type="month" value={payrollMonth} onChange={onPayrollMonthChange} />
       </>
@@ -193,13 +197,14 @@ const SalaryReportSummary = ({ activeReport, summary }) => {
   if (!summary) return null;
 
   return (
-    <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
+    <div className={`grid grid-cols-1 gap-2 ${activeReport === 'statutory' ? 'sm:grid-cols-2 xl:grid-cols-5' : 'sm:grid-cols-4'}`}>
       <MetricCard icon={Landmark} label="Employees" value={formatNumber(summary.total_employees)} />
       {activeReport === 'statutory' ? (
         <>
-          <MetricCard icon={Wallet} label="Gross wages" value={formatCurrency(summary.total_wages)} />
-          <MetricCard icon={ShieldCheck} label="Employee contribution" value={formatCurrency(summary.total_employee_contribution)} />
-          <MetricCard icon={ShieldCheck} label="Total contributions" value={formatCurrency(summary.grand_total)} accent="text-emerald-600" />
+          <MetricCard icon={Wallet} label="Basic pay" value={formatCurrency(summary.total_basic_pay ?? summary.total_wages)} />
+          <MetricCard icon={ShieldCheck} label="Employee deductions" value={formatCurrency(summary.total_employee_contribution)} />
+          <MetricCard icon={ShieldCheck} label="Employer contributions" value={formatCurrency(summary.total_employer_contribution)} />
+          <MetricCard icon={ShieldCheck} label="Combined total" value={formatCurrency(summary.grand_total)} accent="text-emerald-600" />
         </>
       ) : (
         <>
@@ -225,7 +230,7 @@ const STICKY_NET_BODY = '!bg-emerald-100 dark:!bg-emerald-900 sticky z-20 shadow
 const STICKY_ACTION_HEADER = '!bg-slate-100 dark:!bg-slate-900 sticky right-0 z-40 shadow-[-3px_0_8px_rgba(0,0,0,0.12)]';
 const STICKY_ACTION_BODY = '!bg-white dark:!bg-slate-900 sticky right-0 z-20 shadow-[-3px_0_8px_rgba(0,0,0,0.08)]';
 
-const getColumns = (activeReport, chargeColumns, onPayEmployee, payingEmployeeId, canPayEmployees, isPaying) => {
+const getColumns = (activeReport, chargeColumns, onPayEmployee, payingEmployeeId, canPayEmployees, isPaying, deductionTypes = []) => {
   if (activeReport === 'monthly') {
     return [
       {
@@ -260,7 +265,21 @@ const getColumns = (activeReport, chargeColumns, onPayEmployee, payingEmployeeId
       },
       { key: 'present_days', label: 'Present', fullLabel: 'Present Days', className: 'min-w-[65px]', tdClass: 'min-w-[65px] text-right', render: (row) => formatNumber(row.present_days) },
       { key: 'regular_hours', label: 'Basic Hrs', fullLabel: 'Basic Hours Worked', className: 'min-w-[80px]', tdClass: 'min-w-[80px] text-right', render: (row) => formatNumber(row.regular_hours) },
-      { key: 'shutdown_pay', label: 'Shutdown', fullLabel: 'Shutdown Pay', className: 'min-w-[105px]', tdClass: 'min-w-[105px] text-right', render: (row) => formatCurrency(row.shutdown_pay) },
+      {
+        key: 'shutdown_pay',
+        label: 'Shutdown',
+        fullLabel: 'Paid shutdown days and shutdown pay',
+        className: 'min-w-[105px]',
+        tdClass: 'min-w-[105px] text-right',
+        render: (row) => (
+          <span className="flex w-full items-center justify-between gap-2 leading-tight">
+            <span className="text-xs text-(--color-text-muted)" title="Paid shutdown days">
+              {row.shutdown_days == null ? '—' : formatNumber(row.shutdown_days)}
+            </span>
+            <span>{formatCurrency(row.shutdown_pay)}</span>
+          </span>
+        ),
+      },
       {
         key: 'current_salary_pay',
         label: 'Basic Pay',
@@ -368,10 +387,30 @@ const getColumns = (activeReport, chargeColumns, onPayEmployee, payingEmployeeId
   return [
     { key: 'employee_name', label: 'Employee', fullLabel: 'Employee Name', className: 'min-w-[160px]', tdClass: 'min-w-[160px]', sortable: false, render: (row) => <EmployeeCell code={row.employee_code} name={row.employee_name} image={row.image} /> },
     { key: 'plant_name', label: 'Plant', fullLabel: 'Working Plant', className: 'min-w-[120px]', tdClass: 'min-w-[120px]' },
-    { key: 'gross_wages', label: 'Gross Wages', fullLabel: 'Total Gross Wages', className: 'min-w-[110px]', tdClass: 'min-w-[110px] text-right', render: (row) => formatCurrency(row.gross_wages) },
-    { key: 'employee_share', label: 'Emp. Share', fullLabel: 'Employee Contribution Share', className: 'min-w-[110px]', tdClass: 'min-w-[110px] text-right', render: (row) => formatCurrency(row.employee_share) },
-    { key: 'employer_share', label: 'Empr. Share', fullLabel: 'Employer Contribution Share', className: 'min-w-[110px]', tdClass: 'min-w-[110px] text-right', render: (row) => formatCurrency(row.employer_share) },
-    { key: 'total_contribution', label: 'Tot. Contrib.', fullLabel: 'Total Statutory Contribution', className: 'min-w-[115px]', tdClass: 'min-w-[115px] text-right font-semibold', render: (row) => formatCurrency(row.total_contribution) },
+    { key: 'basic_pay', label: 'Basic Pay', fullLabel: 'Regular earned pay used as the deduction basis; falls back to gross salary when regular pay is unavailable', className: 'min-w-[110px]', tdClass: 'min-w-[110px] text-right', render: (row) => formatCurrency(row.basic_pay ?? row.gross_wages) },
+    ...deductionTypes.flatMap((type) => [
+      {
+        key: `deductions.${type.id}.employee_share`,
+        label: `${type.code || type.name} · Emp.`,
+        fullLabel: `${type.name} paid by employee`,
+        className: 'min-w-[125px]',
+        tdClass: 'min-w-[125px] text-right',
+        sortable: false,
+        render: (row) => formatCurrency(row.deductions?.[type.id]?.employee_share),
+      },
+      {
+        key: `deductions.${type.id}.employer_share`,
+        label: `${type.code || type.name} · Empr.`,
+        fullLabel: `${type.name} paid by employer`,
+        className: 'min-w-[125px]',
+        tdClass: 'min-w-[125px] text-right',
+        sortable: false,
+        render: (row) => formatCurrency(row.deductions?.[type.id]?.employer_share),
+      },
+    ]),
+    { key: 'employee_share', label: 'Employee Total', fullLabel: 'Total deductions paid by employee', className: 'min-w-[125px]', tdClass: 'min-w-[125px] text-right font-semibold', render: (row) => formatCurrency(row.employee_share) },
+    { key: 'employer_share', label: 'Employer Total', fullLabel: 'Total contributions paid by employer', className: 'min-w-[125px]', tdClass: 'min-w-[125px] text-right font-semibold', render: (row) => formatCurrency(row.employer_share) },
+    { key: 'total_contribution', label: 'Combined Total', fullLabel: 'Employee deductions plus employer contributions', className: 'min-w-[130px]', tdClass: 'min-w-[130px] text-right font-bold', render: (row) => formatCurrency(row.total_contribution) },
   ];
 };
 
@@ -385,6 +424,7 @@ const SalaryReportTable = ({
   isLoading = false,
   payrollMonth,
   chargeColumns = [],
+  deductionTypes = [],
   onPayEmployee,
   payingEmployeeId,
   canPayEmployees = false,
@@ -395,20 +435,41 @@ const SalaryReportTable = ({
   const [sort, setSort] = useState({ key: null, direction: 'asc' });
   const [zoomLevel, setZoomLevel] = useState(100);
   const [showDeductionDetails, setShowDeductionDetails] = useState(false);
+  const [employeeSearch, setEmployeeSearch] = useState('');
 
   const handleZoomIn = useCallback(() => setZoomLevel((prev) => Math.min(prev + ZOOM_STEP, MAX_ZOOM)), []);
   const handleZoomOut = useCallback(() => setZoomLevel((prev) => Math.max(prev - ZOOM_STEP, MIN_ZOOM)), []);
   const handleResetZoom = useCallback(() => setZoomLevel(100), []);
 
   const columns = useMemo(
-    () => getColumns(activeReport, chargeColumns, onPayEmployee, payingEmployeeId, canPayEmployees, isPaying),
-    [activeReport, chargeColumns, onPayEmployee, payingEmployeeId, canPayEmployees, isPaying]
+    () => getColumns(activeReport, chargeColumns, onPayEmployee, payingEmployeeId, canPayEmployees, isPaying, deductionTypes),
+    [activeReport, chargeColumns, onPayEmployee, payingEmployeeId, canPayEmployees, isPaying, deductionTypes]
   );
 
-  const sortedRows = useMemo(() => {
-    if (activeReport !== 'monthly' || !sort.key) return rows;
+  const visibleRows = useMemo(() => {
+    const query = employeeSearch.trim().toLocaleLowerCase();
+    if (activeReport !== 'monthly' || !query) return rows;
+    return rows.filter((row) => [
+      row.employee_name,
+      row.employee_code,
+      row.employee_id,
+      row.id,
+    ].some((value) => String(value ?? '').toLocaleLowerCase().includes(query)));
+  }, [activeReport, rows, employeeSearch]);
 
-    return [...rows].sort((left, right) => {
+  const sortedRows = useMemo(() => {
+    if (activeReport !== 'monthly') return visibleRows;
+    const query = employeeSearch.trim().toLocaleLowerCase();
+    if (!sort.key && !query) return visibleRows;
+
+    return [...visibleRows].sort((left, right) => {
+      if (query) {
+        const leftStartsWithQuery = String(left.employee_name ?? '').trim().toLocaleLowerCase().startsWith(query);
+        const rightStartsWithQuery = String(right.employee_name ?? '').trim().toLocaleLowerCase().startsWith(query);
+        if (leftStartsWithQuery !== rightStartsWithQuery) return leftStartsWithQuery ? -1 : 1;
+      }
+      if (!sort.key) return 0;
+
       const leftValue = left[sort.key];
       const rightValue = right[sort.key];
       const leftComparable = typeof leftValue === 'string' ? leftValue.toLocaleLowerCase() : leftValue;
@@ -417,7 +478,7 @@ const SalaryReportTable = ({
       if (rightComparable == null) return -1;
       return (leftComparable < rightComparable ? -1 : leftComparable > rightComparable ? 1 : 0) * (sort.direction === 'asc' ? 1 : -1);
     });
-  }, [activeReport, rows, sort]);
+  }, [activeReport, visibleRows, employeeSearch, sort]);
 
   if (activeReport === 'monthly') {
     const monthLabel = payrollMonth
@@ -462,10 +523,35 @@ const SalaryReportTable = ({
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-(--color-border) bg-(--color-bg-elevated) px-3 py-2">
           <div>
             <h2 className="text-sm font-semibold text-(--color-text)">Monthly salary details</h2>
-            <p className="text-[11px] text-(--color-text-muted)">{monthLabel} · {rows.length} employees</p>
+            <p className="text-[11px] text-(--color-text-muted)">
+              {monthLabel} · {employeeSearch.trim() ? `${sortedRows.length} of ${rows.length}` : rows.length} employees
+            </p>
           </div>
 
           <div className="flex items-center gap-3">
+            <div className="flex h-7 w-40 items-center gap-1.5 rounded-lg border border-(--color-border) bg-white px-2 text-xs shadow-xs transition-colors focus-within:border-(--color-accent) focus-within:ring-1 focus-within:ring-(--color-accent)/30 dark:bg-slate-900 sm:w-48">
+              <Search size={13} className="shrink-0 text-(--color-text-muted)" aria-hidden="true" />
+              <input
+                type="search"
+                aria-label="Search employees by name, code, or ID"
+                value={employeeSearch}
+                onChange={(event) => setEmployeeSearch(event.target.value)}
+                placeholder="Name / ID"
+                className="min-w-0 flex-1 bg-transparent text-[10px] text-(--color-text) outline-none placeholder:text-(--color-text-muted)"
+              />
+              {employeeSearch && (
+                <button
+                  type="button"
+                  onClick={() => setEmployeeSearch('')}
+                  aria-label="Clear employee search"
+                  title="Clear search"
+                  className="shrink-0 rounded p-0.5 text-(--color-text-muted) transition-colors hover:text-(--color-text)"
+                >
+                  <X size={12} aria-hidden="true" />
+                </button>
+              )}
+            </div>
+
             <div className="flex items-center gap-1 rounded-lg border border-(--color-border) bg-white p-0.5 text-xs shadow-xs dark:bg-slate-900">
               <button
                 type="button"
@@ -614,16 +700,21 @@ const SalaryReportTable = ({
               ) : sortedRows.length === 0 ? (
                 <tr>
                   <td colSpan={styledColumns.length} className="border-b border-slate-200 dark:border-slate-800 py-8">
-                    <Feedback type="empty" title="No active approved employees found for this month and filters." />
+                    <Feedback
+                      type="empty"
+                      title={employeeSearch.trim()
+                        ? 'No employees match this search.'
+                        : 'No active approved employees found for this month and filters.'}
+                    />
                   </td>
                 </tr>
               ) : (
                 sortedRows.map((row, rowIndex) => (
                   <tr key={row.employee_id ?? row.id ?? rowIndex} className="group">
-                    {styledColumns.map((column) => (
+                    {styledColumns.map((column, columnIndex) => (
                       <td
                         key={column.key}
-                        className={`whitespace-nowrap border-b border-r border-slate-200 dark:border-slate-800 px-[0.7em] py-[0.4em] text-slate-900 dark:text-slate-100 last:border-r-0 ${column.bodyBg} ${column.tdClass ?? ''}`}
+                        className={`whitespace-nowrap border-b border-r border-slate-200 dark:border-slate-800 px-[0.7em] py-[0.4em] text-slate-900 dark:text-slate-100 last:border-r-0 transition-shadow duration-200 ${columnIndex === 0 ? 'group-hover:shadow-[inset_3px_0_0_var(--color-accent),inset_0_1px_0_rgba(255,255,255,0.7),inset_0_-1px_0_rgba(15,23,42,0.12),0_5px_8px_rgba(15,23,42,0.18)] dark:group-hover:shadow-[inset_3px_0_0_var(--color-accent),inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-1px_0_rgba(0,0,0,0.55),0_5px_8px_rgba(0,0,0,0.45)]' : 'group-hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.7),inset_0_-1px_0_rgba(15,23,42,0.12),0_5px_8px_rgba(15,23,42,0.18)] dark:group-hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-1px_0_rgba(0,0,0,0.55),0_5px_8px_rgba(0,0,0,0.45)]'} ${column.bodyBg} ${column.tdClass ?? ''}`}
                       >
                         {column.render ? column.render(row, rowIndex) : row[column.key]}
                       </td>
@@ -651,7 +742,7 @@ const SalaryReportTable = ({
       columns={columns}
       rows={rows}
       total={rows.length}
-      label={activeReport === 'statutory' ? 'contribution records' : 'payroll records'}
+      label={activeReport === 'statutory' ? 'deduction records' : 'payroll records'}
       emptyText={emptyText}
       isLoading={isLoading}
     />

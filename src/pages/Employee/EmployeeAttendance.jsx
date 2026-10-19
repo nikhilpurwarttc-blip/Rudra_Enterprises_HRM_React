@@ -80,7 +80,7 @@ const EmployeeAttendance = ({ employeeId, joiningDate }) => {
 				onMonthChange={changeMonth}
 				onYearChange={changeYear}
 				records={records}
-				isLoading={query.isLoading || query.isFetching}
+				isLoading={query.isLoading}
 				error={query.isError}
 				onRetry={query.refetch}
 			/>
