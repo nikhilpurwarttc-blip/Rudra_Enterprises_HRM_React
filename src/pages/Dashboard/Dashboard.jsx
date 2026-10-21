@@ -115,10 +115,10 @@ const DashboardFilters = ({
   plantsError,
   canSelectPlants,
 }) => (
-  <div className="flex flex-wrap items-end gap-2">
+  <div className="flex flex-wrap items-end gap-2.5">
     <div className="min-w-36 flex-1 sm:flex-none">
       <SearchableSelect
-        label="Overview period"
+        label="Overview Period"
         options={[
           { value: 'today', label: 'Today' },
           { value: 'month', label: 'Month' },
@@ -127,7 +127,7 @@ const DashboardFilters = ({
         ]}
         value={period}
         onChange={onPeriodChange}
-        btnClass="min-h-10 rounded-lg"
+        btnClass="min-h-10 rounded-xl bg-white/5  dark:bg-white/[0.03]"
       />
     </div>
 
@@ -144,7 +144,7 @@ const DashboardFilters = ({
           disabled={Boolean(plantsError)}
           multiSelect
           showSearch
-          btnClass="min-h-10 rounded-lg"
+          btnClass="min-h-10 rounded-xl bg-white/5 dark:bg-white/[0.03]"
         />
         {plantsError && (
           <p role="alert" className="mt-1 text-xs text-(--color-danger)">
@@ -164,7 +164,7 @@ const DashboardFilters = ({
           onChange={(event) => {
             if (event.target.value) onMonthChange(event.target.value);
           }}
-          className="h-10"
+          className="min-h-10 rounded-xl bg-white/5 dark:bg-white/[0.03]"
         />
       </div>
     )}
@@ -183,7 +183,7 @@ const DashboardFilters = ({
           })}
           value={financialYear}
           onChange={onFinancialYearChange}
-          btnClass="min-h-10 rounded-lg"
+          btnClass="min-h-10 rounded-xl bg-white/5 border-white/10 dark:bg-white/[0.03]"
         />
       </div>
     )}
@@ -200,7 +200,7 @@ const DashboardFilters = ({
             onChange={(event) => {
               if (event.target.value) onStartDateChange(event.target.value);
             }}
-            className="h-10"
+            className="h-10 rounded-xl bg-white/5 border-white/10 dark:bg-white/[0.03]"
           />
         </div>
         <div>
@@ -213,7 +213,7 @@ const DashboardFilters = ({
             onChange={(event) => {
               if (event.target.value) onEndDateChange(event.target.value);
             }}
-            className="h-10"
+            className="h-10 rounded-xl bg-white/5 border-white/10 dark:bg-white/[0.03]"
           />
         </div>
       </>
@@ -309,14 +309,11 @@ const Dashboard = () => {
   const pendingActions = (dashboard?.pending_actions ?? []).filter((action) => ACTION_LINKS[action.type]);
   const pendingTotal = pendingActions.reduce((total, action) => total + (Number(action.count) || 0), 0);
   const attendanceSummary = dashboard?.attendance?.status_wise ?? [];
-  // console.log('dashboard', dashboard);
-  // console.log('attendanceSummary', attendanceSummary);
   const attendanceTotal = attendanceSummary.reduce((total, item) => total + (Number(item.count) || 0), 0);
-  // console.log('attendanceTotal', attendanceTotal, 'dashboard?.summary?.present', dashboard?.summary?.present);
   const attendanceRate = attendanceTotal
     ? Math.round(((Number(dashboard?.summary?.present) || 0) / attendanceTotal) * 100)
     : 0;
-// console.log('attendanceRate', attendanceRate, 'dashboard?.summary?.present', dashboard?.summary?.present, 'attendanceTotal', attendanceTotal);
+
   if (!canView) return <AccessDenied pageName="the dashboard" routePath="/" />;
 
   const quickLinks = [
@@ -328,8 +325,8 @@ const Dashboard = () => {
 
   if (isLoading && !dashboard) {
     return (
-      <div className="space-y-5 p-4 sm:p-6 lg:p-8">
-        <div className="h-20 animate-pulse rounded-2xl bg-(--color-accent-soft) motion-reduce:animate-none" />
+      <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+        <div className="h-24 animate-pulse rounded-2xl bg-white/5 border border-white/10 shadow-lg motion-reduce:animate-none" />
         <DashboardSkeleton />
       </div>
     );
@@ -342,30 +339,29 @@ const Dashboard = () => {
           type="error"
           title="Dashboard unavailable"
           message={getErrorMessage(error)}
-          action={<Button variant="ghost" onClick={() => refetch()}><RefreshCw size={15} /> Try again</Button>}
+          action={<Button variant="ghost" onClick={() => refetch()} className="rounded-xl"><RefreshCw size={15} /> Try again</Button>}
         />
       </div>
     );
   }
 
   return (
-    <div className="space-y-5 p-4 pb-8 sm:p-6 lg:p-8">
-      <GlassCard className="relative overflow-hidden p-5 sm:p-6">
-        <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-20 h-52 w-52 rounded-full bg-(--color-accent-soft) blur-3xl" />
-        <div className="relative flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+    <div className="space-y-6 p-4 pb-12 sm:p-6 lg:p-8">
+      <GlassCard className="relative overflow-hidden p-6 sm:p-7 bg-gradient-to-b from-white/10 to-black/5 dark:from-white/5 dark:to-black/20 shadow-xl shadow-black/5 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl">
+        <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-20 h-52 w-52 rounded-full bg-(--color-accent-soft) blur-3xl opacity-60" />
+        <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
           <div className="max-w-xl">
-            <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-(--color-text) sm:text-3xl">
-              <Activity size={20} aria-hidden="true" /> Good Day, {getFirstName(user)}
+            <h1 className="flex items-center gap-2.5 text-2xl font-extrabold tracking-tight text-(--color-text) sm:text-3xl">
+              <Activity size={22} aria-hidden="true" className="text-(--color-accent)" /> Good Day, {getFirstName(user)}
             </h1>
             {dashboard?.filters?.label && (
-              <p className="mt-3 flex items-center gap-1.5 text-xs font-medium text-(--color-text-muted)">
-                <CalendarDays size={14} aria-hidden="true" /> {dashboard.filters.label}
-                {/* {dashboard?.user_role && <span className="ml-1 rounded-full bg-(--color-accent-soft) px-2 py-0.5 capitalize text-(--color-accent)">{dashboard.user_role}</span>} */}
+              <p className="mt-3 flex items-center gap-2 text-xs font-semibold text-(--color-text-muted)">
+                <CalendarDays size={14} aria-hidden="true" className="text-(--color-accent)" /> {dashboard.filters.label}
               </p>
             )}
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between xl:justify-end">
+          <div className="flex flex-col gap-3.5 sm:flex-row sm:items-end sm:justify-between xl:justify-end">
             <DashboardFilters
               period={period}
               onPeriodChange={setPeriod}
@@ -389,23 +385,23 @@ const Dashboard = () => {
               onClick={refreshDashboard}
               disabled={manualRefreshing || isLoading}
               aria-label="Refresh dashboard"
-              className="h-10 min-h-10 shrink-0 px-3"
+              className="h-10 min-h-10 shrink-0 px-3.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10"
             >
               <RefreshCw size={15} className={manualRefreshing ? 'animate-spin motion-reduce:animate-none' : ''} aria-hidden="true" />
               <span className="sm:hidden">Refresh</span>
             </Button>
           </div>
         </div>
-        {isLoading && <div className="absolute inset-x-0 bottom-0 h-0.5 animate-pulse bg-(--color-accent) motion-reduce:animate-none" aria-label="Loading dashboard" />}
+        {isLoading && <div className="absolute inset-x-0 bottom-0 h-1 animate-pulse bg-(--color-accent) motion-reduce:animate-none" aria-label="Loading dashboard" />}
       </GlassCard>
 
       {isError && dashboard && (
-        <div role="alert" className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
+        <div role="alert" className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm font-medium text-amber-800 dark:text-amber-200 backdrop-blur-md">
           Dashboard refresh failed: {getErrorMessage(error)} The last loaded data is still shown.
         </div>
       )}
 
-      <section aria-label="Key workforce metrics" className="grid grid-cols-1 gap-3 :grid-cols-4 xl:grid-cols-6">
+      <section aria-label="Key workforce metrics" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6">
         {canViewEmployees && (
           <DashboardMetric
             icon={Users}
@@ -465,35 +461,34 @@ const Dashboard = () => {
         )}
       </section>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-6">
-
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-6">
         {canViewAttendance && dashboard?.attendance && (
           <div className="grid grid-cols-1 gap-4 xl:col-span-2">
             <DashboardPanel
               title="Attendance snapshot"
               description="Status distribution across your permitted workforce"
-              action={<span className="rounded-full bg-teal-500/10 px-2.5 py-1 text-xs font-semibold text-teal-700 dark:text-teal-300">{attendanceRate}% present</span>}
+              action={<span className="rounded-full bg-teal-500/10 px-3 py-1 text-xs font-bold text-teal-700 dark:text-teal-300 ring-1 ring-inset ring-teal-500/20">{attendanceRate}% present</span>}
             >
               {attendanceTotal ? (
-                <>
+                <div className="p-2 sm:p-3">
                   <div
-                    className="mb-5 flex h-3 overflow-hidden rounded-full bg-(--color-accent-soft)"
+                    className="mb-5 flex h-3.5 overflow-hidden rounded-full bg-black/5 dark:bg-white/5 p-0.5 ring-1 ring-inset ring-white/10"
                     role="img"
                     aria-label={attendanceSummary.map((item) => `${item.label}: ${formatNumber(item.count)}`).join(', ')}
                   >
                     {attendanceSummary.filter((item) => Number(item.count) > 0).map((item) => {
                       const styles = {
-                        present: 'bg-teal-500',
-                        absent: 'bg-rose-500',
-                        partial: 'bg-amber-500',
-                        on_leave: 'bg-violet-500',
-                        holiday: 'bg-sky-500',
-                        weekly_off: 'bg-slate-400',
+                        present: 'bg-teal-500 shadow-sm shadow-teal-500/30',
+                        absent: 'bg-rose-500 shadow-sm shadow-rose-500/30',
+                        partial: 'bg-amber-500 shadow-sm shadow-amber-500/30',
+                        on_leave: 'bg-violet-500 shadow-sm shadow-violet-500/30',
+                        holiday: 'bg-sky-500 shadow-sm shadow-sky-500/30',
+                        weekly_off: 'bg-slate-400 shadow-sm shadow-slate-400/30',
                       };
                       return (
                         <span
                           key={item.status}
-                          className={`${styles[item.status] ?? 'bg-(--color-accent)'} transition-[width] duration-500 motion-reduce:transition-none`}
+                          className={`rounded-full ${styles[item.status] ?? 'bg-(--color-accent)'} transition-[width] duration-500 motion-reduce:transition-none`}
                           style={{ width: `${(Number(item.count) / attendanceTotal) * 100}%` }}
                           title={`${item.label}: ${formatNumber(item.count)}`}
                         />
@@ -506,28 +501,31 @@ const Dashboard = () => {
                       .map((item) => ({ ...item, label: item.label, count: Number(item.count) }))}
                     formatter={formatNumber}
                   />
-                </>
+                </div>
               ) : <DashboardEmpty message="No attendance activity for the selected period." />}
             </DashboardPanel>
           </div>
         )}
+
         {canViewAttendance && dashboard?.attendance && (
           <div className="grid grid-cols-1 gap-4 xl:col-span-2">
             <DashboardPanel title="Plant attendance" description="Attendance records grouped by working plant">
-              <DashboardBarList
-                items={(dashboard.attendance.plant_wise ?? []).map((item) => ({ ...item, label: item.plant_name, count: item.present }))}
-                formatter={(value) => `${formatNumber(value)} present`}
-              />
+              <div className="p-2 sm:p-3">
+                <DashboardBarList
+                  items={(dashboard.attendance.plant_wise ?? []).map((item) => ({ ...item, label: item.plant_name, count: item.present }))}
+                  formatter={(value) => `${formatNumber(value)} present`}
+                />
+              </div>
             </DashboardPanel>
           </div>
         )}
+
         {pendingActions.length > 0 && (
           <div className="grid grid-cols-1 gap-4 xl:col-span-2">
             <DashboardPanel
               title="Needs your attention"
               description="Pending workflows visible to your role"
-              action={<span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-800 dark:text-amber-200">{formatNumber(pendingTotal)} pending</span>}
-              className="p-0 sm:p-0 pb-2 sm:pb-2"
+              action={<span className="rounded-full bg-amber-500/10 px-3 py-1 text-xs font-bold text-amber-800 dark:text-amber-200 ring-1 ring-inset ring-amber-500/20">{formatNumber(pendingTotal)} pending</span>}
             >
               <ul className="divide-y divide-(--color-border)">
                 {pendingActions.map((action) => {
@@ -535,25 +533,25 @@ const Dashboard = () => {
                   const accessibleLink = link?.path && permissionCheck(canModule, link.linkModules ?? link.modules);
                   const content = (
                     <>
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-300">
-                        <ClipboardCheck size={17} aria-hidden="true" />
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500/20 to-amber-500/10 text-amber-700 dark:text-amber-300 ring-1 ring-inset ring-white/20">
+                        <ClipboardCheck size={18} aria-hidden="true" />
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium text-(--color-text)">{action.title}</span>
-                        <span className="mt-0.5 block text-xs text-(--color-text-muted)">{formatNumber(action.count)} item{Number(action.count) === 1 ? '' : 's'}</span>
+                        <span className="block truncate text-sm font-bold text-(--color-text)">{action.title}</span>
+                        <span className="mt-0.5 block text-xs font-medium text-(--color-text-muted)">{formatNumber(action.count)} item{Number(action.count) === 1 ? '' : 's'}</span>
                       </span>
-                      {accessibleLink && <ArrowRight size={16} className="shrink-0 text-(--color-text-muted)" aria-hidden="true" />}
+                      {accessibleLink && <ArrowRight size={16} className="shrink-0 text-(--color-text-muted) transition-transform group-hover:translate-x-0.5" aria-hidden="true" />}
                     </>
                   );
 
                   return (
-                    <li key={action.type} >
+                    <li key={action.type}>
                       {accessibleLink ? (
-                        <Link to={link.path} className="flex items-center gap-3 p-2 px-4 transition-colors hover:bg-(--color-accent-soft) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-accent)">
+                        <Link to={link.path} className="group flex items-center gap-3.5 p-3 rounded-xl transition-all duration-200 hover:bg-(--color-accent-soft) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-accent)">
                           {content}
                         </Link>
                       ) : (
-                        <div className="flex items-center gap-3 rounded-lg p-2">{content}</div>
+                        <div className="flex items-center gap-3.5 p-3 rounded-xl">{content}</div>
                       )}
                     </li>
                   );
@@ -566,31 +564,28 @@ const Dashboard = () => {
         {canViewPayroll && dashboard?.payroll && (
           <div className="grid grid-cols-1 gap-4 xl:col-span-3">
             <DashboardPanel title="Payroll overview" description="Authorized payroll totals for the selected period">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4 p-2 sm:p-3">
                 {[
                   ['Gross', dashboard.payroll.gross],
                   ['Net', dashboard.payroll.net],
                   ['Overtime', dashboard.payroll.ot_amount],
                   ['Deductions', dashboard.payroll.total_deductions],
                 ].filter(([, value]) => value !== undefined).map(([label, value]) => (
-                  <div key={label} className="rounded-xl border border-(--color-border) bg-(--color-bg-elevated)/70 p-3">
-                    <p className="text-xs text-(--color-text-muted)">{label}</p>
-                    <p className="mt-1 truncate text-sm font-bold text-(--color-text)" title={formatCurrency(value)}>{formatCurrency(value)}</p>
+                  <div key={label} className="rounded-2xl border border-white/10 bg-white/5 dark:bg-white/[0.02] p-3.5 shadow-sm">
+                    <p className="text-xs font-medium text-(--color-text-muted)">{label}</p>
+                    <p className="mt-1 truncate text-sm font-extrabold text-(--color-text)" title={formatCurrency(value)}>{formatCurrency(value)}</p>
                   </div>
                 ))}
               </div>
               {dashboard.payroll.plant_wise?.length > 0 && (
-                <div className="mt-5 border-t border-(--color-border) pt-4">
-                  <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-(--color-text-muted)">Gross payroll by plant</p>
+                <div className="px-3 pb-4 sm:px-4">
+                  <p className="mb-3 text-xs font-bold uppercase tracking-wider text-(--color-text-muted)">Gross payroll by plant</p>
                   <DashboardBarList
                     items={dashboard.payroll.plant_wise.map((item) => ({ ...item, label: item.plant_name }))}
                     valueKey="gross"
                     formatter={formatCurrency}
                   />
                 </div>
-              )}
-              {!dashboard.payroll.plant_wise?.length && dashboard.payroll.net === undefined && (
-                <p className="mt-4 text-xs text-(--color-text-muted)">Payroll totals are not available for this operational period.</p>
               )}
             </DashboardPanel>
           </div>
@@ -599,22 +594,23 @@ const Dashboard = () => {
         {canViewStatutory && dashboard?.statutory && (
           <div className="grid grid-cols-1 gap-4 xl:col-span-3">
             <DashboardPanel title="Statutory contributions" description="PF and ESI totals for the selected period">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 p-2 sm:p-3">
                 {[
                   ['ESI', dashboard.statutory.esi],
                   ['PF', dashboard.statutory.pf],
+                  ['LWF', dashboard.statutory.lwf],
                 ].map(([label, metric]) => (
-                  <div key={label} className="flex items-center justify-between gap-3 rounded-xl border border-(--color-border) bg-(--color-bg-elevated)/70 p-4">
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-(--color-accent-soft) text-(--color-accent)">
-                        <ShieldCheck size={17} aria-hidden="true" />
+                  <div key={label} className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 dark:bg-white/[0.02] p-4 shadow-sm">
+                    <div className="flex items-center gap-3.5">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-(--color-accent)/20 to-(--color-accent)/10 text-(--color-accent) ring-1 ring-inset ring-white/20">
+                        <ShieldCheck size={18} aria-hidden="true" />
                       </span>
                       <div>
-                        <p className="text-sm font-semibold text-(--color-text)">{label}</p>
-                        <p className="text-xs text-(--color-text-muted)">{formatNumber(metric?.employee_count)} employees</p>
+                        <p className="text-sm font-bold text-(--color-text)">{label}</p>
+                        <p className="text-xs font-medium text-(--color-text-muted)">{formatNumber(metric?.employee_count)} employees</p>
                       </div>
                     </div>
-                    <p className="text-sm font-bold text-(--color-text)">{formatCurrency(metric?.total_amount)}</p>
+                    <p className="text-sm font-extrabold text-(--color-text)">{formatCurrency(metric?.total_amount)}</p>
                   </div>
                 ))}
               </div>
@@ -625,20 +621,20 @@ const Dashboard = () => {
         {canViewDeputation && dashboard?.deputation && (
           <div className="grid grid-cols-1 gap-4 xl:col-span-2">
             <DashboardPanel title="Employee deputations" description="Cross-plant workforce movement in the selected period">
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-3 p-2 sm:p-3">
                 {[
                   ['Total', dashboard.deputation.total],
                   ['Active', dashboard.deputation.active],
                   ['Pending', dashboard.deputation.pending_verification],
                 ].map(([label, value]) => (
-                  <div key={label} className="rounded-xl bg-(--color-accent-soft) p-3 text-center">
-                    <p className="text-lg font-bold text-(--color-text)">{formatNumber(value)}</p>
-                    <p className="mt-0.5 text-xs text-(--color-text-muted)">{label}</p>
+                  <div key={label} className="rounded-2xl border border-white/10 bg-white/5 dark:bg-white/[0.02] p-3.5 text-center shadow-sm">
+                    <p className="text-xl font-extrabold text-(--color-text)">{formatNumber(value)}</p>
+                    <p className="mt-1 text-xs font-medium text-(--color-text-muted)">{label}</p>
                   </div>
                 ))}
               </div>
               {dashboard.deputation.plant_wise?.length > 0 && (
-                <div className="mt-4">
+                <div className="px-3 pb-3">
                   <DashboardBarList
                     items={dashboard.deputation.plant_wise.map((item) => ({ ...item, label: item.plant_name, count: item.total }))}
                     formatter={formatNumber}
@@ -652,22 +648,24 @@ const Dashboard = () => {
         {canViewDowntime && dashboard?.downtime && (
           <div className="grid grid-cols-1 gap-4 xl:col-span-3">
             <DashboardPanel title="Plant downtime" description="Approved shutdown activity within this period">
-              <div className="mb-4 grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-3 p-2 sm:p-3">
                 {[
                   ['Events', dashboard.downtime.events],
                   ['Hours', dashboard.downtime.hours],
                   ['Compensation', formatCurrency(dashboard.downtime.compensation)],
                 ].map(([label, value]) => (
-                  <div key={label} className="rounded-xl bg-(--color-accent-soft) p-3">
-                    <p className="truncate text-base font-bold text-(--color-text)">{typeof value === 'string' ? value : formatNumber(value)}</p>
-                    <p className="mt-0.5 text-xs text-(--color-text-muted)">{label}</p>
+                  <div key={label} className="rounded-2xl border border-white/10 bg-white/5 dark:bg-white/[0.02] p-3.5 shadow-sm">
+                    <p className="truncate text-base font-extrabold text-(--color-text)">{typeof value === 'string' ? value : formatNumber(value)}</p>
+                    <p className="mt-1 text-xs font-medium text-(--color-text-muted)">{label}</p>
                   </div>
                 ))}
               </div>
-              <DashboardBarList
-                items={(dashboard.downtime.plant_wise ?? []).map((item) => ({ ...item, label: item.plant_name, count: item.events }))}
-                formatter={(value) => `${formatNumber(value)} events`}
-              />
+              <div className="px-3 pb-4">
+                <DashboardBarList
+                  items={(dashboard.downtime.plant_wise ?? []).map((item) => ({ ...item, label: item.plant_name, count: item.events }))}
+                  formatter={(value) => `${formatNumber(value)} events`}
+                />
+              </div>
             </DashboardPanel>
           </div>
         )}
@@ -675,19 +673,19 @@ const Dashboard = () => {
         {quickLinks.length > 0 && (
           <div className="grid grid-cols-1 gap-4 xl:col-span-3">
             <DashboardPanel title="Quick access" description="Go directly to the areas available to your role">
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 p-2 sm:p-3">
                 {quickLinks.map(({ label, detail, path, icon: Icon }) => (
                   <Link
                     key={path}
                     to={path}
-                    className="group flex items-center gap-3 rounded-xl border border-(--color-border) bg-(--color-bg-elevated)/60 p-3 transition duration-200 hover:-translate-y-0.5 hover:border-(--color-border-strong) hover:bg-(--color-accent-soft) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-accent) motion-reduce:transform-none"
+                    className="group flex items-center gap-3.5 rounded-2xl border border-white/10 bg-gradient-to-b from-white/10 to-black/5 dark:from-white/5 dark:to-black/20 p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-black/10 hover:border-(--color-border-strong) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-accent) motion-reduce:transform-none backdrop-blur-xl"
                   >
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-(--color-accent-soft) text-(--color-accent)">
-                      <Icon size={18} aria-hidden="true" />
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-(--color-accent)/20 to-(--color-accent)/10 text-(--color-accent) ring-1 ring-inset ring-white/20 shadow-sm shadow-(--color-accent)/20">
+                      <Icon size={20} aria-hidden="true" />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-semibold text-(--color-text)">{label}</span>
-                      <span className="block truncate text-xs text-(--color-text-muted)">{detail}</span>
+                      <span className="block text-sm font-bold text-(--color-text)">{label}</span>
+                      <span className="block truncate text-xs font-medium text-(--color-text-muted)">{detail}</span>
                     </span>
                     <ArrowUpRight size={16} className="shrink-0 text-(--color-text-muted) transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" aria-hidden="true" />
                   </Link>
@@ -698,32 +696,31 @@ const Dashboard = () => {
         )}
       </div>
 
-
       {!canViewEmployees && !canViewAttendance && !canViewPayroll && !canViewStatutory && !canViewAdvances && !canViewDeputation && !canViewDowntime && pendingActions.length === 0 && (
-        <GlassCard className="p-5 sm:p-7">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-(--color-accent-soft) text-(--color-accent)">
+        <GlassCard className="p-6 sm:p-8 bg-gradient-to-b from-white/10 to-black/5 dark:from-white/5 dark:to-black/20 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-(--color-accent-soft) text-(--color-accent) ring-1 ring-inset ring-white/20 shadow-md">
             <ShieldCheck size={22} aria-hidden="true" />
           </div>
-          <div className="mx-auto mt-3 max-w-2xl text-center">
-            <h2 className="text-base font-semibold text-(--color-text)">Dashboard access is active; workforce data is restricted</h2>
+          <div className="mx-auto mt-4 max-w-2xl text-center">
+            <h2 className="text-base font-bold text-(--color-text)">Dashboard access is active; workforce data is restricted</h2>
             <p className="mt-2 text-sm leading-relaxed text-(--color-text-muted)">
               The Dashboard permission lets you open this page. It does not grant access to employee, attendance, payroll, or other module data.
-              Ask an administrator to assign the relevant <strong className="font-semibold text-(--color-text)">View</strong> permissions below.
+              Ask an administrator to assign the relevant <strong className="font-bold text-(--color-text)">View</strong> permissions below.
             </p>
           </div>
-          <ul className="mx-auto mt-5 grid max-w-4xl grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="mx-auto mt-6 grid max-w-4xl grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
             {missingDashboardModules.map(({ label, permission }) => (
-              <li key={label} className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-(--color-border) bg-(--color-bg-elevated)/60 px-3 py-2.5">
-                <span className="truncate text-sm font-medium text-(--color-text)">{label}</span>
-                <code className="shrink-0 text-right text-[10px] text-(--color-text-muted)">{permission}</code>
+              <li key={label} className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 dark:bg-white/[0.02] px-4 py-3 shadow-sm">
+                <span className="truncate text-sm font-semibold text-(--color-text)">{label}</span>
+                <code className="shrink-0 text-right text-[11px] text-(--color-text-muted)">{permission}</code>
               </li>
             ))}
           </ul>
           {canModule('roles', 'view') && (
-            <div className="mt-5 flex justify-center">
+            <div className="mt-6 flex justify-center">
               <Link
                 to="/roles"
-                className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-(--color-border) px-4 py-2 text-sm font-semibold text-(--color-accent) transition-colors hover:bg-(--color-accent-soft) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-accent)"
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/20 bg-white/5 px-5 py-2.5 text-sm font-bold text-(--color-accent) transition-all hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-accent) shadow-sm"
               >
                 <FileCheck2 size={16} aria-hidden="true" />
                 Open Roles &amp; Permissions
@@ -734,8 +731,8 @@ const Dashboard = () => {
       )}
 
       {dashboard && quickLinks.length > 0 && (
-        <p className="flex items-center justify-center gap-1.5 text-center text-xs text-(--color-text-muted)">
-          <Building2 size={13} aria-hidden="true" />
+        <p className="flex items-center justify-center gap-1.5 text-center text-xs font-medium text-(--color-text-muted)">
+          <Building2 size={13} aria-hidden="true" className="text-(--color-accent)" />
           Data is scoped by your account permissions and assigned plant access.
           <span className="sr-only">Current user scope applies to all displayed metrics.</span>
         </p>

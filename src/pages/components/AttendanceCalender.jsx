@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { CalendarDays, CalendarOff, ChevronLeft, ChevronRight, CircleCheck, CircleX, Clock3, Info, Plane, RefreshCw, Sun, UserRoundX, Wrench, Zap } from 'lucide-react';
+import { CalendarDays, CalendarOff, ChevronLeft, ChevronRight, CircleCheck, CircleX, Clock3, Info, Plane, RefreshCw, PartyPopper, UserRoundX, Wrench, Zap } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { Feedback, LoadingState } from '../../components/Feedback';
 import SearchableSelect from '../../components/SearchableSelect';
@@ -13,9 +13,9 @@ const MONTH_OPTIONS = Array.from({ length: 12 }, (_, monthIndex) => ({
 const STATUS = {
 	0: { label: 'Absent', cellClass: 'bg-rose-500/10', dotClass: 'bg-rose-500', color: 'red', icon: CircleX },
 	1: { label: 'Present', cellClass: 'bg-emerald-500/10', dotClass: 'bg-emerald-500', color: 'green', icon: CircleCheck },
-	2: { label: 'Half Day', cellClass: 'bg-amber-500/10', dotClass: 'bg-amber-500', color: 'amber', icon: Clock3 },
-	3: { label: 'Leave', cellClass: 'bg-violet-500/10', dotClass: 'bg-violet-500', color: 'purple', icon: Plane },
-	4: { label: 'Holiday', cellClass: 'bg-sky-500/10', dotClass: 'bg-sky-500', color: 'blue', icon: Sun },
+	// 2: { label: 'Half Day', cellClass: 'bg-amber-500/10', dotClass: 'bg-amber-500', color: 'amber', icon: Clock3 },
+	// 3: { label: 'Leave', cellClass: 'bg-violet-500/10', dotClass: 'bg-violet-500', color: 'purple', icon: Plane },
+	4: { label: 'Holiday', cellClass: 'bg-sky-500/10', dotClass: 'bg-sky-500', color: 'blue', icon: PartyPopper },
 	5: { label: 'Weekly Off', cellClass: 'bg-slate-500/10', dotClass: 'bg-slate-500', color: 'gray', icon: CalendarOff },
 	6: { label: 'Inactive', cellClass: 'bg-(--color-bg-elevated)', dotClass: 'bg-slate-400', color: 'gray', icon: UserRoundX },
 };
@@ -193,9 +193,14 @@ const AttendanceCalender = ({ month, joiningDate, onMonthChange, onYearChange, r
 				</div>
 			</header>
 
-			<div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-(--color-text-muted)" aria-label="Attendance status legend">
-				{Object.entries(STATUS).map(([key, value]) => <span key={key} className="inline-flex items-center gap-1.5"><span className={`h-2.5 w-2.5 rounded-full ${value.dotClass}`} />{value.label}</span>)}
-				<span className="inline-flex items-center gap-1.5"><Zap size={12} className="text-amber-600" />Plant shutdown</span>
+			<div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-(--color-text-muted)" aria-label="Attendance status legend">
+				{Object.entries(STATUS).map(([key, value]) => (
+					<span key={key} className={`inline-flex items-center gap-1.5 `}>
+						{value.icon && <value.icon size={12} className={`text-${value.color}-700 dark:text-${value.color}-400`} />}
+						{value.label}
+					</span>
+				))}
+				<span className="inline-flex items-center gap-1.5"><Zap size={12} className="text-amber-600" />Plant Shutdown</span>
 				<span className="inline-flex items-center gap-1.5"><Wrench size={12} className="text-blue-600" />Maintenance</span>
 			</div>
 
@@ -235,7 +240,7 @@ const AttendanceCalender = ({ month, joiningDate, onMonthChange, onYearChange, r
 											<time dateTime={key} className={`flex h-7 w-7 items-center justify-center rounded-full text-sm ${key === dateKey(new Date()) ? 'bg-(--color-accent) font-semibold text-white' : 'font-medium'}`}>{date.getDate()}</time>
 											<div className="flex flex-wrap gap-1">
 												{events?.shutdown && (
-													<span title="Plant shutdown" aria-label="Plant shutdown" className="animate-bounce inline-flex h-5 w-5 items-center justify-center rounded-full border border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300">
+													<span title="Plant Shutdown" aria-label="Plant Shutdown" className="animate-bounce inline-flex h-5 w-5 items-center justify-center rounded-full border border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300">
 														<Zap size={11} aria-hidden="true" />
 													</span>
 												)}
@@ -254,9 +259,9 @@ const AttendanceCalender = ({ month, joiningDate, onMonthChange, onYearChange, r
 														<span
 															key={String(record.status ?? 'unknown')}
 															title={label}
-															className={`flex h-5 w-5 items-center justify-center rounded-full border border-${color}-500/20 bg-${color}-500/10 text-${color}-700 dark:text-${color}-300`}
+															className={`flex h-5 w-5 items-center justify-center rounded-full border border-${color}-500/20 ${label === 'Present' && 'animate-pulse transition-colors '} ${label === 'Holiday' && 'bg-transparent border-none'} bg-${color}-500/10 text-${color}-700 dark:text-${color}-400`}
 														>
-															<Icon size={16} aria-hidden="true" />
+															<Icon size={16} aria-hidden="true" className="flex-shrink-0 animate-none" />
 														</span>
 													);
 												})}

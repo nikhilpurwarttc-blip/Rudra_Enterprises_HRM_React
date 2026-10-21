@@ -113,7 +113,7 @@ const SalaryReportTabs = ({ activeReport, onChange }) => (
         role="tab"
         aria-selected={activeReport === id}
         onClick={() => onChange(id)}
-        className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-medium transition-colors ${activeReport === id
+        className={`capitalize flex items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-medium transition-colors ${activeReport === id
             ? 'border-(--color-accent) text-(--color-accent)'
             : 'border-transparent text-(--color-text-muted) hover:text-(--color-text)'
           }`}
@@ -522,7 +522,7 @@ const SalaryReportTable = ({
       <section className="glass-card flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-(--color-border) bg-(--color-surface) shadow-sm">
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-(--color-border) bg-(--color-bg-elevated) px-3 py-2">
           <div>
-            <h2 className="text-sm font-semibold text-(--color-text)">Monthly salary details</h2>
+            <h2 className="capitalize text-sm font-semibold text-(--color-text)">Monthly salary details</h2>
             <p className="text-[11px] text-(--color-text-muted)">
               {monthLabel} · {employeeSearch.trim() ? `${sortedRows.length} of ${rows.length}` : rows.length} employees
             </p>

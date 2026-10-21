@@ -83,7 +83,7 @@ const MainLayout = ({ children }) => {
                 className={[
                   'min-w-0 overflow-x-auto overflow-y-auto flex-1',
                   'bg-[var(--color-bg-elevated)]',
-                  'md:rounded-2xl border border-[var(--color-border)]',
+                  'md:rounded-t-2xl border-l border-t border-[var(--color-border)]',
                   'shadow-[inset_0_10px_20px_rgba(0,0,0,0.08)]',
                   'dark:shadow-[inset_0_0_20px_rgba(255,255,255,0.04)]',
                 ].join(' ')}
@@ -94,12 +94,12 @@ const MainLayout = ({ children }) => {
               {/* Right panel slot — RightModal portals into here */}
               <div
                 id="right-panel-slot"
-                className="relative hidden md:flex w-auto min-w-0 flex-shrink-0 overflow-hidden md:mr-2"
+                className="relative hidden md:flex w-auto min-w-0 flex-shrink-0 overflow-hidden "
               />
             </div>
           </div>
 
-          <Footer />
+          {/* <Footer /> */}
         </div>
       </div>
     </RightPanelProvider>

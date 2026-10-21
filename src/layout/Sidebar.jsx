@@ -1,5 +1,5 @@
 import { useState, useCallback, memo } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import usePermission from "../hooks/usePermission";
 import { ROUTES, getRouteConfig } from "../constants/routes";
 import {
@@ -20,7 +20,11 @@ import {
   IndianRupee,
   Wrench,
   ChevronDown,
+  LogOut,
 } from "lucide-react";
+import { useLogoutMutation } from "../store/api";
+import { useDispatch } from "react-redux";
+import { clearCredentials } from "../store/authSlice";
 
 const MENU = [
   {
@@ -251,6 +255,9 @@ const Sidebar = () => {
   const [isOpen, setIsOpen] = useState(false);
   // const { can, isSuperAdmin } = usePermission();
   const { can } = usePermission();
+    const dispatch = useDispatch();
+    const navigate = useNavigate();
+  const [logout, { isLoading }] = useLogoutMutation();
 
   const canSeeRoute = useCallback((to) => {
     // if (isSuperAdmin) return true;
@@ -277,9 +284,15 @@ const Sidebar = () => {
     return [{ ...item, submenu: visibleSub }];
   });
 
+    const handleLogout = async () => {
+      try { await logout().unwrap(); } catch { /* ignore */ }
+      dispatch(clearCredentials());
+      navigate("/login", { replace: true });
+    };
+
   return (
     <div
-      className={`relative flex flex-col justify-center 
+      className={`relative flex flex-col justify-between 
     ${isOpen ? "w-64" : "w-14"} h-[100vh] transition-width duration-300 print:hidden`}
     >
       <button
@@ -289,7 +302,17 @@ const Sidebar = () => {
         <ChevronDown size={17} className={`text-primary-700 font-bold hover:scale-120 transition-transform ${isOpen ? "rotate-90" : "rotate-270"}`} />
       </button>
 
-      {/* menu list */}
+      {/* Top Section */}
+      <div></div>
+      {/* <Link to="/" className="flex-shrink-0">
+       { !isOpen ? (
+        <img src="/icon.png" alt="" className="w-10 py-1 pl-2 mx-auto" />
+       ) : (
+        <img src="/favicon.png" alt="" className="w-auto h-14 px-2 pt-1"  />
+      )}
+      </Link> */}
+
+      {/* Center menu list */}
       <ul className={`py-1 scrollbar-hide ${isOpen ? "overflow-y-auto" : "overflow-visible"}`}>
         {visibleItems.map((item) =>
           item.type === "item" ? (
@@ -306,8 +329,19 @@ const Sidebar = () => {
           ),
         )}
       </ul>
+
+      {/* Bottom Section */}
+      <button
+          onClick={handleLogout}
+          disabled={isLoading}
+          title="Sign out"
+          className={`flex items-center ${isOpen ? "gap-3 px-4" : "justify-center"} py-4  text-sm transition-colors text-[var(--color-danger)] hover:bg-[var(--color-accent-soft)]`}
+        >
+          <LogOut size={17} /> {isOpen && <span>Sign out</span>}
+        </button>
     </div>
   );
-};
+}
+
 
 export default Sidebar;
