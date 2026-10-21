@@ -1,15 +1,26 @@
 import { useCallback, useMemo, useState } from 'react';
-import { useGetEmployeeAttendanceQuery } from '../../store/api';
+import {
+	useGetEmployeeAttendanceQuery,
+	useGetMaintenanceRecordsQuery,
+	useGetPlantShutdownsQuery,
+} from '../../store/api';
+import usePermission from '../../hooks/usePermission';
 import AttendanceCalender from '../components/AttendanceCalender';
 
 const formatDate = (date) => [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
+const unwrapList = (value) => Array.isArray(value) ? value : value?.data ?? [];
 const parseDate = (value) => {
 	if (!value) return null;
 	const [year, month, day] = String(value).slice(0, 10).split('-').map(Number);
 	return year && month && day ? new Date(year, month - 1, day) : null;
 };
 
-const EmployeeAttendance = ({ employeeId, joiningDate }) => {
+const EmployeeAttendance = ({ employeeId, joiningDate, plantId }) => {
+	const { can } = usePermission();
+	const canViewShutdowns = can('plant-shutdowns', 'view');
+	const canViewMaintenance = can('maintenance', 'view')
+		|| can('maintenance-records', 'view')
+		|| can('maintenance-report', 'view');
 	const [month, setMonth] = useState(() => {
 		const today = new Date();
 		return new Date(today.getFullYear(), today.getMonth(), 1);
@@ -40,6 +51,20 @@ const EmployeeAttendance = ({ employeeId, joiningDate }) => {
 		{ skip: !employeeId || !validDateRange },
 	);
 	const records = useMemo(() => Array.isArray(query.data?.data) ? query.data.data : [], [query.data]);
+	const shutdownsQuery = useGetPlantShutdownsQuery({
+		plant_id: plantId,
+		start_date: formatDate(dateFrom),
+		end_date: formatDate(dateTo),
+		per_page: 100,
+	}, { skip: !employeeId || !plantId || !validDateRange || !canViewShutdowns });
+	const maintenanceRecordsQuery = useGetMaintenanceRecordsQuery({
+		plant_id: plantId,
+		from_date: formatDate(dateFrom),
+		to_date: formatDate(dateTo),
+		per_page: 100,
+	}, { skip: !employeeId || !plantId || !validDateRange || !canViewMaintenance });
+	const shutdowns = useMemo(() => unwrapList(shutdownsQuery.data), [shutdownsQuery.data]);
+	const maintenanceRecords = useMemo(() => unwrapList(maintenanceRecordsQuery.data), [maintenanceRecordsQuery.data]);
 
 	// Shared bounds calculation — eliminates duplication between changeMonth and changeYear
 	const getMonthBounds = useCallback(() => {
@@ -80,6 +105,8 @@ const EmployeeAttendance = ({ employeeId, joiningDate }) => {
 				onMonthChange={changeMonth}
 				onYearChange={changeYear}
 				records={records}
+				shutdowns={shutdowns}
+				maintenanceRecords={maintenanceRecords}
 				isLoading={query.isLoading}
 				error={query.isError}
 				onRetry={query.refetch}
