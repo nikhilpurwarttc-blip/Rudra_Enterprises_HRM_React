@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Plus, RefreshCw } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import Button from '../../../components/Button';
 import { InlineError, LoadingState } from '../../../components/Feedback';
 import SearchableSelect from '../../../components/SearchableSelect';
 import SectionCard from '../../../components/SectionCard';
+import InputField from '../../../components/InputField';
 
 const toNextDate = (date) => {
   if (!date) return '';
@@ -30,6 +31,17 @@ const formatAmount = (amount) => Number(amount ?? 0).toLocaleString('en-IN', {
   maximumFractionDigits: 2,
 });
 
+const formatSalaryInput = (value) => {
+  const normalized = value.replace(/[^\d.]/g, '');
+  const decimalIndex = normalized.indexOf('.');
+  const whole = decimalIndex < 0 ? normalized : normalized.slice(0, decimalIndex);
+  const fraction = decimalIndex < 0 ? '' : normalized.slice(decimalIndex + 1).replace(/\./g, '').slice(0, 2);
+  const formattedWhole = whole
+    ? Number(whole).toLocaleString('en-IN', { maximumFractionDigits: 0 })
+    : '';
+  return decimalIndex < 0 ? formattedWhole : `${formattedWhole}.${fraction}`;
+};
+
 const EmployeeSalarySection = ({
   employeeId,
   salaries,
@@ -50,6 +62,7 @@ const EmployeeSalarySection = ({
   const [effectiveFrom, setEffectiveFrom] = useState('');
   const [includeInPayroll, setIncludeInPayroll] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
   const [success, setSuccess] = useState('');
   const [chargesError, setChargesError] = useState('');
   const [chargesSuccess, setChargesSuccess] = useState('');
@@ -75,13 +88,25 @@ const EmployeeSalarySection = ({
     setError('');
     setSuccess('');
 
-    const amount = Number(monthlySalary);
+    const amount = Number(monthlySalary.replace(/,/g, ''));
+    const nextErrors = {};
     if (!Number.isFinite(amount) || amount <= 0) {
-      setError('Enter a monthly salary greater than zero.');
-      return;
+      nextErrors.monthly_salary = 'Enter a monthly salary greater than zero.';
     }
-    if (!effectiveFrom || (minEffectiveFrom && effectiveFrom < minEffectiveFrom)) {
-      setError(`Choose an effective-from date on or after ${minEffectiveFrom || 'a valid date'}.`);
+    if (!effectiveFrom) {
+      nextErrors.effective_from = 'Effective-from date is required.';
+    } else if (minEffectiveFrom && effectiveFrom < minEffectiveFrom) {
+      nextErrors.effective_from = `Choose a date on or after ${minEffectiveFrom}.`;
+    }
+    setFieldErrors(nextErrors);
+    if (Object.keys(nextErrors).length) {
+      requestAnimationFrame(() => {
+        const invalidField = document.querySelector(
+          'form[data-employee-section="salary"] input[aria-invalid="true"]',
+        );
+        invalidField?.focus({ preventScroll: true });
+        invalidField?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
       return;
     }
 
@@ -95,6 +120,7 @@ const EmployeeSalarySection = ({
       });
       setMonthlySalary('');
       setEffectiveFrom('');
+      setFieldErrors({});
       setIncludeInPayroll(true);
       setSuccess('Salary entry saved.');
     } catch (saveError) {
@@ -207,31 +233,35 @@ const EmployeeSalarySection = ({
       </SectionCard>
 
       <SectionCard title="Add salary / increment" >
-        <form onSubmit={handleSave} className="space-y-4">
+        <form onSubmit={handleSave} className="space-y-4" data-employee-section="salary">
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block text-sm font-medium text-(--color-text)">
-              Monthly salary (₹)
-              <input
-                type="number"
-                min="0.01"
-                step="0.01"
-                value={monthlySalary}
-                onChange={(event) => setMonthlySalary(event.target.value)}
-                required
-                className="mt-1 block w-full rounded-lg border border-(--color-border) bg-(--color-bg-elevated) px-3 py-2 text-(--color-text) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent)"
-              />
-            </label>
-            <label className="block text-sm font-medium text-(--color-text)">
-              Effective from
-              <input
-                type="date"
-                min={minEffectiveFrom || undefined}
-                value={effectiveFrom}
-                onChange={(event) => setEffectiveFrom(event.target.value)}
-                required
-                className="mt-1 block w-full rounded-lg border border-(--color-border) bg-(--color-bg-elevated) px-3 py-2 text-(--color-text) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent)"
-              />
-            </label>
+            <InputField
+              label="Monthly salary"
+              type="text"
+              inputMode="decimal"
+              value={monthlySalary}
+              onChange={(event) => {
+                setMonthlySalary(formatSalaryInput(event.target.value));
+                setFieldErrors((current) => ({ ...current, monthly_salary: undefined }));
+              }}
+              leftIcon={<span aria-hidden="true">₹</span>}
+              error={fieldErrors.monthly_salary}
+              required
+              // className="w-full rounded-lg bg-(--color-bg-elevated)"
+            />
+            <InputField
+              label="Effective from"
+              type="date"
+              min={minEffectiveFrom || undefined}
+              value={effectiveFrom}
+              onChange={(event) => {
+                setEffectiveFrom(event.target.value);
+                setFieldErrors((current) => ({ ...current, effective_from: undefined }));
+              }}
+              error={fieldErrors.effective_from}
+              required
+              // className="w-full rounded-lg bg-(--color-bg-elevated)"
+            />
           </div>
           <label className="flex items-center gap-2 text-sm text-(--color-text)">
             <input

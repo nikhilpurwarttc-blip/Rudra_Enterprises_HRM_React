@@ -76,6 +76,8 @@ const AttendanceReport = () => {
 	gridEnd.setDate(gridStart.getDate() + 41);
 	const dateFrom = formatDate(gridStart);
 	const dateTo = formatDate(gridEnd);
+	const summaryDateFrom = formatDate(new Date(month.getFullYear(), month.getMonth(), 1));
+	const summaryDateTo = formatDate(new Date(month.getFullYear(), month.getMonth() + 1, 0));
 	const selectedPlantId = selectedEmployeeRecord?.plant_id ?? selectedEmployeeRecord?.plant?.id;
 	const shutdownsQuery = useGetPlantShutdownsQuery({
 		plant_id: selectedPlantId,
@@ -93,31 +95,18 @@ const AttendanceReport = () => {
 	const maintenanceRecords = unwrap(maintenanceRecordsQuery.data);
 
 	const attendanceQuery = useGetEmployeeAttendanceQuery(
-		{ employeeId: selectedEmployee, date_from: dateFrom, date_to: dateTo, per_page: 100 },
+		{
+			employeeId: selectedEmployee,
+			date_from: dateFrom,
+			date_to: dateTo,
+			summary_date_from: summaryDateFrom,
+			summary_date_to: summaryDateTo,
+			per_page: 100,
+		},
 		{ skip: !selectedEmployee },
 	);
 	const records = useMemo(() => unwrap(attendanceQuery.data), [attendanceQuery.data]);
-
-	const stats = useMemo(() => {
-		const grouped = new Map();
-		records.forEach((rec) => {
-			const key = String(rec.attendance_date ?? '').slice(0, 10);
-			if (!key) return;
-			const day = grouped.get(key) ?? { statuses: [], overtime: 0, worked: 0 };
-			day.statuses.push(Number(rec.status));
-			day.overtime += Number(rec.overtime_hours) || 0;
-			day.worked += Number(rec.actual_worked_hours) || 0;
-			grouped.set(key, day);
-		});
-		let present = 0, absent = 0, totalOT = 0, totalWorked = 0;
-		grouped.forEach((day) => {
-			if (day.statuses.includes(1)) present += 1;
-			else if (day.statuses.includes(0)) absent += 1;
-			totalOT += day.overtime;
-			totalWorked += day.worked;
-		});
-		return { present, absent, totalOT: totalOT.toFixed(1), totalWorked: totalWorked.toFixed(1) };
-	}, [records]);
+	const stats = attendanceQuery.currentData?.stats;
 
 	const handleMonthChange = (offset) => {
 		if (offset === 0) {
@@ -152,7 +141,7 @@ const AttendanceReport = () => {
 					<h1 className="mt-1 text-lg font-semibold text-(--color-text)">Employees <span className="ml-1 text-xs font-normal text-(--color-text-muted)">{filteredEmployees.length}</span></h1>
 					<div className="mt-4 flex items-center gap-2">
 						<InputField
-							className="min-w-0 flex-1"
+							className="min-w-0 h-8 flex-1"
 							aria-label="Search employees"
 							value={employeeSearch}
 							onChange={(event) => setEmployeeSearch(event.target.value)}
@@ -235,10 +224,10 @@ const AttendanceReport = () => {
 							{selectedEmployeeRecord?.employee_code && <p className="text-sm text-(--color-text-muted)">{selectedEmployeeRecord.employee_code}</p>}
 						</div> */}
 						<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-							<StatCard icon={UserCheck} label="Present Days" value={stats.present} colorClass="bg-emerald-500/10 text-emerald-600" />
-							<StatCard icon={UserX} label="Absent Days" value={stats.absent} colorClass="bg-rose-500/10 text-rose-600" />
-							<StatCard icon={Clock3} label="Total OT Hours" value={`${stats.totalOT}h`} colorClass="bg-amber-500/10 text-amber-600" />
-							<StatCard icon={Clock} label="Total Worked Hours" value={`${stats.totalWorked}h`} colorClass="bg-sky-500/10 text-sky-600" />
+							<StatCard icon={UserCheck} label="Present Days" value={stats ? stats.present : '—'} colorClass="bg-emerald-500/10 text-emerald-600" />
+							<StatCard icon={UserX} label="Absent Days" value={stats ? stats.absent : '—'} colorClass="bg-rose-500/10 text-rose-600" />
+							<StatCard icon={Clock3} label="Total OT Hours" value={stats ? `${Number(stats.total_ot_hours).toFixed(1)}h` : '—'} colorClass="bg-amber-500/10 text-amber-600" />
+							<StatCard icon={Clock} label="Total Worked Hours" value={stats ? `${Number(stats.total_worked_hours).toFixed(1)}h` : '—'} colorClass="bg-sky-500/10 text-sky-600" />
 						</div>
 						<AttendanceCalender
 							month={month}

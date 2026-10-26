@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BadgeCheck, CheckCheck, Clock3, LoaderCircle, LogIn, LogOut, Power, RefreshCw, RotateCcw, Search, UserRoundCheck, UserRoundX, Users, XCircle } from 'lucide-react';
 import {
   useApproveAllAttendanceMutation,
@@ -374,11 +374,9 @@ const Marking = () => {
           shift_id: employee.shift_id,
           attendance_date: getLocalDate(),
         }).unwrap();
-        await refetchAttendanceRoster();
         toast(`${employee.name} checked in.`, 'success');
       } else {
         await checkOut({ attendance_id: employee.attendance.id }).unwrap();
-        await refetchAttendanceRoster();
         toast(`${employee.name} checked out.`, 'success');
       }
     } catch (error) {
@@ -390,7 +388,7 @@ const Marking = () => {
         return next;
       });
     }
-  }, [activeShutdowns, checkIn, checkOut, effectivePlant, hasPendingShutdown, refetchAttendanceRoster, toast]);
+  }, [activeShutdowns, checkIn, checkOut, effectivePlant, hasPendingShutdown, toast]);
 
   const confirmShutdownPresence = async () => {
     const employee = pendingPresenceEmployee;
@@ -473,9 +471,6 @@ const Marking = () => {
       toast(getApiErrorMessage(error, 'Unable to declare plant shutdown.'), 'error');
     }
   };
-
-  const busyRef = useRef(busyEmployeeActions);
-  useEffect(() => { busyRef.current = busyEmployeeActions; }, [busyEmployeeActions]);
 
   const columns = useMemo(() => [
     {
@@ -584,7 +579,7 @@ const Marking = () => {
             <UserRoundX size={15} />
           </button>
         ) : null;
-        const busyAction = busyRef.current[employee.id];
+        const busyAction = busyEmployeeActions[employee.id];
         if (busyAction) {
           const busyLabel = busyAction === 'approve' ? 'Approving...' : busyAction === 'absent' ? 'Marking absent...' : busyAction === 'present' ? 'Marking present...' : busyAction === 'undo' ? 'Undoing...' : busyAction === 'in' ? 'Punching in...' : 'Punching out...';
           return (
@@ -661,7 +656,7 @@ const Marking = () => {
         );
       },
     },
-  ], [canApproveAttendance, canRejectAttendance, departmentMap, handleApproveAttendance, hasPendingShutdown, plantMap, recordPunch, shiftMap, undoShutdownPresence]);
+  ], [busyEmployeeActions, canApproveAttendance, canRejectAttendance, departmentMap, handleApproveAttendance, hasPendingShutdown, plantMap, recordPunch, shiftMap, undoShutdownPresence]);
 
   return (
     <div className="flex h-full flex-col gap-4 p-4 sm:p-6 overflow-y-auto">

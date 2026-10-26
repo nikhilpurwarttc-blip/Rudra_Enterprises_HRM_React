@@ -49,8 +49,8 @@ const EmployeeApprovalActions = ({ employee }) => {
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2">
-        {status != 1 && <span className={`rounded-full px-3 py-1 text-xs font-semibold ${status === 1
+      <div className="flex flex-wrap items-center gap-[1px]">
+        {/* {status != 1 && <span className={`rounded-full px-3 py-1 mr-2 text-xs font-semibold ${status === 1
             ? 'bg-emerald-100 text-emerald-700'
             : status === 2
               ? 'bg-red-100 text-red-700'
@@ -58,7 +58,7 @@ const EmployeeApprovalActions = ({ employee }) => {
           }`}>
           {statusLabel}
         </span>
-        }
+        } */}
         {status === 2 && rejectionReason && (
           <span className="text-xs text-red-700 dark:text-red-300" title={rejectionReason}>
             Reason: {rejectionReason}
@@ -69,9 +69,9 @@ const EmployeeApprovalActions = ({ employee }) => {
             type="button"
             onClick={handleApprove}
             disabled={approving || rejecting}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center justify-center gap-1.5 rounded-l-full bg-gradient-to-b from-emerald-500 to-emerald-700 px-3 py-1 text-xs font-semibold text-white border-t border-emerald-400 shadow-md shadow-emerald-900/30 hover:from-emerald-600 hover:to-emerald-800 active:translate-y-0.5 active:shadow-none disabled:cursor-not-allowed disabled:opacity-60 transition-all"
           >
-            <Check size={14} /> {approving ? 'Approving…' : 'Approve'}
+            <Check size={14} aria-hidden="true" /> {approving ? 'Approving…' : 'Approve'}
           </button>
         )}
         {status === 0 && canReject && (
@@ -79,9 +79,9 @@ const EmployeeApprovalActions = ({ employee }) => {
             type="button"
             onClick={() => setRejectOpen(true)}
             disabled={approving || rejecting}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center justify-center gap-1.5 rounded-r-full bg-gradient-to-b from-red-500 to-red-700 px-3 py-1 text-xs font-semibold text-white border-t border-red-400 shadow-md shadow-red-900/30 hover:from-red-600 hover:to-red-800 active:translate-y-0.5 active:shadow-none disabled:cursor-not-allowed disabled:opacity-60 transition-all"
           >
-            <X size={14} /> Reject
+            <X size={14} aria-hidden="true" /> Reject
           </button>
         )}
       </div>

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState, memo } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { CalendarDays, Download, Filter, LoaderCircle, MoreVertical, Pencil, Plus, Printer, RefreshCw, Search, UserRound, IdCard, WalletCards, Trash2 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -28,19 +29,19 @@ import ConfirmDelete from '../../components/ConfirmDelete';
 import InputField from '../../components/InputField';
 import FilterModal from '../../components/FilterModal';
 import Switch from '../../components/Switch';
-import { Feedback } from '../../components/Feedback';
-import AddEditEmployee from './AddEditEmployee';
-import EmployeeProfile from './EmployeeProfile';
-import EmployeeAttendance from './EmployeeAttendance';
-import EmployeeSalary from './EmployeeSalary';
+import { Feedback, LoadingState } from '../../components/Feedback';
 import EmployeeAvatar from './components/EmployeeAvatar';
 import { getApiErrorMessage } from '../../components/feedbackUtils';
 import { useRenderPerformance } from '../../utils/performance';
 import { selectRole } from '../../store/authSlice';
 import useRefreshOnFocus from '../../hooks/useRefreshOnFocus';
 
+const AddEditEmployee = lazy(() => import('./AddEditEmployee'));
+const EmployeeProfile = lazy(() => import('./EmployeeProfile'));
+const EmployeeAttendance = lazy(() => import('./EmployeeAttendance'));
+const EmployeeSalary = lazy(() => import('./EmployeeSalary'));
+
 const unwrap = (value) => Array.isArray(value) ? value : value?.data ?? [];
-const isSafeUrl = (url) => /^https?:\/\//i.test(String(url ?? ''));
 const matchesEmployeeSearch = (employee, query) => {
   const normalizedQuery = query.toLocaleLowerCase();
   return [
@@ -130,12 +131,13 @@ const Employees = () => {
   });
   const plantFilter = employeeFilters.plants;
   const [menuEmployeeId, setMenuEmployeeId] = useState(null);
-  const [menuPosition, setMenuPosition] = useState(null); // { x, y, fromButton: bool }
+  const [menuPosition, setMenuPosition] = useState(null);
   const [pageMenuPosition, setPageMenuPosition] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [statusTarget, setStatusTarget] = useState(null);
   const [relievingDate, setRelievingDate] = useState('');
   const menuRef = useRef(null);
+  const activeTriggerRef = useRef(null);
   const pageMenuRef = useRef(null);
   const filterTriggerRef = useRef(null);
   const [savingStatusIds, setSavingStatusIds] = useState({});
@@ -202,11 +204,6 @@ const Employees = () => {
   const { data: employeeAccountsData, isLoading: employeeAccountsLoading } = useGetEmployeeBankAccountsQuery(workflowEmployeeId, { skip: !workflowEmployeeId });
   const employeeDocuments = unwrap(employeeDocumentsData);
   const employeeAccounts = unwrap(employeeAccountsData);
-  // const removedActiveView = location.pathname.endsWith('/attendance')
-  //   ? 'attendance'
-  //   : location.pathname.endsWith('/salary')
-  //     ? 'salary'
-  //     : 'profile';
 
   useRenderPerformance('getEmployees', loadedEmployees);
 
@@ -227,7 +224,7 @@ const Employees = () => {
     }
   }, []);
 
-  const loadEmployeePages = useCallback(async (startPage, query, plantIds, replace = false, version = requestVersion.current, { silent = false } = {}) => {
+  const loadEmployeePages = useCallback(async (startPage, query, plantIds, replace = false, version = requestVersion.current, { silent = false, preferCache = true } = {}) => {
     if (loadingEmployees.current) return;
 
     loadingEmployees.current = true;
@@ -242,7 +239,10 @@ const Employees = () => {
         let page = startPage;
         let replacePage = shouldReplace;
         while (version === requestVersion.current) {
-          const response = await fetchEmployees({ page, per_page: 100, search: query, plant_id: plantId }).unwrap();
+          const response = await fetchEmployees(
+            { page, per_page: 100, search: query, plant_id: plantId },
+            preferCache,
+          ).unwrap();
           if (version !== requestVersion.current) break;
 
           const pageEmployees = unwrap(response);
@@ -338,7 +338,7 @@ const Employees = () => {
     if (!silent) setBackgroundRefreshing(false);
     setHasLoadError(false);
     if (silent) setBackgroundRefreshing(true);
-    loadEmployeePages(1, query, plantFilter, true, version, { silent })
+    loadEmployeePages(1, query, plantFilter, true, version, { silent, preferCache: false })
       .finally(() => {
         if (silent && version === requestVersion.current) setBackgroundRefreshing(false);
       });
@@ -347,12 +347,119 @@ const Employees = () => {
 
   const isSearchPending = debouncedSearch !== search.trim();
   const isEmployeeLoading = isSearchPending || isLoading || (isFetching && !backgroundRefreshing);
+  const menuEmployee = displayEmployeesData.find(
+    (employee) => String(employee.id) === String(menuEmployeeId),
+  );
 
   const openEmployeeView = (employee, view = 'profile') => {
-    setMenuEmployeeId(null);
-    setMenuPosition(null);
+    closeMenu();
     navigate(view === 'profile' ? `/employees/${employee.id}` : `/employees/${employee.id}/${view}`);
   };
+
+  // Robust menu closing & positioning
+  const closeMenu = useCallback(() => {
+    setMenuEmployeeId(null);
+    setMenuPosition(null);
+    activeTriggerRef.current = null;
+  }, []);
+
+  const handleMenuToggle = (event, employee, isContextMenu = false) => {
+    event.stopPropagation();
+    if (isContextMenu) event.preventDefault();
+    setPageMenuPosition(null);
+
+    if (!isContextMenu && String(menuEmployeeId) === String(employee.id)) {
+      closeMenu();
+      return;
+    }
+
+    activeTriggerRef.current = isContextMenu ? null : event.currentTarget;
+    if (isContextMenu) {
+      setMenuPosition({ x: event.clientX, y: event.clientY, fromButton: false });
+    } else {
+      const buttonRect = event.currentTarget.getBoundingClientRect();
+      setMenuPosition({
+        x: buttonRect.right,
+        y: buttonRect.bottom + 4,
+        buttonTop: buttonRect.top,
+        fromButton: true,
+      });
+    }
+
+    setMenuEmployeeId(String(employee.id));
+  };
+
+  useLayoutEffect(() => {
+    if (!menuPosition || !menuRef.current) return undefined;
+
+    const positionMenu = () => {
+      const menu = menuRef.current;
+      if (!menu) return;
+
+      const { width, height } = menu.getBoundingClientRect();
+      const margin = 12;
+      const viewportWidth = document.documentElement.clientWidth;
+      const viewportHeight = document.documentElement.clientHeight;
+      let left = menuPosition.fromButton ? menuPosition.x - width : menuPosition.x;
+      let top = menuPosition.y;
+
+      if (top + height > viewportHeight - margin) {
+        top = menuPosition.fromButton
+          ? menuPosition.buttonTop - height - 4
+          : menuPosition.y - height;
+      }
+
+      left = Math.max(margin, Math.min(left, viewportWidth - width - margin));
+      top = Math.max(margin, Math.min(top, viewportHeight - height - margin));
+      menu.style.left = `${left}px`;
+      menu.style.top = `${top}px`;
+      menu.style.visibility = 'visible';
+    };
+
+    positionMenu();
+    window.addEventListener('resize', positionMenu);
+    const closeOnScroll = (event) => {
+      if (!menuRef.current?.contains(event.target)) closeMenu();
+    };
+    document.addEventListener('scroll', closeOnScroll, true);
+
+    return () => {
+      window.removeEventListener('resize', positionMenu);
+      document.removeEventListener('scroll', closeOnScroll, true);
+    };
+  }, [menuEmployeeId, menuPosition, closeMenu]);
+
+  useEffect(() => {
+    if (menuEmployeeId !== null && !menuEmployee) closeMenu();
+  }, [closeMenu, menuEmployee, menuEmployeeId]);
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(event.target) &&
+        !event.target.closest('[data-employee-menu-trigger]') &&
+        (!activeTriggerRef.current || !activeTriggerRef.current.contains(event.target))
+      ) {
+        closeMenu();
+      }
+      if (!event.target.closest('[data-page-context-menu]')) setPageMenuPosition(null);
+    };
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        closeMenu();
+        setPageMenuPosition(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [closeMenu]);
 
   // Optimistic status toggle — single Map update instead of two array maps
   const patchEmployee = useCallback((employeeId, patch) => {
@@ -468,64 +575,26 @@ const Employees = () => {
     setPageMenuPosition(null);
   };
 
-  // Use a ref to avoid stale closure over menuEmployeeId
-  const menuEmployeeIdRef = useRef(null);
-  useEffect(() => { menuEmployeeIdRef.current = menuEmployeeId; }, [menuEmployeeId]);
-
-  // Clamp menu into viewport after it renders — handles both right-click and three-dot button
-  useEffect(() => {
-    if (!menuPosition || !menuRef.current) return;
-    const menu = menuRef.current;
-    const { width, height } = menu.getBoundingClientRect();
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const MARGIN = 6;
-
-    let left = menuPosition.fromButton ? menuPosition.x - width : menuPosition.x + 4;
-    let top  = menuPosition.fromButton ? menuPosition.y : menuPosition.y + 4;
-
-    // Flip left if overflows right edge
-    if (left + width + MARGIN > vw) left = menuPosition.x - width;
-    // Clamp to left edge
-    if (left < MARGIN) left = MARGIN;
-    // Flip up if overflows bottom edge
-    if (top + height + MARGIN > vh) top = menuPosition.y - height;
-    // Clamp to top edge
-    if (top < MARGIN) top = MARGIN;
-
-    menu.style.left = `${left}px`;
-    menu.style.top  = `${top}px`;
-    menu.style.visibility = 'visible';
-  }, [menuPosition, menuEmployeeId]);
-
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!pageMenuPosition || !pageMenuRef.current) return;
-    const menu = pageMenuRef.current;
-    const { width, height } = menu.getBoundingClientRect();
-    const margin = 6;
-    menu.style.left = `${Math.max(margin, Math.min(pageMenuPosition.x + 4, window.innerWidth - width - margin))}px`;
-    menu.style.top = `${Math.max(margin, Math.min(pageMenuPosition.y + 4, window.innerHeight - height - margin))}px`;
-    menu.style.visibility = 'visible';
-  }, [pageMenuPosition]);
 
-  useEffect(() => {
-    const closeMenuWhenClickingOutside = (event) => {
-      if (menuEmployeeIdRef.current && !event.target.closest('[data-employee-menu]')) {
-        setMenuEmployeeId(null);
-        setMenuPosition(null);
-      }
-      if (!event.target.closest('[data-page-context-menu]')) setPageMenuPosition(null);
+    const positionMenu = () => {
+      const menu = pageMenuRef.current;
+      if (!menu) return;
+
+      const { width, height } = menu.getBoundingClientRect();
+      const margin = 8;
+      const viewportWidth = document.documentElement.clientWidth;
+      const viewportHeight = document.documentElement.clientHeight;
+      menu.style.left = `${Math.max(margin, Math.min(pageMenuPosition.x + 4, viewportWidth - width - margin))}px`;
+      menu.style.top = `${Math.max(margin, Math.min(pageMenuPosition.y + 4, viewportHeight - height - margin))}px`;
+      menu.style.visibility = 'visible';
     };
-    const closePageMenuOnEscape = (event) => {
-      if (event.key === 'Escape') setPageMenuPosition(null);
-    };
-    document.addEventListener('mousedown', closeMenuWhenClickingOutside);
-    document.addEventListener('keydown', closePageMenuOnEscape);
-    return () => {
-      document.removeEventListener('mousedown', closeMenuWhenClickingOutside);
-      document.removeEventListener('keydown', closePageMenuOnEscape);
-    };
-  }, []);
+
+    positionMenu();
+    window.addEventListener('resize', positionMenu);
+    return () => window.removeEventListener('resize', positionMenu);
+  }, [pageMenuPosition]);
 
   const handleSave = async (payload) => {
     try {
@@ -607,22 +676,24 @@ const Employees = () => {
       onContextMenu={(event) => {
         if (event.target.closest('[data-page-context-menu]')) return;
         event.preventDefault();
-        setMenuEmployeeId(null);
-        setMenuPosition(null);
+        closeMenu();
         setPageMenuPosition({ x: event.clientX, y: event.clientY });
       }}
     >
-      {pageMenuPosition && (
+      {pageMenuPosition && createPortal(
         <div
           ref={pageMenuRef}
           data-page-context-menu
           role="menu"
           aria-label="Employee list actions"
-          className="fixed z-50 w-60 rounded-lg border border-(--color-border) bg-(--color-surface-strong) p-1.5 shadow-xl"
+          className="fixed z-50 w-54 rounded-2xl border border-(--color-border) bg-(--color-surface-strong) p-1.5 shadow-xl"
           style={{ left: pageMenuPosition.x, top: pageMenuPosition.y, visibility: 'hidden' }}
-          onContextMenu={(event) => event.preventDefault()}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
         >
-          <label className="mb-1 flex items-center gap-2 rounded-md border border-(--color-border) px-2.5 py-2">
+          <label className="mb-1 flex items-center gap-2 rounded-xl border border-(--color-border) px-2.5 py-2">
             <Search size={15} className="shrink-0 text-(--color-text-muted)" />
             <input
               autoFocus
@@ -648,10 +719,65 @@ const Employees = () => {
           <button type="button" role="menuitem" onClick={exportEmployeesCsv} disabled={displayEmployeesData.length === 0} className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-sm text-(--color-text) hover:bg-(--color-accent-soft) disabled:cursor-not-allowed disabled:opacity-50">
             <Download size={15} /> Export As CSV
           </button>
-          <button type="button" role="menuitem" onClick={() => { setPageMenuPosition(null); navigate('/employees/barcodes'); }} className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-sm text-(--color-text) hover:bg-(--color-accent-soft)">
+          <button type="button" role="menuitem" onClick={() => { setPageMenuPosition(null); navigate('/employees/barcodes'); }} className="flex w-full items-center gap-2 rounded rounded-b-xl px-2.5 py-2 text-left text-sm text-(--color-text) hover:bg-(--color-accent-soft)">
             <Printer size={15} /> Print Barcodes
           </button>
-        </div>
+        </div>,
+        document.body,
+      )}
+      {menuEmployee && menuPosition && createPortal(
+        <div
+          ref={menuRef}
+          data-employee-menu
+          role="menu"
+          aria-label={`${menuEmployee.name} actions`}
+          style={{
+            position: 'fixed',
+            left: menuPosition.x,
+            top: menuPosition.y,
+            visibility: 'hidden',
+            zIndex: 50,
+            maxHeight: 'calc(100vh - 24px)',
+            overflowY: 'auto',
+          }}
+          className="w-48 max-w-[calc(100vw-24px)] rounded-2xl border border-(--color-border) bg-(--color-surface-strong) shadow-xl backdrop-blur-xl"
+          onClick={(event) => event.stopPropagation()}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
+        >
+          <button type="button" role="menuitem" onClick={() => openEmployeeView(menuEmployee)} className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition-colors hover:bg-(--color-accent-soft)"><IdCard size={18} /> Profile</button>
+          <button type="button" role="menuitem" onClick={() => openEmployeeView(menuEmployee, 'attendance')} className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition-colors hover:bg-(--color-accent-soft)"><CalendarDays size={15} /> Attendance</button>
+          <button type="button" role="menuitem" onClick={() => openEmployeeView(menuEmployee, 'salary')} className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition-colors hover:bg-(--color-accent-soft)"><WalletCards size={15} /> Salary</button>
+          {canEdit && !isReadOnly && (
+            <button type="button" role="menuitem" onClick={() => { closeMenu(); navigate(`/employees/${menuEmployee.id}/edit`); }} className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition-colors hover:bg-(--color-accent-soft)"><Pencil size={15} /> Edit {menuEmployee.name}</button>
+          )}
+          {canDelete && !isReadOnly && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                closeMenu();
+                setDeleteTarget(menuEmployee);
+              }}
+              className="flex w-full items-center gap-2 border-t border-(--color-border)/60 px-3 py-2.5 text-left text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
+            >
+              <Trash2 size={15} /> Delete {menuEmployee.name}
+            </button>
+          )}
+          <div className="flex items-center justify-between gap-2 border-t border-(--color-border)/60 px-3 py-2.5 bg-(--color-bg)/40" onClick={(event) => event.stopPropagation()}>
+            <span className="text-sm font-medium text-(--color-text)">{menuEmployee.status ? 'Active' : 'Inactive'}</span>
+            <Switch
+              checked={Boolean(menuEmployee.status)}
+              disabled={!canEdit || isReadOnly || Boolean(savingStatusIds[menuEmployee.id])}
+              ariaLabel={`${menuEmployee.name} active status`}
+              title={menuEmployee.status ? 'Mark inactive' : 'Mark active'}
+              onClick={() => toggleEmployeeStatus(menuEmployee)}
+            />
+          </div>
+        </div>,
+        document.body,
       )}
       <aside className="flex w-full max-w-sm shrink-0 flex-col border-r border-(--color-border) bg-(--color-bg-elevated) lg:w-92">
         {/* Header */}
@@ -679,7 +805,7 @@ const Employees = () => {
             </div>
           </div>
           <div className="mt-4 flex items-center justify-between gap-2">
-            <InputField className="min-w-0 flex-1" value={search} onChange={handleSearchChange} placeholder="Search employees" leftIcon={<Search size={16} />} rightIcon={isEmployeeLoading && <LoaderCircle size={15} className="animate-spin" />} />
+            <InputField className="min-w-0 min-h-0 h-10 rounded-full" value={search} onChange={handleSearchChange} placeholder="Search employees" leftIcon={<Search size={16} />} rightIcon={isEmployeeLoading && <LoaderCircle size={15} className="animate-spin" />} />
             <FilterModal
               buttonRef={filterTriggerRef}
               title="Filter employees"
@@ -757,109 +883,71 @@ const Employees = () => {
           </div>
         </div>
 
-        {/* main */}
-        <div className="min-h-0 flex-1 overflow-y-auto p-2">
+        {/* main 3D List */}
+        <div className="min-h-0 flex-1 overflow-y-auto p-3 space-y-2">
           {hasLoadError && employeesData.length === 0 && <Feedback type="error" title="Unable to load employees" message="Please refresh the page and try again." />}
           {!isSearchPending && !isLoading && !isFetching && !hasLoadError && employeesData.length === 0 && <p className="py-10 text-center text-sm text-(--color-text-muted)">No employees found.</p>}
-          {displayEmployeesData.map((employee) => (
-            <div
-              key={employee.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => openEmployeeView(employee)}
-              onKeyDown={(event) => event.key === 'Enter' && openEmployeeView(employee)}
-              onContextMenu={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                setMenuEmployeeId(employee.id);
-                setMenuPosition({ x: event.clientX, y: event.clientY, fromButton: false });
-              }}
-              className={`group flex w-full items-center gap-3 rounded-lg border px-3 py-3 text-left transition ${String(id) === String(employee.id) ? 'border-(--color-accent) bg-(--color-accent-soft)' : 'border-transparent hover:border-(--color-border) hover:bg-(--color-accent-soft)'}`}
-            >
-              <EmployeeAvatar employee={employee} className="h-11 w-11 text-sm" />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold text-(--color-text)">{employee.name}</span>
-                <span className="mt-0.5 block truncate text-xs text-(--color-text-muted)">{employee.employee_code} · {employee.plant?.name}</span>
-                <span className="mt-1 block truncate text-xs text-(--color-accent)">{employee.department?.name ?? employee.designation?.name}</span>
-                {employee.approval_status_label && employee.approval_status !== 1 && (
-                  <span className={`mt-1 block truncate text-xs font-medium ${employee.approval_status === 2 ? 'text-red-600' : 'text-amber-700 dark:text-amber-300'}`}>
-                    {employee.approval_status_label}
-                    {employee.approval_status === 2 && employee.rejection_reason ? ` · ${employee.rejection_reason}` : ''}
-                  </span>
-                )}
-              </span>
-              <span
-                className={`h-2 w-2 shrink-0 rounded-full ${employee.status ? 'bg-emerald-500' : 'bg-red-400'}`}
-              />
-              <div className="relative shrink-0">
-                <button
-                  type="button"
-                  aria-label={`Actions for ${employee.name}`}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    if (menuEmployeeId === employee.id) {
-                      setMenuEmployeeId(null);
-                      setMenuPosition(null);
-                    } else {
-                      const rect = event.currentTarget.getBoundingClientRect();
-                      setMenuPosition({ x: rect.right, y: rect.bottom - 2, fromButton: true });
-                      setMenuEmployeeId(employee.id);
-                    }
-                  }}
-                  className="rounded p-1 text-(--color-text-muted) hover:bg-(--color-border) hover:text-(--color-text)"
-                ><MoreVertical size={17} /></button>
-                {menuEmployeeId === employee.id &&
-                <div
-                  ref={menuRef}
-                  data-employee-menu
-                  className="fixed z-20 w-48 rounded-lg border border-(--color-border) bg-(--color-surface-strong) shadow-lg"
-                  style={menuPosition ? { left: menuPosition.x, top: menuPosition.y, visibility: 'hidden' } : undefined}
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  <button type="button" onClick={() => openEmployeeView(employee)} className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-(--color-accent-soft)"><IdCard size={18} /> Profile</button>
-                  <button type="button" onClick={() => openEmployeeView(employee, 'attendance')} className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-(--color-accent-soft)"><CalendarDays size={15} /> Attendance</button>
-                  <button type="button" onClick={() => openEmployeeView(employee, 'salary')} className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-(--color-accent-soft)"><WalletCards size={15} /> Salary</button>
-                    {canEdit && !isReadOnly && <button type="button" onClick={() => { setMenuEmployeeId(null); navigate(`/employees/${employee.id}/edit`); }} className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-(--color-accent-soft)"><Pencil size={15} /> Edit {employee.name}</button>}
-                    {canDelete && !isReadOnly && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMenuEmployeeId(null);
-                          setMenuPosition(null);
-                          setDeleteTarget(employee);
-                        }}
-                        className="flex w-full items-center gap-2 border-t border-(--color-border) px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
-                      >
-                        <Trash2 size={15} /> Delete {employee.name}
-                      </button>
-                    )}
-                  <div className="flex items-center justify-between gap-2 border-t border-(--color-border) px-3 py-2" onClick={(event) => event.stopPropagation()}>
-                    <span className="text-sm text-(--color-text)">{employee.status ? 'Active' : 'Inactive'}</span>
-                    <Switch
-                      checked={Boolean(employee.status)}
-                      disabled={!canEdit || isReadOnly || Boolean(savingStatusIds[employee.id])}
-                      ariaLabel={`${employee.name} active status`}
-                      title={employee.status ? 'Mark inactive' : 'Mark active'}
-                      onClick={() => toggleEmployeeStatus(employee)}
-                    />
-                  </div>
-                </div>}
+          {displayEmployeesData.map((employee) => {
+            const isSelected = String(id) === String(employee.id);
+
+            return (
+              <div
+                key={employee.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => openEmployeeView(employee)}
+                onKeyDown={(event) => event.key === 'Enter' && openEmployeeView(employee)}
+                onContextMenu={(event) => handleMenuToggle(event, employee, true)}
+                className={`group relative my-2 flex w-full items-center gap-3 rounded-2xl border px-3.5 py-3 text-left transition-all duration-300 ${
+                  isSelected
+                    ? 'border-(--color-accent)/80 bg-(--color-accent-soft) shadow-[0_8px_20px_-4px_var(--color-accent-shadow,rgba(0,0,0,0.12)),0_2px_6px_-1px_rgba(0,0,0,0.06)] ring-2 ring-(--color-accent)/30 translate-y-[-1px]'
+                    : 'border-(--color-border)/50 bg-(--color-bg-elevated)/80 shadow-[0_4px_12px_-2px_rgba(0,0,0,0.05),0_1px_3px_rgba(0,0,0,0.02)] hover:border-(--color-accent)/40 hover:bg-(--color-bg-elevated) hover:shadow-[0_8px_24px_-4px_rgba(0,0,0,0.08),0_2px_6px_rgba(0,0,0,0.04)] hover:translate-y-[-2px]'
+                } focus-within:border-(--color-accent) focus-within:bg-(--color-accent-soft)`}
+              >
+                <EmployeeAvatar employee={employee} className="h-11 w-11 text-sm shrink-0 shadow-sm border border-(--color-border)/40" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-(--color-text)">{employee.name}</span>
+                  <span className="mt-0.5 block truncate text-xs text-(--color-text-muted)">{employee.employee_code} · {employee.plant?.name}</span>
+                  <span className="mt-1 block truncate text-xs font-medium text-(--color-accent)">{employee.department?.name ?? employee.designation?.name}</span>
+                  {employee.approval_status_label && employee.approval_status !== 1 && (
+                    <span className={`mt-1 block truncate text-xs font-medium ${employee.approval_status === 2 ? 'text-red-600' : 'text-amber-700 dark:text-amber-300'}`}>
+                      {employee.approval_status_label}
+                      {employee.approval_status === 2 && employee.rejection_reason ? ` · ${employee.rejection_reason}` : ''}
+                    </span>
+                  )}
+                </span>
+                <span
+                  className={`h-2.5 w-2.5 shrink-0 rounded-full shadow-sm ${employee.status ? 'bg-emerald-500 shadow-emerald-500/30 ring-2 ring-emerald-500/20' : 'bg-red-400'}`}
+                />
+                <div className="relative shrink-0">
+                  <button
+                    type="button"
+                    data-employee-menu-trigger
+                    aria-label={`Actions for ${employee.name}`}
+                    onClick={(event) => handleMenuToggle(event, employee, false)}
+                    className="rounded-lg p-1.5 text-(--color-text-muted) transition-colors hover:bg-(--color-border)/60 hover:text-(--color-text)"
+                  >
+                    <MoreVertical size={17} />
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           {hasLoadError && employeesData.length > 0 && <p className="py-3 text-center text-xs text-(--color-text-muted)">Unable to load more employees.</p>}
         </div>
       </aside>
 
       <main className="min-w-0 flex-1 overflow-hidden bg-(--color-bg)">
         <div key={`${id ?? 'none'}-${activeView}`} className="h-full page-enter">
-        {isEditRoute && !selectedEmployee && selectedEmployeeLoading && <p className="p-6 text-sm text-(--color-text-muted)">Loading employee details...</p>}
-        {isEditRoute && !selectedEmployee && selectedEmployeeError && <Feedback type="error" title="Unable to load employee" message="The employee details could not be loaded. Please return to the employee list and try again." />}
-        {(isAddRoute || (isEditRoute && selectedEmployee)) && <AddEditEmployee key={isAddRoute ? `add-${addSessionKey}` : `edit-${selectedEmployee.id}`} employee={isEditRoute ? selectedEmployee : createdEmployee ?? undefined} plants={plants} departments={departments} designations={designations} shifts={shifts} charges={charges} documents={employeeDocuments} accounts={employeeAccounts} documentsLoading={employeeDocumentsLoading} accountsLoading={employeeAccountsLoading} errors={errors} saving={creating || updating} savingDocument={savingDocument} savingAccount={savingAccount} onClose={() => { setCreatedEmployee(null); navigate('/employees'); }} onSubmit={handleSave} onSaveDocument={handleSaveDocument} onDeleteDocument={handleDeleteDocument} onSaveAccount={handleSaveAccount} onDeleteAccount={handleDeleteAccount} />}
-        {!isAddRoute && !isEditRoute && selectedEmployee && activeView === 'profile' && <EmployeeProfile key={selectedEmployee.id} employeeId={selectedEmployee.id} initialEmployee={selectedEmployee} embedded onClose={() => navigate('/employees')} />}
-        {!isAddRoute && !isEditRoute && selectedEmployee && activeView === 'attendance' && <EmployeeAttendance key={selectedEmployee.id} employeeId={selectedEmployee.id} joiningDate={selectedEmployee.joining_date} plantId={selectedEmployee.plant_id ?? selectedEmployee.plant?.id} />}
-        {!isAddRoute && !isEditRoute && selectedEmployee && activeView === 'salary' && <EmployeeSalary key={selectedEmployee.id} employee={selectedEmployee} />}
-        {!isAddRoute && !isEditRoute && !selectedEmployee && <div className="flex h-full items-center justify-center p-8"><div className="max-w-sm text-center text-(--color-text-muted)"><UserRound size={28} className="mx-auto mb-4 text-(--color-accent)" /><h2 className="text-base font-semibold text-(--color-text)">Select an employee</h2><p className="mt-1 text-sm">Choose an employee from the list to view their profile.</p></div></div>}
+          <Suspense fallback={<LoadingState message={isEditRoute ? 'Loading employee form...' : 'Loading employee view...'} className="h-full min-h-0" />}>
+            {!isAddRoute && id && !selectedEmployee && selectedEmployeeLoading && <LoadingState message="Loading employee details..." className="h-full min-h-0" />}
+            {!isAddRoute && id && !selectedEmployee && selectedEmployeeError && <Feedback type="error" title="Unable to load employee" message="The employee details could not be loaded. Please return to the employee list and try again." />}
+            {(isAddRoute || (isEditRoute && selectedEmployee)) && <AddEditEmployee key={isAddRoute ? `add-${addSessionKey}` : `edit-${selectedEmployee.id}`} employee={isEditRoute ? selectedEmployee : createdEmployee ?? undefined} plants={plants} departments={departments} designations={designations} shifts={shifts} charges={charges} documents={employeeDocuments} accounts={employeeAccounts} documentsLoading={employeeDocumentsLoading} accountsLoading={employeeAccountsLoading} errors={errors} saving={creating || updating} savingDocument={savingDocument} savingAccount={savingAccount} onClose={() => { setCreatedEmployee(null); navigate('/employees'); }} onSubmit={handleSave} onSaveDocument={handleSaveDocument} onDeleteDocument={handleDeleteDocument} onSaveAccount={handleSaveAccount} onDeleteAccount={handleDeleteAccount} />}
+            {!isAddRoute && !isEditRoute && selectedEmployee && activeView === 'profile' && <EmployeeProfile key={selectedEmployee.id} employeeId={selectedEmployee.id} initialEmployee={selectedEmployee} embedded onClose={() => navigate('/employees')} />}
+            {!isAddRoute && !isEditRoute && selectedEmployee && activeView === 'attendance' && <EmployeeAttendance key={selectedEmployee.id} employeeId={selectedEmployee.id} joiningDate={selectedEmployee.joining_date} plantId={selectedEmployee.plant_id ?? selectedEmployee.plant?.id} />}
+            {!isAddRoute && !isEditRoute && selectedEmployee && activeView === 'salary' && <EmployeeSalary key={selectedEmployee.id} employee={selectedEmployee} />}
+            {!isAddRoute && !id && !selectedEmployee && <div className="flex h-full items-center justify-center p-8"><div className="max-w-sm text-center text-(--color-text-muted)"><UserRound size={28} className="mx-auto mb-4 text-(--color-accent)" /><h2 className="text-base font-semibold text-(--color-text)">Select an employee</h2><p className="mt-1 text-sm">Choose an employee from the list to view their profile.</p></div></div>}
+          </Suspense>
         </div>
       </main>
 

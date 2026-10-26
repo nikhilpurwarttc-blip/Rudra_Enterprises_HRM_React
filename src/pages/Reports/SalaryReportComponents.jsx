@@ -44,6 +44,79 @@ const formatNumber = (value) =>
     maximumFractionDigits: 2,
   }).format(Number(value) || 0);
 
+const sumValues = (rows, getValue) =>
+  rows.reduce((total, row) => total + (Number(getValue(row)) || 0), 0);
+
+const getTotalValue = (column, rows, activeReport) => {
+  const { key } = column;
+
+  if (key === '_serial') return 'Total';
+  if (key === 'employee_name') return activeReport === 'monthly' ? `${rows.length} employees` : 'Total';
+  if (key === 'plant_name' || key === 'designation_name' || key === 'base_salary' || key === 'current_salary' || key === 'actions') return '';
+
+  if (activeReport === 'monthly') {
+    if (key === 'shutdown_pay') {
+      const shutdownDays = sumValues(rows, (row) => row.shutdown_days);
+      const shutdownPay = sumValues(rows, (row) => row.shutdown_pay);
+      return (
+        <span className="flex w-full items-center justify-between gap-2 leading-tight">
+          <span>{formatNumber(shutdownDays)}</span>
+          <span>{formatCurrency(shutdownPay)}</span>
+        </span>
+      );
+    }
+    if (key === 'total_hours') {
+      return formatNumber(sumValues(rows, (row) => Number(row.regular_hours || 0) + Number(row.overtime_hours || 0)));
+    }
+    if (key === 'advance') {
+      return formatCurrency(sumValues(rows, (row) => Number(row.cash_advance || 0) + Number(row.bank_advance || 0)));
+    }
+    if (key.startsWith('charge-')) {
+      const chargeId = key.slice('charge-'.length);
+      return formatCurrency(sumValues(rows, (row) =>
+        row.charge_breakdown?.find((item) => String(item.id) === chargeId)?.amount));
+    }
+    if (['present_days', 'regular_hours', 'overtime_hours'].includes(key)) {
+      return formatNumber(sumValues(rows, (row) => row[key]));
+    }
+    if ([
+      'current_salary_pay',
+      'base_salary_pay',
+      'overtime_pay',
+      'total_pay',
+      'total_deductions',
+      'furnace_allowance',
+      'net_salary',
+    ].includes(key)) {
+      return formatCurrency(sumValues(rows, (row) => row[key]));
+    }
+    return '';
+  }
+
+  if (activeReport === 'yearly') {
+    if (key.startsWith('months.')) {
+      const monthName = key.slice('months.'.length);
+      return formatCurrency(sumValues(rows, (row) => row.months?.[monthName]));
+    }
+    if (['year_gross', 'year_deductions', 'year_net_salary'].includes(key)) {
+      return formatCurrency(sumValues(rows, (row) => row[key]));
+    }
+    return '';
+  }
+
+  if (key === 'basic_pay') {
+    return formatCurrency(sumValues(rows, (row) => row.basic_pay ?? row.gross_wages));
+  }
+  if (key.startsWith('deductions.')) {
+    const [, typeId, share] = key.split('.');
+    return formatCurrency(sumValues(rows, (row) => row.deductions?.[typeId]?.[share]));
+  }
+  if (['employee_share', 'employer_share', 'total_contribution'].includes(key)) {
+    return formatCurrency(sumValues(rows, (row) => row[key]));
+  }
+  return '';
+};
+
 const MetricCard = ({ icon: Icon, label, value, accent = 'text-(--color-accent)' }) => (
   <GlassCard className="flex min-w-0 items-center gap-2 rounded-xl border border-(--color-border) bg-(--color-surface) px-3 py-2.5">
     <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-(--color-accent-soft) ${accent}`}>
@@ -480,6 +553,19 @@ const SalaryReportTable = ({
     });
   }, [activeReport, visibleRows, employeeSearch, sort]);
 
+  const footerRow = !isLoading && sortedRows.length > 0 ? (
+    <tr className="flex w-full border-t-2 border-(--color-border-strong) bg-(--color-bg-elevated) font-bold text-(--color-text)">
+      {columns.map((column) => (
+        <td
+          key={column.key}
+          className={`flex-1 min-w-0 w-0 px-4 py-3 text-sm last:border-r-0 ${column.tdClass ?? ''}`}
+        >
+          {getTotalValue(column, activeReport === 'monthly' ? sortedRows : rows, activeReport)}
+        </td>
+      ))}
+    </tr>
+  ) : null;
+
   if (activeReport === 'monthly') {
     const monthLabel = payrollMonth
       ? new Date(`${payrollMonth}-01T00:00:00`).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
@@ -723,6 +809,20 @@ const SalaryReportTable = ({
                 ))
               )}
             </tbody>
+            {footerRow && (
+              <tfoot className="sticky bottom-0 z-[60] bg-slate-100 dark:bg-slate-800">
+                <tr className="font-bold text-slate-900 dark:text-slate-100">
+                  {styledColumns.map((column) => (
+                    <td
+                      key={column.key}
+                      className={`whitespace-nowrap border-t-2 border-r border-slate-300 dark:border-slate-700 px-[0.7em] py-[0.5em] last:border-r-0 ${column.bodyBg} ${column.tdClass ?? ''}`}
+                    >
+                      {getTotalValue(column, sortedRows, activeReport)}
+                    </td>
+                  ))}
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
 
@@ -745,6 +845,7 @@ const SalaryReportTable = ({
       label={activeReport === 'statutory' ? 'deduction records' : 'payroll records'}
       emptyText={emptyText}
       isLoading={isLoading}
+      footerRow={footerRow}
     />
     // </div>
   );

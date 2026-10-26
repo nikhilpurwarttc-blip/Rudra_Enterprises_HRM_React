@@ -10,8 +10,11 @@ import {
   ClipboardCheck,
   Clock3,
   FileCheck2,
+  Layers,
+  PieChart,
   RefreshCw,
   ShieldCheck,
+  Sparkles,
   Users,
   WalletCards,
   Wrench,
@@ -26,11 +29,15 @@ import { selectUser } from '../../store/authSlice';
 import { useGetDashboardQuery, useGetPlantsQuery } from '../../store/api';
 import { useSelector } from 'react-redux';
 import {
+  AttendanceDonutChart,
+  DailyPlantAttendanceVisualizer,
   DashboardBarList,
   DashboardEmpty,
   DashboardMetric,
   DashboardPanel,
   DashboardSkeleton,
+  DashboardStatCard,
+  MonthlyDailyPlantAttendanceChart,
 } from './components/DashboardComponents';
 import SearchableSelect from '../../components/SearchableSelect';
 import InputField from '../../components/InputField';
@@ -50,6 +57,14 @@ const today = () => {
   const date = new Date();
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 };
+
+const getDateRangeDays = (start, end) => {
+  if (!start || !end || start > end) return 0;
+  const startTime = Date.parse(`${start}T00:00:00Z`);
+  const endTime = Date.parse(`${end}T00:00:00Z`);
+  return Math.floor((endTime - startTime) / 86400000) + 1;
+};
+
 const numberFormat = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 1 });
 const currencyFormat = new Intl.NumberFormat('en-IN', {
   style: 'currency',
@@ -114,112 +129,151 @@ const DashboardFilters = ({
   plantsLoading,
   plantsError,
   canSelectPlants,
-}) => (
-  <div className="flex flex-wrap items-end gap-2.5">
-    <div className="min-w-36 flex-1 sm:flex-none">
-      <SearchableSelect
-        label="Overview Period"
-        options={[
-          { value: 'today', label: 'Today' },
-          { value: 'month', label: 'Month' },
-          { value: 'financial_year', label: 'Financial year' },
-          { value: 'custom', label: 'Custom range' },
-        ]}
-        value={period}
-        onChange={onPeriodChange}
-        btnClass="min-h-10 rounded-xl bg-white/5  dark:bg-white/[0.03]"
-      />
-    </div>
+}) => {
+  const customRangeTooLong = period === 'custom' && getDateRangeDays(startDate, endDate) > 365;
+  const currentMonthValue = currentMonth();
+  const currentDateValue = today();
+  const currentFinancialYearValue = currentFinancialYear();
 
-    {canSelectPlants && (
-      <div className="min-w-44 flex-1 sm:flex-none">
-        <SearchableSelect
-          label="Plants"
-          ariaLabel="Filter dashboard by plants"
-          options={plantOptions}
-          value={plantIds}
-          onChange={onPlantIdsChange}
-          placeholder="All accessible plants"
-          isLoading={plantsLoading}
-          disabled={Boolean(plantsError)}
-          multiSelect
-          showSearch
-          btnClass="min-h-10 rounded-xl bg-white/5 dark:bg-white/[0.03]"
-        />
-        {plantsError && (
-          <p role="alert" className="mt-1 text-xs text-(--color-danger)">
-            {getErrorMessage(plantsError)}
-          </p>
+  return (
+    <div className="flex flex-col gap-2" >
+      {customRangeTooLong && (
+        <p role="alert" className="px-2 text-xs font-medium text-[var(--color-danger)]">
+          Custom date range is limited to 365 days. Please choose a shorter range.
+        </p>
+      )}
+      <div className="flex flex-wrap items-center justify-end gap-2"> 
+
+        {period === 'month' && (
+          <div>
+            <InputField
+              label="Month"
+              aria-label="Dashboard month"
+              type="month"
+              value={month}
+              max={currentMonthValue}
+              onChange={(event) => {
+                if (event.target.value && event.target.value <= currentMonth()) {
+                  onMonthChange(event.target.value);
+                }
+              }}
+              className="h-10 min-h-10 rounded-xl bg-white/15 dark:bg-white/[0.04] border border-white/20 dark:border-white/10 text-xs font-semibold shadow-[0_2px_6px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,0.2)]"
+            />
+          </div>
         )}
-      </div>
-    )}
 
-    {period === 'month' && (
-      <div>
-        <InputField
-          label="Month"
-          aria-label="Dashboard month"
-          type="month"
-          value={month}
-          onChange={(event) => {
-            if (event.target.value) onMonthChange(event.target.value);
-          }}
-          className="min-h-10 rounded-xl bg-white/5 dark:bg-white/[0.03]"
-        />
-      </div>
-    )}
+        {period === 'financial_year' && (
+          <div>
+            <SearchableSelect
+              label="Financial year"
+              ariaLabel="Financial year start"
+              options={Array.from({ length: 8 }, (_, index) => {
+                const year = Number(currentFinancialYearValue.slice(0, 4)) - index;
+                return {
+                  value: `${year}-${String((year + 1) % 100).padStart(2, '0')}`,
+                  label: `${year}-${String((year + 1) % 100).padStart(2, '0')}`,
+                };
+              })}
+              value={financialYear}
+              onChange={(value) => {
+                if (value <= currentFinancialYear()) onFinancialYearChange(value);
+              }}
+              className="min-w-38"
+              btnClass="h-10 min-h-10 rounded-xl bg-white/15 dark:bg-white/[0.04] border border-white/20 dark:border-white/10 text-xs font-semibold shadow-[0_2px_6px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,0.2)]"
+            />
+          </div>
+        )}
 
-    {period === 'financial_year' && (
-      <div>
-        <SearchableSelect
-          label="Financial year"
-          ariaLabel="Financial year start"
-          options={Array.from({ length: 8 }, (_, index) => {
-            const year = new Date().getFullYear() - index;
-            return {
-              value: `${year}-${String((year + 1) % 100).padStart(2, '0')}`,
-              label: `${year}-${String((year + 1) % 100).padStart(2, '0')}`,
-            };
-          })}
-          value={financialYear}
-          onChange={onFinancialYearChange}
-          btnClass="min-h-10 rounded-xl bg-white/5 border-white/10 dark:bg-white/[0.03]"
-        />
-      </div>
-    )}
+        {period === 'custom' && (
+          <div className="flex items-center gap-2">
+            <InputField
+              label="From"
+              aria-label="Custom range start date"
+              type="date"
+              value={startDate}
+              max={endDate && endDate < currentDateValue ? endDate : currentDateValue}
+              onChange={(event) => {
+                if (
+                  event.target.value
+                  && event.target.value <= currentDateValue
+                  && (!endDate || event.target.value <= endDate)
+                ) {
+                  onStartDateChange(event.target.value);
+                }
+              }}
+              className="h-10 min-h-10 rounded-xl bg-white/15 dark:bg-white/[0.04] border border-white/20 dark:border-white/10 text-xs font-semibold shadow-[0_2px_6px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,0.2)]"
+            />
+            <InputField
+              label="To"
+              aria-label="Custom range end date"
+              type="date"
+              value={endDate}
+              min={startDate}
+              max={currentDateValue}
+              onChange={(event) => {
+                if (
+                  event.target.value
+                  && event.target.value <= currentDateValue
+                  && (!startDate || event.target.value >= startDate)
+                ) {
+                  onEndDateChange(event.target.value);
+                }
+              }}
+              className="h-10 min-h-10 rounded-xl bg-white/15 dark:bg-white/[0.04] border border-white/20 dark:border-white/10 text-xs font-semibold shadow-[0_2px_6px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,0.2)]"
+            />
+          </div>
+        )}        
 
-    {period === 'custom' && (
-      <>
-        <div>
-          <InputField
-            label="From"
-            aria-label="Custom range start date"
-            type="date"
-            value={startDate}
-            max={endDate}
-            onChange={(event) => {
-              if (event.target.value) onStartDateChange(event.target.value);
-            }}
-            className="h-10 rounded-xl bg-white/5 border-white/10 dark:bg-white/[0.03]"
-          />
+        {canSelectPlants && (
+          <div className="min-w-44 flex-1 sm:flex-none">
+            <SearchableSelect
+              label="Filter Plants"
+              ariaLabel="Filter dashboard by plants"
+              options={plantOptions}
+              value={plantIds}
+              onChange={onPlantIdsChange}
+              placeholder="All operating plants"
+              isLoading={plantsLoading}
+              disabled={Boolean(plantsError)}
+              multiSelect
+              showSearch
+              btnClass="h-10 min-h-10 rounded-xl bg-white/15 dark:bg-white/[0.04] border border-white/20 dark:border-white/10 text-xs font-semibold shadow-[0_2px_6px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,0.2)]"
+            />
+            {plantsError && (
+              <p role="alert" className="mt-1 text-xs text-[var(--color-danger)]">
+                {getErrorMessage(plantsError)}
+              </p>
+            )}
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-white/15 dark:border-white/10 bg-black/[0.04] dark:bg-black/30 p-0.5 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.06)] backdrop-blur-md">
+          {/* Quick Period Presets */}
+          <div className="inline-flex rounded-xl border border-white/15 dark:border-white/10 bg-white/10 dark:bg-white/[0.03] p-0.5">
+            {[
+              { value: 'today', label: 'Today' },
+              { value: 'month', label: 'Month' },
+              { value: 'financial_year', label: 'FY' },
+              { value: 'custom', label: 'Custom' },
+            ].map((tab) => (
+              <button
+                key={tab.value}
+                type="button"
+                onClick={() => onPeriodChange(tab.value)}
+                className={`rounded-xl px-2.5 py-1 text-xs font-bold transition-all ${period === tab.value
+                    ? 'bg-[var(--color-accent)] text-white shadow-sm'
+                    : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
+                  }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
-        <div>
-          <InputField
-            label="To"
-            aria-label="Custom range end date"
-            type="date"
-            value={endDate}
-            min={startDate}
-            onChange={(event) => {
-              if (event.target.value) onEndDateChange(event.target.value);
-            }}
-            className="h-10 rounded-xl bg-white/5 border-white/10 dark:bg-white/[0.03]"
-          />
-        </div>
-      </>
-    )}
-  </div>
-);
+      </div>
+
+    </div>
+  );
+};
 
 const getFirstName = (user) => {
   const name = user?.name ?? user?.full_name ?? '';
@@ -230,7 +284,7 @@ const Dashboard = () => {
   const user = useSelector(selectUser);
   const { canView } = usePermission('/');
   const { can: canModule } = usePermission();
-  const [period, setPeriod] = useState('month');
+  const [period, setPeriod] = useState('today');
   const [month, setMonth] = useState(currentMonth);
   const [financialYear, setFinancialYear] = useState(currentFinancialYear);
   const [startDate, setStartDate] = useState(today);
@@ -238,20 +292,19 @@ const Dashboard = () => {
   const [plantIds, setPlantIds] = useState([]);
   const [manualRefreshing, setManualRefreshing] = useState(false);
   const canSelectPlants = canModule('plants', 'view');
+
   const {
     data: plantsResponse,
     isLoading: plantsLoading,
     error: plantsError,
   } = useGetPlantsQuery({ per_page: 100 }, { skip: !canView || !canSelectPlants });
-  const plantOptions = useMemo(
-    () => {
-      const plants = Array.isArray(plantsResponse?.data)
-        ? plantsResponse.data
-        : Array.isArray(plantsResponse) ? plantsResponse : [];
-      return plants.map((plant) => ({ value: String(plant.id), label: plant.name }));
-    },
-    [plantsResponse],
-  );
+
+  const plantOptions = useMemo(() => {
+    const plants = Array.isArray(plantsResponse?.data)
+      ? plantsResponse.data
+      : Array.isArray(plantsResponse) ? plantsResponse : [];
+    return plants.map((plant) => ({ value: String(plant.id), label: plant.name }));
+  }, [plantsResponse]);
 
   const queryParams = useMemo(() => {
     const dateFilters = period === 'month'
@@ -275,9 +328,19 @@ const Dashboard = () => {
     isLoading,
     refetch,
   } = useGetDashboardQuery(queryParams, {
-    skip: !canView || (period === 'custom' && (!startDate || !endDate || startDate > endDate)),
+    skip: !canView || (period === 'custom' && (
+      !startDate
+      || !endDate
+      || startDate > endDate
+      || startDate > today()
+      || endDate > today()
+      || getDateRangeDays(startDate, endDate) > 365
+    ))
+      || (period === 'month' && month > currentMonth())
+      || (period === 'financial_year' && financialYear > currentFinancialYear()),
     refetchOnMountOrArgChange: true,
   });
+
   const refreshDashboard = async () => {
     setManualRefreshing(true);
     try {
@@ -286,8 +349,10 @@ const Dashboard = () => {
       setManualRefreshing(false);
     }
   };
-  const dashboard = response?.data;
 
+  const dashboard = response?.data;
+  console.log('dashboard', dashboard)
+  // Strict Permission Verification
   const capabilities = dashboard?.capabilities;
   const canViewEmployees = capabilities?.can_view_employees ?? permissionCheck(canModule, ['employees', 'employee', 'employee-view']);
   const canViewAttendance = capabilities?.can_view_attendance ?? permissionCheck(canModule, ['attendance', 'attendance-report', 'attendances']);
@@ -296,6 +361,7 @@ const Dashboard = () => {
   const canViewAdvances = capabilities?.can_view_advances ?? permissionCheck(canModule, ['advances', 'employee-advances']);
   const canViewDeputation = capabilities?.can_view_deputation ?? permissionCheck(canModule, ['employee-deputations', 'deputations']);
   const canViewDowntime = capabilities?.can_view_downtime ?? permissionCheck(canModule, ['plant-shutdowns', 'maintenance-report', 'plants']);
+
   const missingDashboardModules = [
     !canViewEmployees && { label: 'Employees', permission: 'employees: view' },
     !canViewAttendance && { label: 'Attendance', permission: 'attendance: view' },
@@ -318,15 +384,15 @@ const Dashboard = () => {
 
   const quickLinks = [
     canModule('employees', 'view') && { label: 'Employees', detail: 'Workforce directory', path: '/employees', icon: Users },
-    canModule('attendance', 'view') && { label: 'Attendance', detail: 'Daily attendance', path: '/attendance', icon: CalendarDays },
-    canModule('salary-report', 'view') && { label: 'Payroll reports', detail: 'Salary and payroll', path: '/reports/salary', icon: WalletCards },
-    canModule('advances', 'view') && { label: 'Advances', detail: 'Employee advances', path: '/advances', icon: Banknote },
+    canModule('attendance', 'view') && { label: 'Attendance', detail: 'Daily attendance logs', path: '/attendance', icon: CalendarDays },
+    canModule('salary-report', 'view') && { label: 'Payroll reports', detail: 'Wage & salary register', path: '/reports/salary', icon: WalletCards },
+    canModule('advances', 'view') && { label: 'Advances', detail: 'Employee advance tracking', path: '/advances', icon: Banknote },
   ].filter(Boolean);
 
   if (isLoading && !dashboard) {
     return (
       <div className="space-y-6 p-4 sm:p-6 lg:p-8">
-        <div className="h-24 animate-pulse rounded-2xl bg-white/5 border border-white/10 shadow-lg motion-reduce:animate-none" />
+        <div className="h-28 animate-pulse rounded-2xl border border-white/15 dark:border-white/10 bg-white/10 dark:bg-white/[0.03] shadow-lg backdrop-blur-xl motion-reduce:animate-none" />
         <DashboardSkeleton />
       </div>
     );
@@ -339,29 +405,63 @@ const Dashboard = () => {
           type="error"
           title="Dashboard unavailable"
           message={getErrorMessage(error)}
-          action={<Button variant="ghost" onClick={() => refetch()} className="rounded-xl"><RefreshCw size={15} /> Try again</Button>}
+          action={
+            <Button variant="ghost" onClick={() => refetch()} className="rounded-xl shadow-sm">
+              <RefreshCw size={15} /> Try again
+            </Button>
+          }
         />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 p-4 pb-12 sm:p-6 lg:p-8">
-      <GlassCard className="relative overflow-hidden p-6 sm:p-7 bg-gradient-to-b from-white/10 to-black/5 dark:from-white/5 dark:to-black/20 shadow-xl shadow-black/5 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl">
-        <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-20 h-52 w-52 rounded-full bg-(--color-accent-soft) blur-3xl opacity-60" />
+    <div className="space-y-6 p-4 pb-12 sm:p-6 lg:p-8 bg-black/5 dark:bg-black/20">
+      {/* ── Tier 1: Command Header & Quick Filter Presets ─────────────────────── */}
+      <GlassCard className="relative overflow-hidden rounded-2xl border border-white/20 dark:border-white/10 border-t-white/40 dark:border-t-white/20 bg-gradient-to-b from-white/15 via-white/5 to-black/5 dark:from-white/10 dark:via-white/[0.02] dark:to-black/35 p-6 sm:p-7 backdrop-blur-xl shadow-[0_16px_40px_-10px_rgba(0,0,0,0.1),inset_0_1px_1px_rgba(255,255,255,0.35)] dark:shadow-[0_24px_60px_-12px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.1)]">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-12 -top-24 h-64 w-64 rounded-full bg-(--color-accent-soft) blur-3xl opacity-70"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -left-12 -bottom-24 h-48 w-48 rounded-full bg-teal-500/10 blur-3xl opacity-50"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/70 dark:via-white/35 to-transparent"
+        />
+
         <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
           <div className="max-w-xl">
-            <h1 className="flex items-center gap-2.5 text-2xl font-extrabold tracking-tight text-(--color-text) sm:text-3xl">
-              <Activity size={22} aria-hidden="true" className="text-(--color-accent)" /> Good Day, {getFirstName(user)}
+            {/* <div className="mb-2.5 inline-flex items-center gap-2 rounded-full border border-white/20 dark:border-white/10 bg-white/10 dark:bg-white/[0.03] px-3 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75 motion-reduce:hidden" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+              </span>
+              <span className="text-[11px] font-bold tracking-wide uppercase text-(--color-text-muted)">
+                Executive Pulse &amp; Operations
+              </span>
+            </div> */}
+
+            <h1 className="flex items-center gap-3 text-2xl font-black tracking-tight text-(--color-text) sm:text-3xl">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-(--color-accent)/25 via-(--color-accent)/15 to-(--color-accent)/5 text-(--color-accent) ring-1 ring-white/35 dark:ring-white/15 shadow-[0_4px_12px_rgba(0,0,0,0.08),inset_0_1.5px_1px_rgba(255,255,255,0.5)]">
+                <Activity size={20} aria-hidden="true" />
+              </span>
+              Good Day, {getFirstName(user)}
             </h1>
+
             {dashboard?.filters?.label && (
-              <p className="mt-3 flex items-center gap-2 text-xs font-semibold text-(--color-text-muted)">
-                <CalendarDays size={14} aria-hidden="true" className="text-(--color-accent)" /> {dashboard.filters.label}
-              </p>
+              <div className="mt-3 flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 dark:border-white/10 bg-white/10 dark:bg-white/[0.03] px-3 py-1 text-xs font-bold text-(--color-text-muted) shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+                  <CalendarDays size={13} aria-hidden="true" className="text-(--color-accent)" />
+                  {dashboard.filters.label}
+                </span>
+              </div>
             )}
           </div>
 
-          <div className="flex flex-col gap-3.5 sm:flex-row sm:items-end sm:justify-between xl:justify-end">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between xl:justify-end">
             <DashboardFilters
               period={period}
               onPeriodChange={setPeriod}
@@ -380,76 +480,99 @@ const Dashboard = () => {
               plantsError={plantsError}
               canSelectPlants={canSelectPlants}
             />
+
             <Button
               variant="ghost"
               onClick={refreshDashboard}
               disabled={manualRefreshing || isLoading}
-              aria-label="Refresh dashboard"
-              className="h-10 min-h-10 shrink-0 px-3.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10"
+              aria-label="Refresh dashboard metrics"
+              className=" shrink-0 p-2.5 mb-1 rounded-xl border border-white/20 dark:border-white/10 bg-gradient-to-b from-white/15 to-white/5 dark:from-white/10 dark:to-white/[0.02] shadow-[0_4px_12px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,0.3)] hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-95 transition-all text-xs font-bold text-(--color-text)"
             >
-              <RefreshCw size={15} className={manualRefreshing ? 'animate-spin motion-reduce:animate-none' : ''} aria-hidden="true" />
+              <RefreshCw
+                size={17}
+                className={manualRefreshing ? 'animate-spin motion-reduce:animate-none' : ''}
+                aria-hidden="true"
+              />
               <span className="sm:hidden">Refresh</span>
             </Button>
           </div>
         </div>
-        {isLoading && <div className="absolute inset-x-0 bottom-0 h-1 animate-pulse bg-(--color-accent) motion-reduce:animate-none" aria-label="Loading dashboard" />}
+
+        {isLoading && (
+          <div
+            className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-transparent via-(--color-accent) to-transparent animate-pulse motion-reduce:animate-none"
+            aria-label="Updating dashboard metrics"
+          />
+        )}
       </GlassCard>
 
       {isError && dashboard && (
-        <div role="alert" className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm font-medium text-amber-800 dark:text-amber-200 backdrop-blur-md">
-          Dashboard refresh failed: {getErrorMessage(error)} The last loaded data is still shown.
+        <div
+          role="alert"
+          className="rounded-2xl border border-amber-500/30 bg-gradient-to-r from-amber-500/15 to-amber-500/5 px-4 py-3.5 text-sm font-semibold text-amber-900 dark:text-amber-200 shadow-[0_4px_16px_rgba(245,158,11,0.08),inset_0_1px_0_rgba(255,255,255,0.2)] backdrop-blur-md"
+        >
+          Dashboard refresh failed: {getErrorMessage(error)}. The last loaded data is still shown.
         </div>
       )}
 
-      <section aria-label="Key workforce metrics" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6">
+      {/* ── Tier 2: The Executive Pulse (Hero KPI Metrics) ───────────────────── */}
+      <section
+        aria-label="Core operational KPIs"
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
+      >
         {canViewEmployees && (
           <DashboardMetric
             icon={Users}
-            label="Total employees"
+            label="Total workforce"
             value={formatNumber(dashboard?.summary?.workforce_total_employees ?? dashboard?.summary?.total_employees)}
             breakdown={[
               { label: 'Active', value: formatNumber(dashboard?.summary?.active_employees ?? dashboard?.summary?.total_employees) },
-              { label: 'Inactive', value: formatNumber(dashboard?.summary?.inactive_employees) },
+              { label: 'Inactive/Unapproved', value: formatNumber(dashboard?.summary?.inactive_employees) },
             ]}
             tone="accent"
           />
         )}
+
         {canViewAttendance && (
           <DashboardMetric
             icon={CheckCircle2}
             label="Present"
             value={formatNumber(dashboard?.summary?.present)}
-            detail={attendanceTotal ? `${attendanceRate}% of attendance records` : 'No attendance recorded'}
+            detail={attendanceTotal ? `${attendanceRate}% verified attendance` : 'No logs recorded'}
             tone="teal"
           />
         )}
+
         {canViewAttendance && (
           <DashboardMetric
             icon={Clock3}
-            label="Pending verification"
+            label="Verification queue"
             value={formatNumber(dashboard?.summary?.pending_verification)}
-            detail="Attendance records to review"
+            detail="Requires supervisor action"
             tone="amber"
           />
         )}
+
         {canViewPayroll && dashboard?.payroll && (
           <DashboardMetric
             icon={Banknote}
-            label={dashboard.payroll.net !== undefined ? 'Net payroll' : 'Overtime cost'}
+            label={dashboard.payroll.net !== undefined ? 'Net disbursement' : 'Overtime cost'}
             value={formatCurrency(dashboard.payroll.net ?? dashboard.payroll.ot_amount)}
-            detail={dashboard.payroll.net !== undefined ? `Gross ${formatCurrency(dashboard.payroll.gross)}` : 'Operational estimate'}
+            detail={dashboard.payroll.net !== undefined ? `Gross: ${formatCurrency(dashboard.payroll.gross)}` : 'Operational estimate'}
             tone="blue"
           />
         )}
+
         {canViewAttendance && dashboard?.summary?.total_ot_hours !== undefined && (
           <DashboardMetric
-            icon={Activity}
-            label="Overtime hours"
+            icon={Sparkles}
+            label="Overtime logged"
             value={formatNumber(dashboard.summary.total_ot_hours)}
-            detail="Recorded in this period"
+            detail="Total approved hours"
             tone="violet"
           />
         )}
+
         {canViewDowntime && dashboard?.downtime && (
           <DashboardMetric
             icon={Wrench}
@@ -461,97 +584,129 @@ const Dashboard = () => {
         )}
       </section>
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-6">
+      {/* ── Monthly Daily Plant Attendance Trend Graph ──────────────────────── */}
+      {canViewAttendance && dashboard?.attendance && !(period === 'custom' && getDateRangeDays(startDate, endDate) > 365) && (
+        <MonthlyDailyPlantAttendanceChart
+          dailyPlantWise={dashboard.attendance.daily_plant_wise ?? []}
+          hourlyPlantWise={dashboard.attendance.hourly_plant_wise ?? []}
+          period={period}
+          todayDate={dashboard.filters?.start_date}
+          selectedMonth={month}
+          financialYear={financialYear}
+          startDate={startDate}
+          endDate={endDate}
+          plantIds={plantIds}
+          formatter={formatNumber}
+        />
+      )}
+
+      {/* ── Tier 3: Primary Operations Arena (Per-Day Attendance & Distribution) ─ */}
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-6 items-start">
+        {/* Main Operational Focal Point: Daily Attendance Per Plant (4 cols) */}
         {canViewAttendance && dashboard?.attendance && (
-          <div className="grid grid-cols-1 gap-4 xl:col-span-2">
+          <div className="xl:col-span-4">
             <DashboardPanel
-              title="Attendance snapshot"
-              description="Status distribution across your permitted workforce"
-              action={<span className="rounded-full bg-teal-500/10 px-3 py-1 text-xs font-bold text-teal-700 dark:text-teal-300 ring-1 ring-inset ring-teal-500/20">{attendanceRate}% present</span>}
+              title="Daily Plant Attendance &amp; Operations"
+              description="Visual headcount distribution across permitted operating facilities"
+              icon={Building2}
+              action={
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-teal-500/30 bg-teal-500/10 px-3 py-1 text-xs font-bold text-teal-700 dark:text-teal-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+                  {dashboard.attendance.plant_wise?.length ?? 0} Active Facilities
+                </span>
+              }
+            >
+              <DailyPlantAttendanceVisualizer
+                plants={dashboard.attendance.plant_wise ?? []}
+                formatter={formatNumber}
+              />
+            </DashboardPanel>
+          </div>
+        )}
+
+        {/* Supporting Analytics: Status Distribution Donut & Shifts (2 cols) */}
+        {canViewAttendance && dashboard?.attendance && (
+          <div className="xl:col-span-2">
+            <DashboardPanel
+              title="Workforce Distribution"
+              description="Status breakdown &amp; shift balance"
+              icon={PieChart}
+              action={
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-teal-500/30 bg-teal-500/10 px-2.5 py-0.5 text-xs font-bold text-teal-700 dark:text-teal-300">
+                  {attendanceRate}% present
+                </span>
+              }
             >
               {attendanceTotal ? (
-                <div className="p-2 sm:p-3">
-                  <div
-                    className="mb-5 flex h-3.5 overflow-hidden rounded-full bg-black/5 dark:bg-white/5 p-0.5 ring-1 ring-inset ring-white/10"
-                    role="img"
-                    aria-label={attendanceSummary.map((item) => `${item.label}: ${formatNumber(item.count)}`).join(', ')}
-                  >
-                    {attendanceSummary.filter((item) => Number(item.count) > 0).map((item) => {
-                      const styles = {
-                        present: 'bg-teal-500 shadow-sm shadow-teal-500/30',
-                        absent: 'bg-rose-500 shadow-sm shadow-rose-500/30',
-                        partial: 'bg-amber-500 shadow-sm shadow-amber-500/30',
-                        on_leave: 'bg-violet-500 shadow-sm shadow-violet-500/30',
-                        holiday: 'bg-sky-500 shadow-sm shadow-sky-500/30',
-                        weekly_off: 'bg-slate-400 shadow-sm shadow-slate-400/30',
-                      };
-                      return (
-                        <span
-                          key={item.status}
-                          className={`rounded-full ${styles[item.status] ?? 'bg-(--color-accent)'} transition-[width] duration-500 motion-reduce:transition-none`}
-                          style={{ width: `${(Number(item.count) / attendanceTotal) * 100}%` }}
-                          title={`${item.label}: ${formatNumber(item.count)}`}
-                        />
-                      );
-                    })}
-                  </div>
-                  <DashboardBarList
-                    items={attendanceSummary
-                      .filter((item) => Number(item.count) > 0)
-                      .map((item) => ({ ...item, label: item.label, count: Number(item.count) }))}
-                    formatter={formatNumber}
-                  />
-                </div>
-              ) : <DashboardEmpty message="No attendance activity for the selected period." />}
-            </DashboardPanel>
-          </div>
-        )}
-
-        {canViewAttendance && dashboard?.attendance && (
-          <div className="grid grid-cols-1 gap-4 xl:col-span-2">
-            <DashboardPanel title="Plant attendance" description="Attendance records grouped by working plant">
-              <div className="p-2 sm:p-3">
-                <DashboardBarList
-                  items={(dashboard.attendance.plant_wise ?? []).map((item) => ({ ...item, label: item.plant_name, count: item.present }))}
-                  formatter={(value) => `${formatNumber(value)} present`}
+                <AttendanceDonutChart
+                  summary={attendanceSummary}
+                  total={attendanceTotal}
+                  rate={attendanceRate}
+                  dayShiftPresent={dashboard.attendance.day_shift_present ?? 0}
+                  nightShiftPresent={dashboard.attendance.night_shift_present ?? 0}
+                  formatter={formatNumber}
                 />
-              </div>
+              ) : (
+                <DashboardEmpty message="No attendance activity logged for this period." />
+              )}
             </DashboardPanel>
           </div>
         )}
+      </div>
 
+      {/* ── Tier 4: Action Queue & Secondary Intelligence ─────────────────────── */}
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-6 items-start">
+        {/* Needs Attention Approval Queue (Spans 2 cols or 3 cols depending on content) */}
         {pendingActions.length > 0 && (
-          <div className="grid grid-cols-1 gap-4 xl:col-span-2">
+          <div className="xl:col-span-2">
             <DashboardPanel
-              title="Needs your attention"
-              description="Pending workflows visible to your role"
-              action={<span className="rounded-full bg-amber-500/10 px-3 py-1 text-xs font-bold text-amber-800 dark:text-amber-200 ring-1 ring-inset ring-amber-500/20">{formatNumber(pendingTotal)} pending</span>}
+              title="Needs Your Attention"
+              description="Workflows awaiting authorization"
+              icon={ClipboardCheck}
+              action={
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-bold text-amber-700 dark:text-amber-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+                  {formatNumber(pendingTotal)} pending
+                </span>
+              }
             >
-              <ul className="divide-y divide-(--color-border)">
+              <ul className="space-y-2.5">
                 {pendingActions.map((action) => {
                   const link = ACTION_LINKS[action.type];
                   const accessibleLink = link?.path && permissionCheck(canModule, link.linkModules ?? link.modules);
+
                   const content = (
                     <>
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500/20 to-amber-500/10 text-amber-700 dark:text-amber-300 ring-1 ring-inset ring-white/20">
-                        <ClipboardCheck size={18} aria-hidden="true" />
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400/30 via-orange-500/20 to-amber-600/10 text-amber-700 dark:text-amber-300 ring-1 ring-amber-400/35 dark:ring-amber-400/20 shadow-[0_4px_14px_rgba(245,158,11,0.15),inset_0_1.5px_1px_rgba(255,255,255,0.5)]">
+                        <ClipboardCheck size={20} aria-hidden="true" />
                       </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-bold text-(--color-text)">{action.title}</span>
-                        <span className="mt-0.5 block text-xs font-medium text-(--color-text-muted)">{formatNumber(action.count)} item{Number(action.count) === 1 ? '' : 's'}</span>
-                      </span>
-                      {accessibleLink && <ArrowRight size={16} className="shrink-0 text-(--color-text-muted) transition-transform group-hover:translate-x-0.5" aria-hidden="true" />}
+                      <div className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-bold text-(--color-text)">
+                          {action.title}
+                        </span>
+                        <span className="mt-0.5 inline-flex items-center gap-1 text-xs font-semibold text-amber-700 dark:text-amber-400">
+                          {formatNumber(action.count)} pending item{Number(action.count) === 1 ? '' : 's'}
+                        </span>
+                      </div>
+                      {accessibleLink && (
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/20 dark:border-white/10 bg-white/10 text-(--color-text-muted) shadow-xs transition-all duration-200 group-hover:translate-x-1 group-hover:text-(--color-accent) group-hover:bg-white/20">
+                          <ArrowRight size={15} aria-hidden="true" />
+                        </span>
+                      )}
                     </>
                   );
 
                   return (
                     <li key={action.type}>
                       {accessibleLink ? (
-                        <Link to={link.path} className="group flex items-center gap-3.5 p-3 rounded-xl transition-all duration-200 hover:bg-(--color-accent-soft) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-accent)">
+                        <Link
+                          to={link.path}
+                          className="group flex items-center gap-3.5 rounded-2xl border border-white/15 dark:border-white/10 border-t-white/30 dark:border-t-white/20 bg-gradient-to-b from-white/15 to-white/5 dark:from-white/[0.04] dark:to-white/[0.01] p-3 shadow-[0_4px_12px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,0.25)] transition-all duration-200 hover:-translate-y-0.5 hover:border-white/35 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-accent)"
+                        >
                           {content}
                         </Link>
                       ) : (
-                        <div className="flex items-center gap-3.5 p-3 rounded-xl">{content}</div>
+                        <div className="flex items-center gap-3.5 rounded-2xl border border-white/10 bg-white/5 p-3">
+                          {content}
+                        </div>
                       )}
                     </li>
                   );
@@ -561,29 +716,41 @@ const Dashboard = () => {
           </div>
         )}
 
+        {/* Payroll Overview (Adjusts span if Action Queue is present) */}
         {canViewPayroll && dashboard?.payroll && (
-          <div className="grid grid-cols-1 gap-4 xl:col-span-3">
-            <DashboardPanel title="Payroll overview" description="Authorized payroll totals for the selected period">
-              <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4 p-2 sm:p-3">
+          <div className={pendingActions.length > 0 ? 'xl:col-span-4' : 'xl:col-span-3'}>
+            <DashboardPanel
+              title="Payroll overview"
+              description="Authorized payroll distribution for current cycle"
+              icon={WalletCards}
+            >
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {[
-                  ['Gross', dashboard.payroll.gross],
-                  ['Net', dashboard.payroll.net],
-                  ['Overtime', dashboard.payroll.ot_amount],
-                  ['Deductions', dashboard.payroll.total_deductions],
-                ].filter(([, value]) => value !== undefined).map(([label, value]) => (
-                  <div key={label} className="rounded-2xl border border-white/10 bg-white/5 dark:bg-white/[0.02] p-3.5 shadow-sm">
-                    <p className="text-xs font-medium text-(--color-text-muted)">{label}</p>
-                    <p className="mt-1 truncate text-sm font-extrabold text-(--color-text)" title={formatCurrency(value)}>{formatCurrency(value)}</p>
-                  </div>
+                  ['Gross', dashboard.payroll.gross, 'Total earnings', 'blue'],
+                  ['Net', dashboard.payroll.net, 'Take-home total', 'teal'],
+                  ['Overtime', dashboard.payroll.ot_amount, 'Extra hours', 'violet'],
+                  ['Deductions', dashboard.payroll.total_deductions, 'Statutory & tax', 'amber'],
+                ].filter(([, value]) => value !== undefined).map(([label, value, subtext, tone]) => (
+                  <DashboardStatCard
+                    key={label}
+                    label={label}
+                    value={formatCurrency(value)}
+                    subtext={subtext}
+                    tone={tone}
+                  />
                 ))}
               </div>
+
               {dashboard.payroll.plant_wise?.length > 0 && (
-                <div className="px-3 pb-4 sm:px-4">
-                  <p className="mb-3 text-xs font-bold uppercase tracking-wider text-(--color-text-muted)">Gross payroll by plant</p>
+                <div className="mt-5 border-t border-white/10 pt-4">
+                  <p className="mb-3 uppercase text-[11px] font-bold tracking-wider text-(--color-text-muted)">
+                    Gross payroll by operational plant
+                  </p>
                   <DashboardBarList
                     items={dashboard.payroll.plant_wise.map((item) => ({ ...item, label: item.plant_name }))}
                     valueKey="gross"
                     formatter={formatCurrency}
+                    tone="blue"
                   />
                 </div>
               )}
@@ -591,53 +758,95 @@ const Dashboard = () => {
           </div>
         )}
 
+        {/* Statutory Contributions */}
         {canViewStatutory && dashboard?.statutory && (
           <div className="grid grid-cols-1 gap-4 xl:col-span-3">
-            <DashboardPanel title="Statutory contributions" description="PF and ESI totals for the selected period">
-              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 p-2 sm:p-3">
+            <DashboardPanel
+              title="Statutory contributions"
+              description="PF, ESI and labor welfare compliance"
+              icon={ShieldCheck}
+            >
+              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
                 {[
-                  ['ESI', dashboard.statutory.esi],
-                  ['PF', dashboard.statutory.pf],
-                  ['LWF', dashboard.statutory.lwf],
-                ].map(([label, metric]) => (
-                  <div key={label} className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 dark:bg-white/[0.02] p-4 shadow-sm">
-                    <div className="flex items-center gap-3.5">
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-(--color-accent)/20 to-(--color-accent)/10 text-(--color-accent) ring-1 ring-inset ring-white/20">
-                        <ShieldCheck size={18} aria-hidden="true" />
-                      </span>
-                      <div>
-                        <p className="text-sm font-bold text-(--color-text)">{label}</p>
-                        <p className="text-xs font-medium text-(--color-text-muted)">{formatNumber(metric?.employee_count)} employees</p>
+                  ['ESI', dashboard.statutory.esi, 'Medical insurance', 'teal'],
+                  ['PF', dashboard.statutory.pf, 'Provident fund', 'blue'],
+                  ['LWF', dashboard.statutory.lwf, 'Labor welfare', 'amber'],
+                ].map(([label, metric, subtext, tone]) => {
+                  const badgeToneStyles = {
+                    teal: 'bg-gradient-to-br from-emerald-400/30 to-teal-500/10 text-teal-700 dark:text-teal-300 ring-emerald-400/30',
+                    blue: 'bg-gradient-to-br from-sky-400/30 to-blue-500/10 text-blue-700 dark:text-blue-300 ring-blue-400/30',
+                    amber: 'bg-gradient-to-br from-amber-400/30 to-amber-500/10 text-amber-700 dark:text-amber-300 ring-amber-400/30',
+                  };
+
+                  return (
+                    <div
+                      key={label}
+                      className="group relative overflow-hidden rounded-2xl border border-white/15 dark:border-white/10 border-t-white/30 dark:border-t-white/20 bg-gradient-to-b from-white/15 to-white/5 dark:from-white/[0.04] dark:to-white/[0.01] p-4 shadow-[0_4px_16px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,0.3)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                    >
+                      <div
+                        aria-hidden="true"
+                        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 dark:via-white/20 to-transparent"
+                      />
+                      <div className="flex items-center justify-between gap-2.5">
+                        <span className="uppercase text-[11px] font-bold tracking-wider text-(--color-text-muted)">
+                          {label}
+                        </span>
+                        <span className={`flex h-7 w-7 items-center justify-center rounded-lg ring-1 shadow-xs ${badgeToneStyles[tone] ?? 'bg-white/20 text-(--color-accent) ring-white/20'}`}>
+                          <ShieldCheck size={14} aria-hidden="true" />
+                        </span>
+                      </div>
+                      <p className="mt-2 text-lg font-black tracking-tight text-(--color-text) tabular-nums">
+                        {formatCurrency(metric?.total_amount)}
+                      </p>
+                      <div className="mt-1 flex items-center justify-between text-xs font-medium text-(--color-text-muted)">
+                        <span>{formatNumber(metric?.employee_count)} employees</span>
+                        <span className="text-[10px] uppercase font-bold text-(--color-text-muted)/70">{subtext}</span>
                       </div>
                     </div>
-                    <p className="text-sm font-extrabold text-(--color-text)">{formatCurrency(metric?.total_amount)}</p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </DashboardPanel>
           </div>
         )}
 
+        {/* Employee Deputations */}
         {canViewDeputation && dashboard?.deputation && (
-          <div className="grid grid-cols-1 gap-4 xl:col-span-2">
-            <DashboardPanel title="Employee deputations" description="Cross-plant workforce movement in the selected period">
-              <div className="grid grid-cols-3 gap-3 p-2 sm:p-3">
+          <div className="grid grid-cols-1 gap-4 xl:col-span-3">
+            <DashboardPanel
+              title="Employee deputations"
+              description="Cross-plant movements in this cycle"
+              icon={Layers}
+            >
+              <div className="grid grid-cols-3 gap-3">
                 {[
-                  ['Total', dashboard.deputation.total],
-                  ['Active', dashboard.deputation.active],
-                  ['Pending', dashboard.deputation.pending_verification],
-                ].map(([label, value]) => (
-                  <div key={label} className="rounded-2xl border border-white/10 bg-white/5 dark:bg-white/[0.02] p-3.5 text-center shadow-sm">
-                    <p className="text-xl font-extrabold text-(--color-text)">{formatNumber(value)}</p>
-                    <p className="mt-1 text-xs font-medium text-(--color-text-muted)">{label}</p>
-                  </div>
+                  ['Total deputations', dashboard.deputation.total, 'All transfers', 'accent'],
+                  ['Active assignments', dashboard.deputation.active, 'In progress', 'teal'],
+                  ['Pending action', dashboard.deputation.pending_verification, 'Awaiting approval', 'amber'],
+                ].map(([label, value, subtext, tone]) => (
+                  <DashboardStatCard
+                    key={label}
+                    label={label}
+                    value={formatNumber(value)}
+                    subtext={subtext}
+                    tone={tone}
+                  />
                 ))}
               </div>
+
               {dashboard.deputation.plant_wise?.length > 0 && (
-                <div className="px-3 pb-3">
+                <div className="mt-5 border-t border-white/10 pt-4">
+                  <p className="mb-3 uppercase text-[11px] font-bold tracking-wider text-(--color-text-muted)">
+                    Deputations by destination plant
+                  </p>
                   <DashboardBarList
-                    items={dashboard.deputation.plant_wise.map((item) => ({ ...item, label: item.plant_name, count: item.total }))}
+                    items={dashboard.deputation.plant_wise.map((item) => ({
+                      ...item,
+                      label: item.plant_name,
+                      count: item.total,
+                    }))}
                     formatter={formatNumber}
+                    tone="accent"
                   />
                 </div>
               )}
@@ -645,74 +854,113 @@ const Dashboard = () => {
           </div>
         )}
 
+        {/* Plant Downtime */}
         {canViewDowntime && dashboard?.downtime && (
           <div className="grid grid-cols-1 gap-4 xl:col-span-3">
-            <DashboardPanel title="Plant downtime" description="Approved shutdown activity within this period">
-              <div className="grid grid-cols-3 gap-3 p-2 sm:p-3">
-                {[
-                  ['Events', dashboard.downtime.events],
-                  ['Hours', dashboard.downtime.hours],
-                  ['Compensation', formatCurrency(dashboard.downtime.compensation)],
-                ].map(([label, value]) => (
-                  <div key={label} className="rounded-2xl border border-white/10 bg-white/5 dark:bg-white/[0.02] p-3.5 shadow-sm">
-                    <p className="truncate text-base font-extrabold text-(--color-text)">{typeof value === 'string' ? value : formatNumber(value)}</p>
-                    <p className="mt-1 text-xs font-medium text-(--color-text-muted)">{label}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="px-3 pb-4">
-                <DashboardBarList
-                  items={(dashboard.downtime.plant_wise ?? []).map((item) => ({ ...item, label: item.plant_name, count: item.events }))}
-                  formatter={(value) => `${formatNumber(value)} events`}
+            <DashboardPanel
+              title="Plant downtime &amp; maintenance"
+              description="Approved shutdown and maintenance events"
+              icon={Wrench}
+            >
+              <div className="grid grid-cols-3 gap-3">
+                <DashboardStatCard
+                  label="Shutdown events"
+                  value={formatNumber(dashboard.downtime.events)}
+                  subtext="Logged stops"
+                  tone="amber"
+                />
+                <DashboardStatCard
+                  label="Total hours"
+                  value={formatNumber(dashboard.downtime.hours)}
+                  subtext="Guaranteed hours"
+                  tone="violet"
+                />
+                <DashboardStatCard
+                  label="Compensation"
+                  value={formatCurrency(dashboard.downtime.compensation)}
+                  subtext="Stipend sum"
+                  tone="blue"
                 />
               </div>
-            </DashboardPanel>
-          </div>
-        )}
 
-        {quickLinks.length > 0 && (
-          <div className="grid grid-cols-1 gap-4 xl:col-span-3">
-            <DashboardPanel title="Quick access" description="Go directly to the areas available to your role">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 p-2 sm:p-3">
-                {quickLinks.map(({ label, detail, path, icon: Icon }) => (
-                  <Link
-                    key={path}
-                    to={path}
-                    className="group flex items-center gap-3.5 rounded-2xl border border-white/10 bg-gradient-to-b from-white/10 to-black/5 dark:from-white/5 dark:to-black/20 p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-black/10 hover:border-(--color-border-strong) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-accent) motion-reduce:transform-none backdrop-blur-xl"
-                  >
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-(--color-accent)/20 to-(--color-accent)/10 text-(--color-accent) ring-1 ring-inset ring-white/20 shadow-sm shadow-(--color-accent)/20">
-                      <Icon size={20} aria-hidden="true" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-bold text-(--color-text)">{label}</span>
-                      <span className="block truncate text-xs font-medium text-(--color-text-muted)">{detail}</span>
-                    </span>
-                    <ArrowUpRight size={16} className="shrink-0 text-(--color-text-muted) transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" aria-hidden="true" />
-                  </Link>
-                ))}
-              </div>
+              {dashboard.downtime.plant_wise?.length > 0 && (
+                <div className="mt-5 border-t border-white/10 pt-4">
+                  <p className="mb-3 uppercase text-[11px] font-bold tracking-wider text-(--color-text-muted)">
+                    Events by plant facility
+                  </p>
+                  <DashboardBarList
+                    items={(dashboard.downtime.plant_wise ?? []).map((item) => ({
+                      ...item,
+                      label: item.plant_name,
+                      count: item.events,
+                    }))}
+                    formatter={(value) => `${formatNumber(value)} events`}
+                    tone="amber"
+                  />
+                </div>
+              )}
             </DashboardPanel>
           </div>
         )}
       </div>
 
+      {/* ── Tier 5: Quick Navigation Shortcuts (Footer Strip) ─────────────────── */}
+      {quickLinks.length > 0 && (
+        <DashboardPanel
+          title="Quick Navigation"
+          description="Direct access to primary workforce modules"
+        >
+          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+            {quickLinks.map(({ label, detail, path, icon: Icon }) => (
+              <Link
+                key={path}
+                to={path}
+                className="group relative flex items-center gap-3.5 overflow-hidden rounded-2xl border border-white/20 dark:border-white/10 border-t-white/40 dark:border-t-white/20 bg-gradient-to-b from-white/15 to-white/5 dark:from-white/10 dark:to-white/[0.02] p-4 shadow-[0_8px_20px_-4px_rgba(0,0,0,0.06),inset_0_1px_1px_rgba(255,255,255,0.3)] transition-all duration-300 hover:-translate-y-1 hover:border-white/35 hover:shadow-[0_16px_32px_-6px_rgba(0,0,0,0.12),inset_0_1px_1px_rgba(255,255,255,0.45)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-accent) motion-reduce:transform-none"
+              >
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent"
+                />
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-(--color-accent)/25 via-(--color-accent)/15 to-(--color-accent)/5 text-(--color-accent) ring-1 ring-white/30 dark:ring-white/15 shadow-[0_4px_12px_rgba(0,0,0,0.08),inset_0_1.5px_1px_rgba(255,255,255,0.5)] transition-transform duration-300 group-hover:scale-105 motion-reduce:transform-none">
+                  <Icon size={22} aria-hidden="true" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-bold text-(--color-text)">{label}</span>
+                  <span className="block truncate text-xs font-medium text-(--color-text-muted)">{detail}</span>
+                </span>
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/20 dark:border-white/10 bg-white/10 text-(--color-text-muted) shadow-xs transition-all duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:bg-white/25 group-hover:text-(--color-accent)">
+                  <ArrowUpRight size={16} aria-hidden="true" />
+                </span>
+              </Link>
+            ))}
+          </div>
+        </DashboardPanel>
+      )}
+
+      {/* Restricted Access Fallback */}
       {!canViewEmployees && !canViewAttendance && !canViewPayroll && !canViewStatutory && !canViewAdvances && !canViewDeputation && !canViewDowntime && pendingActions.length === 0 && (
-        <GlassCard className="p-6 sm:p-8 bg-gradient-to-b from-white/10 to-black/5 dark:from-white/5 dark:to-black/20 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-(--color-accent-soft) text-(--color-accent) ring-1 ring-inset ring-white/20 shadow-md">
-            <ShieldCheck size={22} aria-hidden="true" />
+        <GlassCard className="relative overflow-hidden rounded-2xl border border-white/20 dark:border-white/10 border-t-white/35 bg-gradient-to-b from-white/15 to-white/5 dark:from-white/10 dark:to-black/35 p-6 sm:p-8 backdrop-blur-xl shadow-xl">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-(--color-accent)/25 to-(--color-accent)/10 text-(--color-accent) ring-1 ring-white/30 shadow-[0_4px_16px_rgba(0,0,0,0.1),inset_0_1.5px_1px_rgba(255,255,255,0.5)]">
+            <ShieldCheck size={26} aria-hidden="true" />
           </div>
           <div className="mx-auto mt-4 max-w-2xl text-center">
-            <h2 className="text-base font-bold text-(--color-text)">Dashboard access is active; workforce data is restricted</h2>
+            <h2 className="text-lg font-black tracking-tight text-(--color-text)">
+              Dashboard access active; workforce modules restricted
+            </h2>
             <p className="mt-2 text-sm leading-relaxed text-(--color-text-muted)">
-              The Dashboard permission lets you open this page. It does not grant access to employee, attendance, payroll, or other module data.
-              Ask an administrator to assign the relevant <strong className="font-bold text-(--color-text)">View</strong> permissions below.
+              Your account has view access to this dashboard, but specific workforce submodules (Attendance, Payroll, Employees) require additional permissions. Contact your system administrator to activate view access for the modules below:
             </p>
           </div>
-          <ul className="mx-auto mt-6 grid max-w-4xl grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="mx-auto mt-6 grid max-w-4xl grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {missingDashboardModules.map(({ label, permission }) => (
-              <li key={label} className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 dark:bg-white/[0.02] px-4 py-3 shadow-sm">
-                <span className="truncate text-sm font-semibold text-(--color-text)">{label}</span>
-                <code className="shrink-0 text-right text-[11px] text-(--color-text-muted)">{permission}</code>
+              <li
+                key={label}
+                className="flex min-w-0 items-center justify-between gap-3 rounded-2xl border border-white/15 dark:border-white/10 bg-white/10 dark:bg-white/[0.02] px-4 py-3 shadow-[0_2px_8px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,0.2)]"
+              >
+                <span className="truncate text-sm font-bold text-(--color-text)">{label}</span>
+                <code className="shrink-0 rounded-lg bg-black/10 dark:bg-black/40 px-2 py-0.5 text-right text-[11px] font-mono text-(--color-text-muted)">
+                  {permission}
+                </code>
               </li>
             ))}
           </ul>
@@ -720,20 +968,21 @@ const Dashboard = () => {
             <div className="mt-6 flex justify-center">
               <Link
                 to="/roles"
-                className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/20 bg-white/5 px-5 py-2.5 text-sm font-bold text-(--color-accent) transition-all hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-accent) shadow-sm"
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/25 bg-gradient-to-b from-white/20 to-white/10 px-5 py-2.5 text-sm font-extrabold text-(--color-accent) shadow-[0_4px_12px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.4)] transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-accent)"
               >
                 <FileCheck2 size={16} aria-hidden="true" />
-                Open Roles &amp; Permissions
+                Manage Roles &amp; Permissions
               </Link>
             </div>
           )}
         </GlassCard>
       )}
 
+      {/* Scoped Access Footer Notice */}
       {dashboard && quickLinks.length > 0 && (
-        <p className="flex items-center justify-center gap-1.5 text-center text-xs font-medium text-(--color-text-muted)">
-          <Building2 size={13} aria-hidden="true" className="text-(--color-accent)" />
-          Data is scoped by your account permissions and assigned plant access.
+        <p className="flex items-center justify-center gap-2 text-center text-xs font-semibold text-(--color-text-muted)">
+          <Building2 size={14} aria-hidden="true" className="text-(--color-accent)" />
+          Data is scoped by your assigned plant permissions and active role authorizations.
           <span className="sr-only">Current user scope applies to all displayed metrics.</span>
         </p>
       )}

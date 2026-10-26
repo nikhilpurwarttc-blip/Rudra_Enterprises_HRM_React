@@ -28,7 +28,7 @@ const InputField = ({
     <div className="w-auto">
       <div
         className={cn(
-          "relative flex min-h-12 items-center rounded-md border bg-transparent px-3 transition-colors",
+          "relative flex min-h-12 items-center rounded-full border bg-transparent px-3 transition-colors",
           disabled && "opacity-60 cursor-not-allowed bg-[var(--color-accent-soft)]/20",
           !disabled && "focus-within:border-[var(--color-accent)] focus-within:ring-1 focus-within:ring-[var(--color-accent)]",
           error ? "border-[var(--color-danger)] focus-within:border-[var(--color-danger)] focus-within:ring-[var(--color-danger)]" : "border-[var(--color-border-strong)]",
@@ -38,7 +38,7 @@ const InputField = ({
         {label && (
           <label
             htmlFor={inputId}
-            className="pointer-events-none absolute -top-2 left-3 bg-[var(--color-bg-elevated)] px-1 text-xs leading-none text-[var(--color-text-muted)]"
+            className="uppercase pointer-events-none absolute -top-2 left-4 bg-[var(--color-bg-elevated)] px-1 text-xs leading-none text-[var(--color-text-muted)]"
           >
             {label}{required && <span className="ml-1 text-[var(--color-danger)]">*</span>}
           </label>

@@ -48,6 +48,12 @@ const buildSearchQuery = (resource, value) => {
 
   if (search) params.search = search;
   if (payload.plant_id !== undefined && payload.plant_id !== null && payload.plant_id !== '') params.plant_id = payload.plant_id;
+  if (payload.approval_status !== undefined && payload.approval_status !== null && payload.approval_status !== '') {
+    params.approval_status = payload.approval_status;
+  }
+  if (payload.status !== undefined && payload.status !== null && payload.status !== '') {
+    params.status = payload.status;
+  }
   if (Array.isArray(payload.ids)) {
     params['ids[]'] = payload.ids.filter((id) => id !== null && id !== undefined && id !== '');
   } else if (payload.ids !== undefined && payload.ids !== null && payload.ids !== '') {
@@ -159,14 +165,17 @@ export const api = createApi({
     getEmployees: builder.query({
       query: (arg) => buildSearchQuery('/employees', arg),
       providesTags: ['Employee'],
+      keepUnusedDataFor: 120,
     }),
     getEmployeeById: builder.query({
       query: (id) => `/employees/${id}`,
       providesTags: (_result, _error, id) => [{ type: 'Employee', id }],
+      keepUnusedDataFor: 120,
     }),
     getEmployeeAttendance: builder.query({
       query: ({ employeeId, ...params }) => ({ url: `/employees/${employeeId}/attendance`, params }),
       providesTags: ['Attendance'],
+      keepUnusedDataFor: 120,
     }),
     createEmployee: builder.mutation({
       query: (body) => ({ url: '/employees', method: 'POST', body: toEmployeeRequestBody(body) }),

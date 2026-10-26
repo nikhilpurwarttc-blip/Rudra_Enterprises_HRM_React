@@ -10,7 +10,7 @@ import EmployeeProgress from './components/EmployeeProgress';
 import EmployeeSalarySection from './components/EmployeeSalarySection';
 import useEmployeeDraft from './hooks/useEmployeeDraft';
 import useEmployeeForm from './hooks/useEmployeeForm';
-import useEmployeeValidation from './hooks/useEmployeeValidation';
+import useEmployeeValidation, { validateAccountDraft, validateDocumentDraft } from './hooks/useEmployeeValidation';
 import { DETAIL_SECTIONS, EMPLOYEE_DRAFT_PREFIX, EMPLOYEE_STEPS } from './utils/employeeForm.constants';
 import { buildSelectOptions, createEmployeePayload, normalizeEmployee } from './utils/employeeForm.utils';
 
@@ -65,6 +65,8 @@ const AddEditEmployee = ({
   const [activeStep, setActiveStep] = useState('details');
   const [documentDraft, setDocumentDraft] = useState(EMPTY_DOCUMENT);
   const [accountDraft, setAccountDraft] = useState(EMPTY_ACCOUNT);
+  const [documentErrors, setDocumentErrors] = useState({});
+  const [accountErrors, setAccountErrors] = useState({});
   const [stepError, setStepError] = useState('');
   const { can } = usePermission('/employees');
   const { validateEmployeeForm, clearFieldError, getFirstErrorSection } = useEmployeeValidation();
@@ -156,15 +158,17 @@ const AddEditEmployee = ({
           : salaryHistory.length > 0,
   })), [employeeId, documents.length, accounts.length, salaryHistory.length, showSalaryStep]);
 
-  const scrollToFirstError = (validationErrors) => {
-    const firstSection = getFirstErrorSection(validationErrors, DETAIL_SECTIONS);
-    if (!firstSection) return;
-
+  const scrollToSection = (sectionId) => {
     requestAnimationFrame(() => {
       document
-        .querySelector(`[data-employee-section="${firstSection.id}"]`)
+        .querySelector(`[data-employee-section="${sectionId}"]`)
         ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
+  };
+
+  const scrollToFirstError = (validationErrors) => {
+    const firstSection = getFirstErrorSection(validationErrors, DETAIL_SECTIONS);
+    if (firstSection) scrollToSection(firstSection.id);
   };
 
   const handleSaveDraft = () => {
@@ -203,14 +207,19 @@ const AddEditEmployee = ({
       setStepError('Submit employee details before adding KYC documents.');
       return;
     }
-    if (!documentDraft.document_type.trim() || !documentDraft.document_number.trim()) {
-      setStepError('Document type and document number are required.');
+    const nextErrors = validateDocumentDraft(documentDraft);
+    setDocumentErrors(nextErrors);
+    if (Object.keys(nextErrors).length) {
+      scrollToSection('kyc');
       return;
     }
 
     setStepError('');
     const saved = await onSaveDocument({ employee_id: employeeId, ...documentDraft });
-    if (saved) setDocumentDraft(EMPTY_DOCUMENT);
+    if (saved) {
+      setDocumentDraft(EMPTY_DOCUMENT);
+      setDocumentErrors({});
+    }
   };
 
   const handleSaveAccount = async () => {
@@ -218,14 +227,19 @@ const AddEditEmployee = ({
       setStepError('Submit employee details before adding account details.');
       return;
     }
-    if (!accountDraft.bank_name.trim() || !accountDraft.account_number.trim() || !accountDraft.account_holder_name.trim()) {
-      setStepError('Bank name, account number, and account holder name are required.');
+    const nextErrors = validateAccountDraft(accountDraft);
+    setAccountErrors(nextErrors);
+    if (Object.keys(nextErrors).length) {
+      scrollToSection('accounts');
       return;
     }
 
     setStepError('');
     const saved = await onSaveAccount({ employee_id: employeeId, ...accountDraft });
-    if (saved) setAccountDraft(EMPTY_ACCOUNT);
+    if (saved) {
+      setAccountDraft(EMPTY_ACCOUNT);
+      setAccountErrors({});
+    }
   };
 
   const handleSaveCharges = async () => {
@@ -245,11 +259,22 @@ const AddEditEmployee = ({
 
   const handleDocumentFieldChange = (field, value) => {
     setDocumentDraft((current) => ({ ...current, [field]: value }));
+    setDocumentErrors((current) => ({
+      ...current,
+      [field]: undefined,
+      ...(field === 'document_type' ? { document_number: undefined } : {}),
+    }));
     setStepError('');
   };
 
   const handleAccountFieldChange = (field, value) => {
-    setAccountDraft((current) => ({ ...current, [field]: value }));
+    const fieldValue = field === 'account_number'
+      ? value.replace(/\D/g, '').slice(0, 18)
+      : field === 'ifsc_code'
+        ? value.replace(/[^a-z\d]/gi, '').toUpperCase().slice(0, 11)
+        : value;
+    setAccountDraft((current) => ({ ...current, [field]: fieldValue }));
+    setAccountErrors((current) => ({ ...current, [field]: undefined }));
     setStepError('');
   };
 
@@ -295,6 +320,7 @@ const AddEditEmployee = ({
               isLoading={documentsLoading}
               documentDraft={documentDraft}
               setDocumentDraft={handleDocumentFieldChange}
+              errors={documentErrors}
               saving={savingDocument}
               onSave={handleSaveDocument}
               onDelete={onDeleteDocument}
@@ -308,6 +334,7 @@ const AddEditEmployee = ({
               isLoading={accountsLoading}
               accountDraft={accountDraft}
               setAccountDraft={handleAccountFieldChange}
+              errors={accountErrors}
               saving={savingAccount}
               onSave={handleSaveAccount}
               onDelete={onDeleteAccount}

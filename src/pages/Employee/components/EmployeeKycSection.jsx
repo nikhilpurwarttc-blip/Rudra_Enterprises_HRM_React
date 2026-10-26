@@ -14,6 +14,7 @@ const EmployeeKycSection = ({
   isLoading = false,
   documentDraft,
   setDocumentDraft,
+  errors = {},
   saving,
   onSave,
   onDelete,
@@ -45,7 +46,7 @@ const EmployeeKycSection = ({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-employee-section="kyc">
       <SectionCard title={`KYC documents · ${documents.length} submitted`}>
         {isLoading ? (
           <LoadingState message="Loading KYC documents…" />
@@ -62,6 +63,7 @@ const EmployeeKycSection = ({
             value={documentDraft.document_type}
             onChange={handleDocumentTypeChange}
             placeholder="Select document type"
+            error={errors.document_type}
             required
           />
           <InputField
@@ -69,6 +71,7 @@ const EmployeeKycSection = ({
             value={documentDraft.document_number}
             onChange={handleDocumentNumberChange}
             placeholder="Enter document number"
+            error={errors.document_number}
             required
           />
         </div>
@@ -80,6 +83,8 @@ const EmployeeKycSection = ({
           accept="image/jpeg,image/png,image/jpg,application/pdf"
           maxSize={5 * 1024 * 1024}
           helperText="JPG, PNG, or PDF up to 5 MB"
+          error={errors.document_file}
+          required
         />
       </SectionCard>
 

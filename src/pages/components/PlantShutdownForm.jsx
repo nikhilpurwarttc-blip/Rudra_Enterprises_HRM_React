@@ -29,7 +29,13 @@ const PlantShutdownForm = ({
   const [attendeeIds, setAttendeeIds] = useState([]);
   const [confirmAttendanceOpen, setConfirmAttendanceOpen] = useState(false);
   const employeesQuery = useGetEmployeesQuery(
-    { all: true, per_page: 100, ...(plantId ? { plant_id: plantId } : {}) },
+    {
+      all: true,
+      per_page: 100,
+      approval_status: 1,
+      status: 1,
+      ...(plantId ? { plant_id: plantId } : {}),
+    },
     { skip: mode !== 'request' },
   );
   const employees = unwrap(employeesQuery.data);
@@ -148,7 +154,7 @@ const PlantShutdownForm = ({
       <ConfirmDelete
         isOpen={confirmAttendanceOpen}
         title="Mark these employees present?"
-        message="Attendance will be marked for the first shutdown date. Anyone already present or punched in will be skipped."
+        message="Attendance will be marked for the first shutdown date. Employees with recorded punch times are paid for their worked hours; employees not marked present or punched in receive the shutdown guaranteed hours. Anyone already present or punched in will be skipped."
         confirmLabel="Yes, mark present"
         confirmLoadingLabel="Submitting..."
         confirmClass="bg-emerald-700 hover:bg-emerald-800"

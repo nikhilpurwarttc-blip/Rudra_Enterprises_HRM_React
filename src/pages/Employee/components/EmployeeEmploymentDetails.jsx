@@ -7,12 +7,12 @@ const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frida
 
 const EmployeeEmploymentDetails = ({ form, errors, plants, departments, designations, shifts, setField, selectField, updateForm }) => (
   <SectionCard title="Employment assignment">
-    <div className="grid gap-4 sm:grid-cols-2">
-      <InputField label="Joining date" type="date" value={form.joining_date} onChange={setField('joining_date')} error={errors.joining_date} />
-      <SearchableSelect label="Plant" options={plants} value={String(form.plant_id)} onChange={selectField('plant_id')} placeholder="Select plant" error={errors.plant_id} />
-      <SearchableSelect label="Department" options={departments} value={String(form.department_id)} onChange={selectField('department_id')} placeholder="Select department" error={errors.department_id} />
-      <SearchableSelect label="Designation" options={designations} value={String(form.designation_id)} onChange={selectField('designation_id')} placeholder="Select designation" error={errors.designation_id} />
-      <SearchableSelect label="Shift" options={shifts} value={String(form.shift_id)} onChange={selectField('shift_id')} placeholder="Select shift" error={errors.shift_id} />
+    <div className="grid gap-4 md:gap-6 sm:grid-cols-2">
+      <InputField label="Joining date" type="date" value={form.joining_date} onChange={setField('joining_date')} error={errors.joining_date} required />
+      <SearchableSelect label="Plant" options={plants} value={String(form.plant_id)} onChange={selectField('plant_id')} placeholder="Select plant" error={errors.plant_id} required />
+      <SearchableSelect label="Department" options={departments} value={String(form.department_id)} onChange={selectField('department_id')} placeholder="Select department" error={errors.department_id} required />
+      <SearchableSelect label="Designation" options={designations} value={String(form.designation_id)} onChange={selectField('designation_id')} placeholder="Select designation" error={errors.designation_id} required />
+      <SearchableSelect label="Shift" options={shifts} value={String(form.shift_id)} onChange={selectField('shift_id')} placeholder="Select shift" error={errors.shift_id} required />
       <fieldset className="sm:col-span-2">
         <legend className="mb-2 text-sm font-medium text-(--color-text)">Weekly off days</legend>
         <div className="flex flex-wrap gap-x-4 gap-y-2">

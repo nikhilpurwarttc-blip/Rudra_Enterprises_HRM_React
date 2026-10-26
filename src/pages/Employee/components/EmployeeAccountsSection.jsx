@@ -11,6 +11,7 @@ const EmployeeAccountsSection = ({
   isLoading = false,
   accountDraft,
   setAccountDraft,
+  errors = {},
   saving,
   onSave,
   onDelete,
@@ -34,7 +35,7 @@ const EmployeeAccountsSection = ({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-employee-section="accounts">
       <SectionCard title={`Bank accounts · ${accounts.length} submitted`}>
         {isLoading ? (
           <LoadingState message="Loading bank accounts…" />
@@ -45,10 +46,10 @@ const EmployeeAccountsSection = ({
 
       <SectionCard title="Add bank account">
         <div className="grid gap-4 sm:grid-cols-2">
-          <InputField label="Bank name" value={accountDraft.bank_name} onChange={handleAccountFieldChange('bank_name')} required />
-          <InputField label="Account holder name" value={accountDraft.account_holder_name} onChange={handleAccountFieldChange('account_holder_name')} required />
-          <InputField label="Account number" value={accountDraft.account_number} onChange={handleAccountFieldChange('account_number')} required />
-          <InputField label="IFSC code" value={accountDraft.ifsc_code} onChange={handleAccountFieldChange('ifsc_code')} />
+          <InputField label="Bank name" value={accountDraft.bank_name} onChange={handleAccountFieldChange('bank_name')} error={errors.bank_name} required />
+          <InputField label="Account holder name" value={accountDraft.account_holder_name} onChange={handleAccountFieldChange('account_holder_name')} error={errors.account_holder_name} required />
+          <InputField label="Account number" inputMode="numeric" maxLength={18} value={accountDraft.account_number} onChange={handleAccountFieldChange('account_number')} error={errors.account_number} required />
+          <InputField label="IFSC code" maxLength={11} value={accountDraft.ifsc_code} onChange={handleAccountFieldChange('ifsc_code')} error={errors.ifsc_code} />
         </div>
         <label className="mt-4 flex items-center gap-2 text-sm text-(--color-text)">
           <input

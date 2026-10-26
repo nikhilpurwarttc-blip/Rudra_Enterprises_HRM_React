@@ -115,7 +115,7 @@ const SearchableSelect = ({
   return (
     <div className={cn('relative', className)}>
       {label && (
-        <label className="pointer-events-none absolute -top-2 left-3 z-10 bg-(--color-bg-elevated) px-1 text-xs leading-none text-(--color-text-muted)">
+        <label className="uppercase pointer-events-none absolute -top-2 left-4 z-10 bg-(--color-bg-elevated) px-1 text-xs leading-none text-(--color-text-muted)">
           {label}{required && <span className="ml-1 text-(--color-danger)">*</span>}
         </label>
       )}
@@ -127,8 +127,10 @@ const SearchableSelect = ({
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-label={ariaLabel}
+        aria-required={required}
+        aria-invalid={Boolean(error)}
         className={cn(
-          'flex w-full min-h-12.5 rounded-md items-center justify-between border bg-transparent px-3 text-sm text-(--color-text) transition-colors focus:outline-none focus:ring-1',
+          'flex w-full min-h-12.5 rounded-full items-center justify-between border bg-transparent px-3 text-sm text-(--color-text) transition-colors focus:outline-none focus:ring-1',
           error
             ? 'border-(--color-danger) focus:border-(--color-danger) focus:ring-(--color-danger)'
             : 'border-(--color-border-strong) focus:border-(--color-accent) focus:ring-(--color-accent)',
@@ -244,7 +246,7 @@ const SearchableSelect = ({
         </div>,
         document.body
       )}
-      {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
+      {error && <p role="alert" className="text-red-500 text-xs mt-1">{error}</p>}
     </div>
   );
 };

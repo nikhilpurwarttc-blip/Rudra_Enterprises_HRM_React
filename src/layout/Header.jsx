@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Menu, LogOut, Search, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Menu, LogOut, Search, X, ChevronLeft, ChevronRight, Bell } from "lucide-react";
 import { useSelector, useDispatch } from "react-redux";
 import { selectUser, selectRole, clearCredentials } from "../store/authSlice";
-import { useLogoutMutation } from "../store/api";
+import {
+  useGetAttendanceRosterQuery,
+  useGetDashboardQuery,
+  useGetPlantShutdownsQuery,
+  useLogoutMutation,
+} from "../store/api";
 import { useNavigate } from "react-router-dom";
 import ThemeToggle from "../components/ThemeToggle";
 import Breadcrumb from "../components/Breadcrumb";
@@ -12,13 +17,38 @@ import UserProfilePanel from "./UserProfilePanel";
 import NotificationModal from "./NotifiModal";
 import AppDownloadButton from "./AppDownload";
 import EmployeeAvatar from "../pages/Employee/components/EmployeeAvatar";
+import usePermission from "../hooks/usePermission";
+import { getLocalDate, getNotificationCount, NOTIFICATION_ACTION_ROUTES } from "./notificationUtils";
 
 const Header = ({ onToggleSidebar }) => {
   const user = useSelector(selectUser);
   const role = useSelector(selectRole);
+  const { can } = usePermission();
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [logout, { isLoading }] = useLogoutMutation();
+  const today = getLocalDate();
+  const canViewAttendance = can("attendance", "view");
+  const canViewShutdowns = can("plants", "view") || can("plant-shutdowns", "view");
+  const canViewDashboardActions = can("dashboard", "view")
+    && Object.values(NOTIFICATION_ACTION_ROUTES)
+      .some(({ permission }) => can(permission, "view"));
+  const { data: dashboardResponse } = useGetDashboardQuery({ period: "today" }, {
+    skip: !canViewDashboardActions,
+  });
+  const { data: attendanceResponse } = useGetAttendanceRosterQuery({
+    date: today,
+    page: 1,
+    per_page: 1,
+  }, {
+    skip: !canViewAttendance,
+  });
+  const { data: shutdownResponse } = useGetPlantShutdownsQuery({
+    status: 1,
+    per_page: 10,
+  }, {
+    skip: !canViewShutdowns,
+  });
 
   const { searchQuery, setSearchQuery, isSearchOpen, setIsSearchOpen, searchResults } = useSearch();
   const [selectedIndex, setSelectedIndex] = useState(-1);
@@ -27,6 +57,16 @@ const Header = ({ onToggleSidebar }) => {
   const searchRef = useRef(null);
 
   const roleName = typeof role === 'string' ? role : role?.name ?? '';
+  const pendingShutdowns = Array.isArray(shutdownResponse?.data)
+    ? shutdownResponse.data
+    : Array.isArray(shutdownResponse) ? shutdownResponse : [];
+  const notificationCount = getNotificationCount({
+    dashboard: dashboardResponse?.data,
+    attendanceCount: attendanceResponse?.summary?.pending_verification ?? 0,
+    shutdownResponse,
+    shutdowns: pendingShutdowns.filter((shutdown) => Number(shutdown.status) === 1 && shutdown.id != null),
+    can,
+  });
 
   const handleLogout = async () => {
     try { await logout().unwrap(); } catch { /* ignore */ }
@@ -164,13 +204,28 @@ const Header = ({ onToggleSidebar }) => {
 
         <AppDownloadButton />
 
-        {/* <button
+        <button
+          type="button"
           onClick={() => setIsNotificationOpen(true)}
-          className="relative p-2 rounded-md hover:bg-[var(--color-border)] transition-colors"
+          aria-label={notificationCount > 0
+            ? `Open notifications, ${notificationCount} pending`
+            : "Open notifications"}
+          aria-haspopup="dialog"
+          aria-expanded={isNotificationOpen}
+          className={`relative p-2 rounded-md transition-colors hover:bg-[var(--color-border)] ${
+            isNotificationOpen ? 'bg-[var(--color-accent-soft)]' : ''
+          }`}
         >
-          <Bell size={16} className="text-gray-600 dark:text-gray-200" />
-          <span className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-red-500" />
-        </button> */}
+          <Bell size={16} className="text-[var(--color-text)]" />
+          {notificationCount > 0 && (
+            <span
+              id="notification-count"
+              className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full border-2 border-[var(--color-bg)] bg-red-600 px-0.5 text-[9px] font-bold leading-none text-white"
+            >
+              {notificationCount > 99 ? "99+" : notificationCount}
+            </span>
+          )}
+        </button>
 
         {/* User Info */}
         <button
