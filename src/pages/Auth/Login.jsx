@@ -69,6 +69,11 @@ const Login = () => {
 
   return (
     <main className="app-surface flex min-h-screen items-center justify-center px-4 py-8">
+      {/* background image */}
+      {/* <img src="/loginBG.avif" alt="" className="w-full h-full absolute inset-0 object-cover" /> */}
+      <span className="w-3xs absolute right-4 bottom-4">
+        <img src="/favicon.png" alt="HRM Logo" />
+      </span>
       <div className="w-full max-w-md">
         <div className="mb-5 flex items-center justify-between px-1">
           <div>
@@ -77,7 +82,7 @@ const Login = () => {
           </div>
           <ThemeToggle />
         </div>
-        <GlassCard as="form" noValidate onSubmit={handleSubmit} className="p-6 sm:p-8">
+        <GlassCard as="form" noValidate onSubmit={handleSubmit} className="p-6 sm:p-8 bg-white/2 opacity-100 transition-opacity">
           <h1 className="text-3xl font-semibold tracking-tight text-[var(--color-text)]">Sign in</h1>
           <p className="mt-2 mb-7 text-sm text-[var(--color-text-muted)]">Use your HRM account to continue.</p>
           <div className="space-y-4">

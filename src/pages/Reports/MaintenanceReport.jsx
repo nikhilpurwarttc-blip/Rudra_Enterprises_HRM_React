@@ -1,13 +1,12 @@
 import { useMemo, useState } from 'react';
-import { Download, Filter, Search } from 'lucide-react';
+import { Download } from 'lucide-react';
 import AccessDenied from '../../components/AccessDenied';
 import Badge from '../../components/Badge';
 import Button from '../../components/Button';
 import { Feedback, InlineError, LoadingState } from '../../components/Feedback';
-import InputField from '../../components/InputField';
+import FilterModal from '../../components/FilterModal';
 import PageTable from '../../components/PageTable';
 import Pagination from '../../components/Pagination';
-import SearchableSelect from '../../components/SearchableSelect';
 import usePermission from '../../hooks/usePermission';
 import {
   useGetMaintenanceRecordsQuery,
@@ -70,7 +69,6 @@ const MaintenanceReport = () => {
   const [page, setPage] = useState(1);
   const [defaultDateRange] = useState(getCurrentDateRange);
   const [{ fromDate, toDate }, setDateRange] = useState(defaultDateRange);
-  const [filtersVisible, setFiltersVisible] = useState(false);
   const [exportError, setExportError] = useState('');
   const [exporting, setExporting] = useState(false);
   const visibleActiveReport = activeReport === 'powercut' && !canViewPowercuts
@@ -135,12 +133,6 @@ const MaintenanceReport = () => {
       { value: '2', label: 'Approved' },
       { value: '3', label: 'Rejected' },
     ];
-  const hasActiveFilters = Boolean(search.trim())
-    || plantIds.length > 0
-    || status !== ''
-    || fromDate !== defaultDateRange.fromDate
-    || toDate !== defaultDateRange.toDate;
-
   const handleExport = async () => {
     setExportError('');
     setExporting(true);
@@ -301,19 +293,61 @@ const MaintenanceReport = () => {
       </header> */}
 
       <div className="flex justify-end gap-2">
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={() => setFiltersVisible((visible) => !visible)}
-          aria-label={filtersVisible ? 'Hide maintenance report filters' : 'Show maintenance report filters'}
-          aria-expanded={filtersVisible}
-          aria-controls="maintenance-report-filters"
-          title={hasActiveFilters ? 'Filters applied' : 'Filters'}
-          className={`h-11 w-11 p-0 ${hasActiveFilters ? 'border-(--color-accent) bg-(--color-accent-soft) text-(--color-accent)' : ''}`}
-        >
-          <Filter size={16} aria-hidden="true" />
-          <span className="sr-only">Filters</span>
-        </Button>
+        <FilterModal
+          title={isMaintenance ? 'Filter maintenance report' : 'Filter powercut report'}
+          values={{
+            ...(isMaintenance ? { search } : {}),
+            plantIds,
+            status,
+            fromDate,
+            toDate,
+          }}
+          onApply={(nextFilters) => {
+            if (isMaintenance) setSearch(nextFilters.search ?? '');
+            setPlantIds(nextFilters.plantIds ?? plantIds);
+            setStatus(nextFilters.status ?? '');
+            setDateRange({
+              fromDate: nextFilters.fromDate ?? '',
+              toDate: nextFilters.toDate ?? '',
+            });
+            setPage(1);
+          }}
+          fields={[
+            ...(isMaintenance ? [{
+              key: 'search',
+              label: 'Search',
+              placeholder: 'Plant, employee, remarks',
+            }] : []),
+            ...(canViewPlants ? [{
+              key: 'plantIds',
+              label: 'Plants',
+              type: 'multiselect',
+              options: plantOptions,
+              placeholder: 'All plants',
+              isLoading: plantsQuery.isLoading,
+            }] : []),
+            {
+              key: 'status',
+              label: 'Status',
+              type: 'select',
+              options: statusOptions,
+              placeholder: 'All statuses',
+              showSearch: false,
+            },
+            {
+              key: 'fromDate',
+              label: 'From',
+              type: 'date',
+              max: (draft) => draft.toDate || undefined,
+            },
+            {
+              key: 'toDate',
+              label: 'To',
+              type: 'date',
+              min: (draft) => draft.fromDate || undefined,
+            },
+          ]}
+        />
         {isMaintenance && canExportMaintenance && (
           <Button
             type="button"
@@ -325,61 +359,6 @@ const MaintenanceReport = () => {
           </Button>
         )}
       </div>
-
-      {filtersVisible && (
-        <div id="maintenance-report-filters" className="w-full flex gap-3 justify-between items-end flex-wrap">
-          <div className="grid gap-3 rounded-xl sm:grid-cols-2 xl:grid-cols-5">
-            {isMaintenance && (
-              <InputField
-                label="Search"
-                value={search}
-                onChange={(event) => { setSearch(event.target.value); setPage(1); }}
-                placeholder="Plant, employee, remarks"
-                leftIcon={<Search size={16} />}
-              />
-            )}
-            {canViewPlants && (
-              <div>
-                <SearchableSelect
-                  label="Plant"
-                  options={plantOptions}
-                  value={plantIds}
-                  onChange={(value) => { setPlantIds(value); setPage(1); }}
-                  placeholder="All plants"
-                  isLoading={plantsQuery.isLoading}
-                  showSearch
-                  multiSelect
-                />
-              </div>
-            )}
-            <div>
-              <SearchableSelect
-                label="Status"
-                options={statusOptions}
-                value={status}
-                onChange={(value) => { setStatus(value); setPage(1); }}
-                placeholder="All statuses"
-                showSearch={false}
-              />
-            </div>
-            <InputField
-              label="From"
-              type="date"
-              value={fromDate}
-              max={toDate || undefined}
-              onChange={(event) => { setDateRange((current) => ({ ...current, fromDate: event.target.value })); setPage(1); }}
-            />
-            <InputField
-              label="To"
-              type="date"
-              value={toDate}
-              min={fromDate || undefined}
-              onChange={(event) => { setDateRange((current) => ({ ...current, toDate: event.target.value })); setPage(1); }}
-            />
-          </div>
-        </div>
-      )}
-
 
       {exportError && <InlineError message={exportError} />}
       {plantsQuery.isError && canViewPlants && (

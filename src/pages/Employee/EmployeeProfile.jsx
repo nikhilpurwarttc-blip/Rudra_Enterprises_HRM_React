@@ -137,7 +137,7 @@ const EmployeeProfile = ({ employeeId, initialEmployee, embedded = false, onClos
         type="error"
         title="Unable to load employee"
         message="The employee may no longer exist."
-        action={<Button onClick={close} className="mt-2">Back to employees</Button>}
+        action={<Button onClick={close} className="mt-2">Back to Employees</Button>}
       />
     );
   }
@@ -153,8 +153,8 @@ const EmployeeProfile = ({ employeeId, initialEmployee, embedded = false, onClos
           {/* Navigation & Action Bar */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             {embedded &&
-              <Button variant="ghost" onClick={close} className="group flex items-center gap-2 rounded-full py-0 text-xs font-medium text-(--color-text-muted) hover:text-(--color-text)">
-                <ArrowLeft size={16} className="transition-transform group-hover:-translate-x-1" /> Back to employees
+              <Button variant="ghost" onClick={close} className="group flex items-center gap-2 rounded-full text-xs font-medium text-(--color-text-muted) hover:text-(--color-text)">
+                <ArrowLeft size={16} className="transition-transform group-hover:-translate-x-1" /> Back to Employees
               </Button>
             }
             <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-3">
@@ -187,7 +187,7 @@ const EmployeeProfile = ({ employeeId, initialEmployee, embedded = false, onClos
 
           <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(300px,380px)_minmax(0,1fr)] xl:items-start">
             {/* CR80 ID Card Centerpiece Container */}
-            <div className="relative mx-auto w-full max-w-[320px] overflow-hidden rounded-2xl border-2 border-(--color-border) bg-(--color-bg-elevated) shadow-2xl transition-transform duration-300 hover:scale-[1.01] xl:mx-0 xl:sticky xl:top-0">
+            <div className="relative mx-auto w-full max-w-[320px] overflow-hidden rounded-2xl border-2 border-(--color-border) bg-(--color-bg-elevated) shadow-2xl transition-transform duration-300 hover:scale-[1.01] xl:mx-0 xl:sticky xl:top-6">
 
               {/* ID Card Top Accent Bar / Lanyard Slot Visual */}
               <div className="relative bg-gradient-to-r from-(--color-accent) via-indigo-600 to-(--color-accent) p-4 text-white text-center">

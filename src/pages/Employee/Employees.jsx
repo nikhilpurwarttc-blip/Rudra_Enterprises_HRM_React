@@ -64,6 +64,12 @@ const getEmployeeWorkflowStatus = (employee) => {
   return 'pending';
 };
 
+const matchesFilterValue = (selectedValues, value) => (
+  Array.isArray(selectedValues)
+    ? selectedValues.length === 0 || selectedValues.includes(value)
+    : !selectedValues || selectedValues === value
+);
+
 const matchesEmployeeFilters = (employee, filters) => {
   const plantId = String(employee.plant_id ?? employee.plant?.id ?? '');
   const departmentId = String(employee.department_id ?? employee.department?.id ?? '');
@@ -76,8 +82,8 @@ const matchesEmployeeFilters = (employee, filters) => {
     : 'inactive';
 
   return (!filters.plants?.length || filters.plants.includes(plantId))
-    && (!filters.status || filters.status === employeeStatus)
-    && (!filters.workflow_status || filters.workflow_status === getEmployeeWorkflowStatus(employee))
+    && matchesFilterValue(filters.status, employeeStatus)
+    && matchesFilterValue(filters.workflow_status, getEmployeeWorkflowStatus(employee))
     && (!filters.department || filters.department === departmentId)
     && (!filters.designation || filters.designation === designationId)
     && (!filters.shift || filters.shift === shiftId);
@@ -123,8 +129,8 @@ const Employees = () => {
   const [search, setSearch] = useState('');
   const [employeeFilters, setEmployeeFilters] = useState({
     plants: [],
-    status: '',
-    workflow_status: '',
+    status: [],
+    workflow_status: [],
     designation: '',
     department: '',
     shift: '',
@@ -797,18 +803,18 @@ const Employees = () => {
                 title="Refresh employees"
                 onClick={handleRefreshEmployees}
                 disabled={isEmployeeLoading}
-                className="flex items-center justify-center disabled:cursor-wait disabled:opacity-60"
+                className="flex items-center justify-center p-2.5 disabled:cursor-wait disabled:opacity-60"
               >
-                <RefreshCw size={16} className={isEmployeeLoading ? 'animate-spin' : ''} />
+                <RefreshCw size={16} className={`hover:scale-120 transition-transform duration-200 ${isEmployeeLoading ? 'scale-120 animate-spin ' : ''}`} />
               </Button>
-              {canCreate && !isReadOnly && <Button type="button" onClick={() => { setCreatedEmployee(null); setAddSessionKey((k) => k + 1); navigate('/employees/add'); }} className="flex items-center gap-1.5 "><Plus size={18} /></Button>}
+              {canCreate && !isReadOnly && <Button type="button" onClick={() => { setCreatedEmployee(null); setAddSessionKey((k) => k + 1); navigate('/employees/add'); }} className="flex items-center gap-1.5 p-2.5"><Plus size={18} className='hover:scale-160 transition-transform duration-200' /></Button>}
             </div>
           </div>
           <div className="mt-4 flex items-center justify-between gap-2">
-            <InputField className="min-w-0 min-h-0 h-10 rounded-full" value={search} onChange={handleSearchChange} placeholder="Search employees" leftIcon={<Search size={16} />} rightIcon={isEmployeeLoading && <LoaderCircle size={15} className="animate-spin" />} />
+            <InputField className="min-w-0 min-h-0 h-10" value={search} onChange={handleSearchChange} placeholder="Search employees" leftIcon={<Search size={16} />} rightIcon={isEmployeeLoading && <LoaderCircle size={15} className="animate-spin" />} />
             <FilterModal
               buttonRef={filterTriggerRef}
-              title="Filter employees"
+              title="Filter Employees"
               values={employeeFilters}
               onApply={handleFilterApply}
               fields={[
@@ -825,7 +831,7 @@ const Employees = () => {
                 {
                   key: 'status',
                   label: 'Status',
-                  type: 'select',
+                  type: 'multiselect',
                   permission: 'employees',
                   options: [
                     { value: 'active', label: 'Active' },
@@ -836,7 +842,7 @@ const Employees = () => {
                 {
                   key: 'workflow_status',
                   label: 'Workflow status',
-                  type: 'select',
+                  type: 'multiselect',
                   permission: 'employees',
                   options: [
                     { value: 'pending', label: 'Pending' },
@@ -870,7 +876,7 @@ const Employees = () => {
                 {
                   key: 'shift',
                   label: 'Shift',
-                  type: 'select',
+                  type: 'multiselect',
                   permission: 'employees',
                   options: shifts.map((shift) => ({
                     value: String(shift.id),

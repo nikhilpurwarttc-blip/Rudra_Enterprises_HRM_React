@@ -2,7 +2,7 @@ import InputField from '../../../components/InputField';
 import SectionCard from '../../../components/SectionCard';
 import Switch from '../../../components/Switch';
 import UploadField from '../../../components/UploadField';
-import ChoiceChips from './ChoiceChips';
+import ChoiceChips from '../../../components/ChoiceChips';
 
 const EmployeePersonalDetails = ({ form, errors, setField, setGender, setMaritalStatus, updateForm }) => (
   <SectionCard

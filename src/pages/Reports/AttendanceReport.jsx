@@ -11,6 +11,7 @@ import {
 import { Feedback } from '../../components/Feedback';
 import InputField from '../../components/InputField';
 import FilterModal from '../../components/FilterModal';
+import EmployeeAvatar from '../Employee/components/EmployeeAvatar';
 import AttendanceCalender from '../components/AttendanceCalender';
 import useDebouncedValue from '../../hooks/useDebouncedValue';
 import usePermission from '../../hooks/usePermission';
@@ -135,13 +136,15 @@ const AttendanceReport = () => {
 
 	return (
 		<div className="flex min-h-0 flex-col lg:h-full lg:flex-row lg:overflow-hidden">
-			<aside className="flex min-h-80 shrink-0 flex-col overflow-hidden border-r border-(--color-border) bg-(--color-bg-elevated) lg:min-h-0 lg:w-80">
+			<aside className="flex w-full max-w-sm min-h-80 shrink-0 flex-col border-r border-(--color-border) bg-(--color-bg-elevated) lg:min-h-0 lg:w-92">
 				<div className="border-b border-(--color-border) px-4 py-4">
-					<p className="text-xs font-semibold uppercase tracking-wider text-(--color-text-muted)">Attendance Report</p>
-					<h1 className="mt-1 text-lg font-semibold text-(--color-text)">Employees <span className="ml-1 text-xs font-normal text-(--color-text-muted)">{filteredEmployees.length}</span></h1>
-					<div className="mt-4 flex items-center gap-2">
+					<div>
+						<p className="text-xs font-semibold uppercase tracking-wider text-(--color-text-muted)">Attendance Report</p>
+						<h1 className="mt-1 text-lg font-semibold text-(--color-text)">Employees <span className="ml-1 text-xs font-normal text-(--color-text-muted)">{filteredEmployees.length}</span></h1>
+					</div>
+					<div className="mt-4 flex items-center justify-between gap-2">
 						<InputField
-							className="min-w-0 h-8 flex-1"
+							className="min-w-0 min-h-0 h-10"
 							aria-label="Search employees"
 							value={employeeSearch}
 							onChange={(event) => setEmployeeSearch(event.target.value)}
@@ -186,7 +189,7 @@ const AttendanceReport = () => {
 						/>
 					</div>
 				</div>
-				<div className="min-h-0 flex-1 overflow-y-auto p-2">
+				<div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
 					{employeesQuery.isError
 						? <Feedback type="error" title="Unable to load employees" message="Please refresh the page and try again." />
 						: employeesQuery.isLoading
@@ -199,15 +202,16 @@ const AttendanceReport = () => {
 										type="button"
 										onClick={() => { setSelectedEmployee(String(employee.id)); setSelectedEmployeeInfo(employee); }}
 										aria-pressed={String(selectedEmployee) === String(employee.id)}
-										className={`mb-1 flex w-full items-center gap-3 rounded-lg border px-3 py-3 text-left transition ${String(selectedEmployee) === String(employee.id) ? 'border-(--color-accent) bg-(--color-accent-soft)' : 'border-transparent hover:border-(--color-border) hover:bg-(--color-accent-soft)'}`}
+										className={`group relative flex w-full items-center gap-3 rounded-2xl border px-3.5 py-3 text-left transition-all duration-300 ${String(selectedEmployee) === String(employee.id)
+												? 'border-(--color-accent)/80 bg-(--color-accent-soft) shadow-[0_8px_20px_-4px_var(--color-accent-shadow,rgba(0,0,0,0.12)),0_2px_6px_-1px_rgba(0,0,0,0.06)] ring-2 ring-(--color-accent)/30 translate-y-[-1px]'
+												: 'border-(--color-border)/50 bg-(--color-bg-elevated)/80 shadow-[0_4px_12px_-2px_rgba(0,0,0,0.05),0_1px_3px_rgba(0,0,0,0.02)] hover:border-(--color-accent)/40 hover:bg-(--color-bg-elevated) hover:shadow-[0_8px_24px_-4px_rgba(0,0,0,0.08),0_2px_6px_rgba(0,0,0,0.04)] hover:translate-y-[-2px]'
+											} focus-visible:outline-2 focus-visible:outline-(--color-accent)`}
 									>
-										{employee.image
-											? <img src={employee.image} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
-											: <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-(--color-accent) text-sm font-semibold text-white">{String(employee.name ?? '?').split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase()}</span>
-										}
+										<EmployeeAvatar employee={employee} className="h-11 w-11 text-sm shadow-sm border border-(--color-border)/40" />
 										<span className="min-w-0 flex-1">
 											<span className="block truncate text-sm font-semibold text-(--color-text)">{employee.name}</span>
-											<span className="mt-0.5 block truncate text-xs text-(--color-text-muted)">{employee.employee_code ?? 'No employee code'} · {employee.department?.name ?? 'No department'}</span>
+											<span className="mt-0.5 block truncate text-xs text-(--color-text-muted)">{employee.employee_code ?? 'No employee code'} · {employee.plant?.name ?? 'No plant'}</span>
+											<span className="mt-1 block truncate text-xs font-medium text-(--color-accent)">{employee.department?.name ?? employee.designation?.name ?? 'No department'}</span>
 										</span>
 										{String(selectedEmployee) === String(employee.id) && <UserRound size={16} className="shrink-0 text-(--color-accent)" />}
 									</button>

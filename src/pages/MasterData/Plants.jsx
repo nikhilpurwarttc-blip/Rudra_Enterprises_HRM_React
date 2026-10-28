@@ -325,11 +325,11 @@ const Plants = () => {
           attendees,
           date: form.shutdown_start_date,
           getAttendance: async (employeeId, date) => unwrap(await getEmployeeAttendance({
-              employeeId,
-              date_from: date,
-              date_to: date,
-              per_page: 100,
-            }).unwrap()),
+            employeeId,
+            date_from: date,
+            date_to: date,
+            per_page: 100,
+          }).unwrap()),
           markPresent: (employeeId, date) => markShutdownPresent({
             employee_id: employeeId,
             attendance_date: date,
@@ -602,31 +602,68 @@ const Plants = () => {
             </div>
 
             {shutdowns.length > 0 && (
-              <section className="space-y-2" aria-label="Shutdown details">
+              <section className="" aria-label="Shutdown details">
                 <h3 className="text-sm font-semibold text-(--color-text)">Shutdown details</h3>
-                {shutdowns.map((shutdown) => {
-                  const { start, end } = getShutdownDates(shutdown);
-                  const isPending = Number(shutdown.status) === 1;
-                  const status = getShutdownStatus(shutdown);
-                  const statusClass = status.color === 'amber'
-                    ? 'border-amber-500/30 bg-amber-500/5 text-amber-800 dark:text-amber-200'
-                    : status.color === 'red'
-                      ? 'border-red-500/30 bg-red-500/5 text-red-700 dark:text-red-300'
-                      : 'border-slate-500/30 bg-slate-500/5 text-slate-700 dark:text-slate-300';
-                  return <div key={shutdown.id ?? `${start}-${shutdown.reason}`} className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 ${statusClass}`}>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold">{start}{end && end !== start ? ` – ${end}` : ''} · {status.label}</p>
-                      <p className="mt-1 text-sm text-(--color-text)">{shutdown.reason || shutdown.shutdown_type || 'Plant shutdown'}</p>
-                      {Number(shutdown.status) === 3 && shutdown.remarks && <p className="mt-1 text-sm text-(--color-text-muted)">Rejection reason: {shutdown.remarks}</p>}
-                    </div>
-                    {isPending && (canApproveShutdown || canRejectShutdown) && (
-                      <div className="flex items-center gap-2">
-                        {canApproveShutdown && <Button type="button" onClick={() => setShutdownToApprove(shutdown)} disabled={approvingShutdown || rejectingShutdown} className="inline-flex items-center gap-2"><Check size={16} />Approve</Button>}
-                        {canRejectShutdown && <Button type="button" onClick={() => { setShutdownToReject(shutdown); setRejectionReason(''); }} disabled={approvingShutdown || rejectingShutdown} className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700"><XCircle size={16} />Reject</Button>}
+                <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                  {shutdowns.map((shutdown) => {
+                    const { start, end } = getShutdownDates(shutdown);
+                    const isPending = Number(shutdown.status) === 1;
+                    const status = getShutdownStatus(shutdown);
+                    const statusClass = status.color === 'amber'
+                      ? 'border-amber-500/30 bg-amber-500/5 text-amber-800 dark:text-amber-200'
+                      : status.color === 'red'
+                        ? 'border-red-500/30 bg-red-500/5 text-red-700 dark:text-red-300'
+                        : 'border-slate-500/30 bg-slate-500/5 text-slate-700 dark:text-slate-300';
+
+                    return (
+                      <div
+                        key={shutdown.id ?? `${start}-${shutdown.reason}`}
+                        className={`flex flex-col justify-between gap-3 rounded-lg border px-4 py-3 sm:flex-row sm:items-center ${statusClass}`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold">
+                            {start}{end && end !== start ? ` – ${end}` : ''} · {status.label}
+                          </p>
+                          <p className="mt-1 text-sm text-(--color-text)">
+                            {shutdown.reason || shutdown.shutdown_type || 'Plant shutdown'}
+                          </p>
+                          {Number(shutdown.status) === 3 && shutdown.remarks && (
+                            <p className="mt-1 text-sm text-(--color-text-muted)">
+                              Rejection reason: {shutdown.remarks}
+                            </p>
+                          )}
+                        </div>
+
+                        {isPending && (canApproveShutdown || canRejectShutdown) && (
+                          <div className="flex items-center gap-2 pt-2 sm:pt-0">
+                            {canApproveShutdown && (
+                              <Button
+                                type="button"
+                                onClick={() => setShutdownToApprove(shutdown)}
+                                disabled={approvingShutdown || rejectingShutdown}
+                                className="inline-flex items-center gap-1.5 text-xs sm:text-sm"
+                              >
+                                <Check size={16} />
+                                Approve
+                              </Button>
+                            )}
+                            {canRejectShutdown && (
+                              <Button
+                                type="button"
+                                onClick={() => { setShutdownToReject(shutdown); setRejectionReason(''); }}
+                                disabled={approvingShutdown || rejectingShutdown}
+                                className="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-xs sm:text-sm"
+                              >
+                                <XCircle size={16} />
+                                Reject
+                              </Button>
+                            )}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>;
-                })}
+                    );
+                  })}
+                </div>
               </section>
             )}
           </section>

@@ -130,7 +130,7 @@ const SearchableSelect = ({
         aria-required={required}
         aria-invalid={Boolean(error)}
         className={cn(
-          'flex w-full min-h-12.5 rounded-full items-center justify-between border bg-transparent px-3 text-sm text-(--color-text) transition-colors focus:outline-none focus:ring-1',
+          'flex w-full min-h-12.5 h-auto rounded-full items-center justify-between border bg-transparent px-3 text-sm text-(--color-text) transition-colors focus:outline-none focus:ring-1',
           error
             ? 'border-(--color-danger) focus:border-(--color-danger) focus:ring-(--color-danger)'
             : 'border-(--color-border-strong) focus:border-(--color-accent) focus:ring-(--color-accent)',
@@ -166,7 +166,7 @@ const SearchableSelect = ({
       </button>
       
       {isOpen && createPortal(
-        <div ref={dropdownRef} data-searchable-select-dropdown style={dropdownStyle} className="max-h-60 overflow-hidden rounded-md border border-(--color-border-strong) bg-(--color-bg-elevated) text-(--color-text) shadow-lg">
+        <div ref={dropdownRef} data-searchable-select-dropdown style={dropdownStyle} className="max-h-60 overflow-hidden rounded-2xl border border-(--color-border-strong) bg-(--color-bg-elevated) text-(--color-text) shadow-lg">
           {showSearch && (
             <div className="border-b border-(--color-border) p-2">
               <div className="flex items-center gap-2">

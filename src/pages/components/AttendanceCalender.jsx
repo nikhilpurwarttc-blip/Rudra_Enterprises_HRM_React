@@ -1,9 +1,10 @@
 import { useMemo, useRef, useState } from 'react';
-import { CalendarDays, CalendarOff, ChevronLeft, ChevronRight, CircleCheck, CircleX, Clock3, Info, Plane, RefreshCw, PartyPopper, UserRoundX, Wrench, Zap } from 'lucide-react';
+import { CalendarDays, CalendarOff, ChevronLeft, ChevronRight, CircleCheck, CircleX, Clock3, Info, RefreshCw, PartyPopper, UserRoundX, Wrench, Zap } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { Feedback, LoadingState } from '../../components/Feedback';
 import SearchableSelect from '../../components/SearchableSelect';
 import { formatHours } from '../../utils/formatHours';
+import Button from '../../components/Button';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTH_OPTIONS = Array.from({ length: 12 }, (_, monthIndex) => ({
@@ -49,19 +50,20 @@ const RemarkTooltip = ({ remark }) => {
 
 	return (
 		<span className="relative inline-flex">
-			<button
+			<Button
 				ref={ref}
 				type="button"
+				variant="ghost"
 				aria-label="View remark"
 				onMouseEnter={show}
 				onMouseLeave={() => setVisible(false)}
 				onFocus={show}
 				onBlur={() => setVisible(false)}
 				onClick={(e) => { e.stopPropagation(); setVisible((v) => !v); }}
-				className="flex items-center text-(--color-accent) hover:text-(--color-text)"
+				className="!rounded-none !border-0 !bg-transparent !p-0 text-(--color-accent) hover:text-(--color-text)"
 			>
 				<Info size={11} />
-			</button>
+			</Button>
 			{visible && createPortal(
 				<div style={style} className="max-w-[200px] rounded-md border border-(--color-border-strong) bg-(--color-bg-elevated) px-2.5 py-1.5 text-[11px] leading-4 text-(--color-text) shadow-lg">
 					{remark}
@@ -164,14 +166,14 @@ const AttendanceCalender = ({ month, joiningDate, onMonthChange, onYearChange, r
 					</div>
 				</div>
 				<div className="flex items-center gap-1">
-					<button type="button" aria-label="Previous month" title="Previous month" onClick={() => onMonthChange(-1)} disabled={!canGoPrevious} className="flex h-9 w-9 items-center justify-center rounded-md border border-(--color-border) text-(--color-text-muted) hover:bg-(--color-accent-soft) hover:text-(--color-text) disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft size={17} /></button>
+					<Button type="button" variant='ghost' aria-label="Previous month" title="Previous month" onClick={() => onMonthChange(-1)} disabled={!canGoPrevious} className="!h-9 !min-h-9 !w-9 !rounded-md !p-0 text-(--color-text-muted) hover:text-(--color-text) disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft size={17} /></Button>
 					<SearchableSelect
 						ariaLabel="Select attendance month"
 						options={MONTH_OPTIONS}
 						value={String(month.getMonth())}
 						onChange={(value) => onMonthChange(Number(value) - month.getMonth())}
 						className="w-32"
-						btnClass="!min-h-9 h-9 px-2"
+						btnClass="!min-h-9 h-9 !rounded-md "
 						placeholder="Month"
 						clearable={false}
 					/>
@@ -181,15 +183,15 @@ const AttendanceCalender = ({ month, joiningDate, onMonthChange, onYearChange, r
 						value={String(month.getFullYear())}
 						onChange={(year) => onYearChange(Number(year))}
 						className="w-24"
-						btnClass="!min-h-9 h-9 px-2"
+						btnClass="!min-h-9 h-9 !rounded-md "
 						placeholder="Year"
 						clearable={false}
 					/>
-					<button type="button" onClick={() => onMonthChange(0)} className="h-9 rounded-md border border-(--color-border) px-3 text-sm font-medium text-(--color-text) hover:bg-(--color-accent-soft)">Today</button>
-					<button type="button" aria-label="Refresh attendance" title="Refresh attendance" onClick={onRetry} disabled={isLoading} className="flex h-9 w-9 items-center justify-center rounded-md border border-(--color-border) text-(--color-text-muted) hover:bg-(--color-accent-soft) hover:text-(--color-text) disabled:cursor-wait disabled:opacity-60">
+					<Button type="button" variant="ghost" onClick={() => onMonthChange(0)} className="!h-9 !min-h-9 !rounded-md px-3 text-sm font-medium">Today</Button>
+					<Button type="button" variant="ghost" aria-label="Refresh attendance" title="Refresh attendance" onClick={onRetry} disabled={isLoading} className="!h-9 !min-h-9 !w-9 !rounded-md !p-0 text-(--color-text-muted) hover:text-(--color-text) disabled:cursor-wait disabled:opacity-60">
 						<RefreshCw size={15} className={isLoading ? 'animate-spin' : ''} />
-					</button>
-					<button type="button" aria-label="Next month" title="Next month" onClick={() => onMonthChange(1)} disabled={!canGoNext} className="flex h-9 w-9 items-center justify-center rounded-md border border-(--color-border) text-(--color-text-muted) hover:bg-(--color-accent-soft) hover:text-(--color-text) disabled:cursor-not-allowed disabled:opacity-40"><ChevronRight size={17} /></button>
+					</Button>
+					<Button type="button" variant="ghost" aria-label="Next month" title="Next month" onClick={() => onMonthChange(1)} disabled={!canGoNext} className="!h-9 !min-h-9 !w-9 !rounded-md !p-0 text-(--color-text-muted) hover:text-(--color-text) disabled:cursor-not-allowed disabled:opacity-40"><ChevronRight size={17} /></Button>
 				</div>
 			</header>
 
@@ -205,7 +207,7 @@ const AttendanceCalender = ({ month, joiningDate, onMonthChange, onYearChange, r
 			</div>
 
 			{error ? (
-				<Feedback type="error" title="Unable to load attendance" message="Try loading this month again." action={<button type="button" onClick={onRetry} className="mt-1 text-sm font-medium text-(--color-accent)">Retry</button>} />
+				<Feedback type="error" title="Unable to load attendance" message="Try loading this month again." action={<Button type="button" variant="ghost" onClick={onRetry} className="!h-auto !min-h-0 !rounded-none !border-0 !bg-transparent !p-0 mt-1 text-sm font-medium text-(--color-accent)">Retry</Button>} />
 			) : isLoading ? (
 				<LoadingState message="Loading attendance..." className="flex-1" />
 			) : (

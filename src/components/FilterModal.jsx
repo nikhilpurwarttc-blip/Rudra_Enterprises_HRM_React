@@ -10,6 +10,7 @@ import {
   X,
 } from 'lucide-react';
 import Button from './Button';
+import ChoiceChips from './ChoiceChips';
 import SearchableSelect from './SearchableSelect';
 import usePermission from '../hooks/usePermission';
 
@@ -151,7 +152,7 @@ const FilterModal = ({
           if (!isOpen) setDraft(values);
           setIsOpen(!isOpen);
         }}
-        className="group relative flex items-center justify-center gap-2 px-3.5 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+        className="group relative  flex items-center justify-center p-2.5 gap-2  rounded-full transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
         title={buttonLabel}
       >
         <Filter size={16} className="transition-transform duration-300 group-hover:rotate-12" />
@@ -202,6 +203,26 @@ const FilterModal = ({
               const value = draft[field.key] ?? emptyValue(field);
               const FieldIcon = field.icon ?? FIELD_ICONS[field.key];
               if (field.type === 'select' || field.type === 'multiselect') {
+                const options = field.options ?? [];
+                if (
+                  !field.isLoading
+                  && options.length > 0
+                  && options.length < 4
+                ) {
+                  return (
+                    <div key={field.key}>
+                      <ChoiceChips
+                        label={field.label}
+                        value={value}
+                        options={options}
+                        onChange={(nextValue) => updateField(field.key, nextValue)}
+                        disabled={field.disabled}
+                        icon={FieldIcon}
+                        multiple={field.type === 'multiselect'}
+                      />
+                    </div>
+                  );
+                }
                 return (
                   <div key={field.key} className="group">
                     <div className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-(--color-text-muted) transition-colors group-focus-within:text-(--color-accent)">
@@ -210,7 +231,7 @@ const FilterModal = ({
                     </div>
                     <SearchableSelect
                       ariaLabel={field.ariaLabel ?? field.label}
-                      options={field.options ?? []}
+                      options={options}
                       value={value}
                       onChange={(nextValue) => updateField(field.key, nextValue)}
                       placeholder={field.placeholder ?? `Select ${field.label.toLowerCase()}`}
@@ -218,7 +239,7 @@ const FilterModal = ({
                       disabled={field.disabled}
                       multiSelect={field.type === 'multiselect'}
                       showSearch={field.showSearch ?? true}
-                      btnClass="min-h-10 rounded-xl transition-all duration-150 hover:border-(--color-border-strong)"
+                      btnClass="rounded-2xl transition-all duration-150 hover:border-(--color-border-strong)"
                     />
                   </div>
                 );
@@ -235,6 +256,8 @@ const FilterModal = ({
                     onChange={(event) => updateField(field.key, event.target.value)}
                     placeholder={field.placeholder}
                     disabled={field.disabled}
+                    min={typeof field.min === 'function' ? field.min(draft) : field.min}
+                    max={typeof field.max === 'function' ? field.max(draft) : field.max}
                     className="mt-1.5 min-h-10 w-full rounded-xl border border-(--color-border-strong) bg-transparent px-3.5 text-sm font-normal text-(--color-text) outline-none transition-all duration-150 placeholder:text-(--color-text-muted)/60 focus:border-(--color-accent) focus:ring-2 focus:ring-(--color-accent)/20 disabled:cursor-not-allowed disabled:opacity-60"
                   />
                 </label>
