@@ -337,22 +337,7 @@ const getColumns = (activeReport, chargeColumns, onPayEmployee, payingEmployeeId
           : <span title={`Effective from ${row.current_salary_effective_from || 'unknown date'}`}>{formatCurrency(row.current_salary)}</span>,
       },
       { key: 'present_days', label: 'Present', fullLabel: 'Present Days', className: 'min-w-[65px]', tdClass: 'min-w-[65px] text-right', render: (row) => formatNumber(row.present_days) },
-      { key: 'regular_hours', label: 'Basic Hrs', fullLabel: 'Basic Hours Worked', className: 'min-w-[80px]', tdClass: 'min-w-[80px] text-right', render: (row) => formatNumber(row.regular_hours) },
-      {
-        key: 'shutdown_pay',
-        label: 'Shutdown',
-        fullLabel: 'Paid shutdown days and shutdown pay',
-        className: 'min-w-[105px]',
-        tdClass: 'min-w-[105px] text-right',
-        render: (row) => (
-          <span className="flex w-full items-center justify-between gap-2 leading-tight">
-            <span className="text-xs text-(--color-text-muted)" title="Paid shutdown days">
-              {row.shutdown_days == null ? '—' : formatNumber(row.shutdown_days)}
-            </span>
-            <span>{formatCurrency(row.shutdown_pay)}</span>
-          </span>
-        ),
-      },
+      { key: 'regular_hours', label: 'Basic Hrs', fullLabel: 'Basic Hours Worked', className: 'min-w-[80px]', tdClass: 'min-w-[80px] text-right', render: (row) => formatNumber(row.regular_hours) },     
       {
         key: 'current_salary_pay',
         label: 'Basic Pay',
@@ -377,6 +362,21 @@ const getColumns = (activeReport, chargeColumns, onPayEmployee, payingEmployeeId
       { key: 'overtime_pay', label: 'OT Pay', fullLabel: 'Overtime Pay', className: 'min-w-[85px]', tdClass: 'min-w-[85px] text-right', render: (row) => formatCurrency(row.overtime_pay) },
       { key: 'total_hours', label: 'Tot. Hrs', fullLabel: 'Total Hours Worked', className: 'min-w-[80px]', tdClass: 'min-w-[80px] text-right', sortable: false, render: (row) => formatNumber(Number(row.regular_hours || 0) + Number(row.overtime_hours || 0)) },
       { key: 'total_pay', label: 'Tot. Pay', fullLabel: 'Total Regular + Overtime Pay (Total Hours × current salary hourly rate)', className: 'min-w-[100px]', tdClass: 'min-w-[100px] text-right font-semibold', render: (row) => formatCurrency(row.total_pay) },
+      {
+        key: 'shutdown_pay',
+        label: 'Shutdown',
+        fullLabel: 'Paid shutdown days and shutdown pay',
+        className: 'min-w-[105px]',
+        tdClass: 'min-w-[105px] text-right',
+        render: (row) => (
+          <span className="flex w-full items-center justify-between gap-2 leading-tight">
+            <span className="text-xs text-(--color-text-muted)" title="Paid shutdown days">
+              {row.shutdown_days == null ? '—' : formatNumber(row.shutdown_days)}
+            </span>
+            <span>{formatCurrency(row.shutdown_pay)}</span>
+          </span>
+        ),
+      },
       ...chargeColumns.map((charge) => ({
         key: `charge-${charge.id}`,
         label: charge.code || charge.name,

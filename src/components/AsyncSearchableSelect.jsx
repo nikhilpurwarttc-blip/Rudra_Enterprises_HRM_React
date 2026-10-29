@@ -173,16 +173,20 @@ const AsyncSearchableSelect = ({
     if (!triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
+    const viewportWidth = document.documentElement.clientWidth;
     const gap = 6;
     const dropdownHeight = 320;
     const availableBelow = viewportHeight - rect.bottom - gap;
     const availableAbove = rect.top - gap;
     const shouldOpenAbove = availableBelow < dropdownHeight && availableAbove > availableBelow;
+    const width = Math.max(rect.width, 240);
 
     setDropdownStyle({
       position: 'fixed',
-      left: Math.max(8, Math.min(rect.left, window.innerWidth - 320 - 8)),
-      width: Math.max(rect.width, 260),
+      left: Math.max(8, Math.min(rect.left, viewportWidth - width - 8)),
+      width: 'auto',
+      minWidth: width,
+      maxWidth: 300,
       ...(shouldOpenAbove ? { bottom: viewportHeight - rect.top + gap } : { top: rect.bottom + gap }),
       zIndex: 9999,
     });
@@ -286,12 +290,12 @@ const AsyncSearchableSelect = ({
         type="button"
         role="option"
         aria-selected={isSelected}
-        className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition-colors ${isSelected ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]' : 'text-[var(--color-text)] hover:bg-[var(--color-accent-soft)]'}`}
+        className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition-colors ${isSelected ? 'bg-(--color-accent-soft) text-(--color-accent)' : 'text-(--color-text) hover:bg-(--color-accent-soft)'}`}
         onClick={() => handleSelection(option)}
       >
         <span className="min-w-0 truncate">{getOptionLabel(option)}</span>
         {multiple && (
-          <span className={`h-4 w-4 rounded border ${isSelected ? 'border-[var(--color-accent)] bg-[var(--color-accent)]' : 'border-[var(--color-border-strong)]'}`} aria-hidden="true" />
+          <span className={`h-4 w-4 rounded border ${isSelected ? 'border-(--color-accent) bg-(--color-accent)' : 'border-(--color-border-strong)'}`} aria-hidden="true" />
         )}
       </button>
     );
@@ -300,9 +304,9 @@ const AsyncSearchableSelect = ({
   return (
     <div className={cn('relative', className)}>
       {label && (
-        <label htmlFor={inputId} className="pointer-events-none absolute -top-2 left-3 z-10 bg-[var(--color-bg-elevated)] px-1 text-xs leading-none text-[var(--color-text-muted)]">
+        <label htmlFor={inputId} className="pointer-events-none absolute -top-2 left-4 z-10 bg-(--color-bg-elevated) px-1 text-xs leading-none text-(--color-text-muted) uppercase">
           {label}
-          {required && <span className="ml-1 text-[var(--color-danger)]">*</span>}
+          {required && <span className="ml-1 text-(--color-danger)">*</span>}
         </label>
       )}
 
@@ -319,16 +323,18 @@ const AsyncSearchableSelect = ({
         aria-required={required}
         aria-describedby={helperText || error ? `${inputId}-description` : undefined}
         className={cn(
-          'flex min-h-12 w-full items-center justify-between rounded-md border bg-transparent px-3 text-sm text-[var(--color-text)] transition-colors focus:outline-none focus:ring-1',
+          'flex w-full min-h-12.5 h-auto items-center justify-between rounded-full border bg-transparent px-3 text-sm text-(--color-text) transition-colors focus:outline-none focus:ring-1',
           error
-            ? 'border-[var(--color-danger)] focus:border-[var(--color-danger)] focus:ring-[var(--color-danger)]'
-            : 'border-[var(--color-border-strong)] focus:border-[var(--color-accent)] focus:ring-[var(--color-accent)]',
-          disabled ? 'cursor-not-allowed opacity-60' : 'hover:border-[var(--color-accent)]',
+            ? 'border-(--color-danger) focus:border-(--color-danger) focus:ring-(--color-danger)'
+            : 'border-(--color-border-strong) focus:border-(--color-accent) focus:ring-(--color-accent)',
+          disabled ? 'cursor-not-allowed opacity-60' : 'hover:border-(--color-accent)',
           buttonClassName,
         )}
       >
-        <span className={selectedValues.length || multiple ? 'text-[var(--color-text)]' : 'text-[var(--color-text-muted)]'}>{labelSummary}</span>
-        <span className="flex items-center gap-2">
+        <span className={cn('truncate', selectedValues.length || multiple ? 'text-(--color-text)' : 'text-(--color-text-muted)')}>
+          {loading ? 'Loading...' : labelSummary}
+        </span>
+        <span className="flex shrink-0 items-center gap-1">
           {clearable && !disabled && selectedValues.length > 0 && (
             <span
               role="button"
@@ -337,26 +343,29 @@ const AsyncSearchableSelect = ({
                 event.stopPropagation();
                 handleClear(event);
               }}
-              className="inline-flex items-center justify-center rounded p-0.5 text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
+              className="text-(--color-text-muted) hover:text-(--color-text)"
             >
               <X size={14} />
             </span>
           )}
-          {loading ? <Loader2 size={16} className="animate-spin text-[var(--color-text-muted)]" /> : <ChevronDown size={16} className={`text-[var(--color-text-muted)] transition-transform ${isOpen ? 'rotate-180' : ''}`} />}
+          {loading
+            ? <Loader2 size={16} className="animate-spin text-(--color-text-muted)" />
+            : <ChevronDown size={16} className={`text-(--color-text-muted) transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+          }
         </span>
       </button>
 
       {(helperText || error) && (
-        <p id={`${inputId}-description`} role={error ? 'alert' : undefined} className={cn('mt-1 text-xs', error ? 'text-[var(--color-danger)]' : 'text-[var(--color-text-muted)]')}>
+        <p id={`${inputId}-description`} role={error ? 'alert' : undefined} className={cn('mt-1 text-xs', error ? 'text-(--color-danger)' : 'text-(--color-text-muted)')}>
           {error || helperText}
         </p>
       )}
 
       {isOpen && createPortal(
-        <div ref={dropdownRef} style={dropdownStyle} className="overflow-hidden rounded-md border border-[var(--color-border-strong)] bg-[var(--color-bg-elevated)] text-[var(--color-text)] shadow-lg">
-          <div className="border-b border-[var(--color-border)] p-2">
+        <div ref={dropdownRef} data-searchable-select-dropdown style={dropdownStyle} className="max-h-60 overflow-hidden rounded-2xl border border-(--color-border-strong) bg-(--color-bg-elevated) text-(--color-text) shadow-lg">
+          <div className="border-b border-(--color-border) p-2">
             <div className="flex items-center gap-2">
-              <Search size={15} className="text-[var(--color-text-muted)]" />
+              <Search size={16} className="text-(--color-text-muted)" />
               <input
                 ref={searchRef}
                 value={inputValue}
@@ -364,28 +373,33 @@ const AsyncSearchableSelect = ({
                 onKeyDown={handleKeyDown}
                 type="text"
                 placeholder="Search..."
-                className="min-w-0 flex-1 bg-transparent py-1 text-sm text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)]"
+                className="min-w-0 flex-1 bg-transparent px-2 py-1 text-sm text-(--color-text) outline-none placeholder:text-(--color-text-muted)"
                 aria-label={label ? `${label} search` : 'Search options'}
                 autoComplete="off"
               />
+              {inputValue && (
+                <button type="button" onClick={() => setInputValue('')} className="text-(--color-text-muted) hover:text-(--color-text)" aria-label="Clear search">
+                  <X size={14} />
+                </button>
+              )}
             </div>
           </div>
 
-          <div id={`${inputId}-listbox`} role="listbox" aria-multiselectable={multiple} className="max-h-72 overflow-y-auto">
+          <div id={`${inputId}-listbox`} role="listbox" aria-multiselectable={multiple} className="max-h-48 overflow-y-auto">
             {loading ? (
-              <div className="flex items-center justify-center gap-2 px-3 py-3 text-sm text-[var(--color-text-muted)]">
+              <div className="flex items-center justify-center gap-2 px-3 py-3 text-sm text-(--color-text-muted)">
                 <Loader2 size={15} className="animate-spin" />
                 Loading options
               </div>
             ) : errorMessage ? (
               <div className="space-y-2 px-3 py-3">
-                <p className="text-sm text-[var(--color-danger)]">Unable to load options</p>
-                <button type="button" onClick={() => loadPage(1, true)} className="rounded border border-[var(--color-border-strong)] px-2 py-1 text-xs font-medium text-[var(--color-accent)]">
+                <p className="text-sm text-(--color-danger)">Unable to load options</p>
+                <button type="button" onClick={() => loadPage(1, true)} className="rounded border border-(--color-border-strong) px-2 py-1 text-xs font-medium text-(--color-accent)">
                   Retry
                 </button>
               </div>
             ) : visibleOptions.length === 0 ? (
-              <div className="px-3 py-3 text-sm text-[var(--color-text-muted)]">{emptyMessage}</div>
+              <div className="px-3 py-3 text-sm text-(--color-text-muted)">{emptyMessage}</div>
             ) : (
               <>
                 {visibleOptions.map((option, index) => (
@@ -399,7 +413,7 @@ const AsyncSearchableSelect = ({
                     type="button"
                     onClick={handleLoadMore}
                     disabled={loadingMore}
-                    className="flex w-full items-center justify-center gap-2 border-t border-[var(--color-border)] px-3 py-2 text-sm font-medium text-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-60"
+                    className="flex w-full items-center justify-center gap-2 border-t border-(--color-border) px-3 py-2 text-sm font-medium text-(--color-accent) disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {loadingMore ? <Loader2 size={15} className="animate-spin" /> : null}
                     {loadingMore ? 'Loading more…' : 'Load more'}

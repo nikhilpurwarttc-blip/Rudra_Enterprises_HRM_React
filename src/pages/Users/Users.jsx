@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LoaderCircle, Plus, Search, User, Trash2, Pencil } from 'lucide-react';
 import {
   useLazyGetUsersQuery,
@@ -23,7 +23,6 @@ import Badge from '../../components/Badge';
 import Switch from '../../components/Switch';
 import ConfirmDelete from '../../components/ConfirmDelete';
 import Button from '../../components/Button';
-import ChipSwitcher from '../../components/ChipSwitcher';
 import { useRenderPerformance } from '../../utils/performance';
 import { getApiErrorMessage } from '../../components/feedbackUtils';
 import useRefreshOnFocus from '../../hooks/useRefreshOnFocus';
@@ -31,10 +30,6 @@ import useRefreshOnFocus from '../../hooks/useRefreshOnFocus';
 const EMPTY_FORM = { name: '', username: '', email: '', password: '', role_id: '', employee_id: '', selected_role: null, selected_employee: null, status: true };
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ROLE_BADGES = { admin: 'blue', manager: 'gold', supervisor: 'aqua', employee: 'gray' };
-const STATUS_OPTIONS = [
-  { value: true, label: 'Active' },
-  { value: false, label: 'Inactive' },
-];
 
 const FIELD_LABELS = {
   employee_id: 'Employee',
@@ -55,7 +50,15 @@ const getRoleOptionLabel = (role) => role.name;
 // Identify system superadmin by username only — never hardcode email as a credential check
 const isSystemSuperAdmin = (user) => String(user?.username ?? '').toLowerCase() === 'superadmin';
 
-const UserForm = ({ form, setForm, roles, employees, loadEmployees, loadRoles, errors }) => {
+const UserForm = memo(({ form, setForm, roles, errors }) => {
+  const [fetchEmployeeOptions] = useLazyGetEmployeesQuery();
+  const [fetchRoleOptions] = useLazyGetRolesQuery();
+  const loadEmployees = useCallback(({ search: query, page, perPage }) => (
+    fetchEmployeeOptions({ search: query, page, per_page: perPage }).unwrap()
+  ), [fetchEmployeeOptions]);
+  const loadRoles = useCallback(({ search: query, page, perPage }) => (
+    fetchRoleOptions({ search: query, page, per_page: perPage }).unwrap()
+  ), [fetchRoleOptions]);
   const set = (field) => (event) => setForm((current) => ({ ...current, [field]: event.target.value }));
   const handleEmployeeChange = (employeeId, employee) => {
     setForm((current) => ({
@@ -79,7 +82,6 @@ const UserForm = ({ form, setForm, roles, employees, loadEmployees, loadRoles, e
         onChange={handleEmployeeChange}
         loadOptions={loadEmployees}
         selectedOptions={[
-          ...employees.filter((employee) => String(employee.id) === String(form.employee_id)),
           ...(form.selected_employee ? [form.selected_employee] : []),
         ]}
         getOptionValue={getEmployeeOptionValue}
@@ -117,15 +119,20 @@ const UserForm = ({ form, setForm, roles, employees, loadEmployees, loadRoles, e
         required
         error={errors.role_id}
       />
-      <ChipSwitcher
-        label="Account Status"
-        options={STATUS_OPTIONS}
-        value={form.status}
-        onChange={(val) => setForm((current) => ({ ...current, status: Boolean(val) }))}
-      />
+      <div className="flex min-h-12 items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium text-(--color-text)">Account Status</p>
+          <p className="text-xs text-(--color-text-muted)">{form.status ? 'Active' : 'Inactive'}</p>
+        </div>
+        <Switch
+          checked={Boolean(form.status)}
+          onClick={() => setForm((current) => ({ ...current, status: !current.status }))}
+          ariaLabel="Account status"
+        />
+      </div>
     </>
   );
-};
+});
 
 const Users = () => {
   const location = useLocation();
@@ -134,8 +141,6 @@ const Users = () => {
   const pageTitle = getRouteConfig(location.pathname)?.name ?? 'Users';
   const [fetchUsers, { isLoading, isFetching }] = useLazyGetUsersQuery({ refetchOnFocus: false });
   const { data: rolesData } = useGetRolesQuery({ per_page: 100 });
-  const [fetchEmployeeOptions] = useLazyGetEmployeesQuery();
-  const [fetchRoleOptions] = useLazyGetRolesQuery();
   const [createUser, { isLoading: creating }] = useCreateUserMutation();
   const [updateUser, { isLoading: updating }] = useUpdateUserMutation();
   const [deleteUser] = useDeleteUserMutation();
@@ -155,8 +160,6 @@ const Users = () => {
     () => (rolesData?.data ?? rolesData ?? []).filter((role) => role.name?.toLowerCase().replace(/[\s_-]+/g, '') !== 'superadmin'),
     [rolesData],
   );
-  // Stable empty array — avoids new reference on every render causing child re-renders
-  const employees = useMemo(() => [], []);
   useRenderPerformance('getUsers', loadedUsers);
   useRenderPerformance('getRoles', rolesData);
   const [search, setSearch] = useState('');
@@ -321,13 +324,6 @@ const Users = () => {
   const updateForm = useCallback((update) => {
     setModal((current) => ({ ...current, form: typeof update === 'function' ? update(current.form) : update }));
   }, []);
-
-  const loadEmployeeOptions = useCallback(({ search: query, page, perPage }) => (
-    fetchEmployeeOptions({ search: query, page, per_page: perPage }).unwrap()
-  ), [fetchEmployeeOptions]);
-  const loadRoleOptions = useCallback(({ search: query, page, perPage }) => (
-    fetchRoleOptions({ search: query, page, per_page: perPage }).unwrap()
-  ), [fetchRoleOptions]);
 
   const handleSave = useCallback(async () => {
     const { id, name, username, email, password, role_id, employee_id, status } = modal.form;
@@ -497,18 +493,19 @@ const Users = () => {
   return (
     <div className="p-4 sm:p-6 space-y-4">
       <SectionCard
-        title={pageTitle}
+        // title={pageTitle}
         action={canCreate && !isReadOnly && (
           <Button type="button" onClick={openAdd} className="flex items-center gap-1.5">
             <Plus size={15} /> Add User
           </Button>
         )}
-      >
-        <div className="mb-4 flex flex-wrap gap-2">
+        left=
+        {<div className="ml-2 flex flex-wrap gap-2">
           <InputField value={search} onChange={handleSearchChange} placeholder="Search name, username, or email" leftIcon={<Search size={16} />} />
           <SearchableSelect options={roleOptions} value={filterRole} onChange={setFilterRole} placeholder="Filter by role" className="min-w-48" />
           {isUserLoading && <span className="flex items-center gap-1.5 px-2 text-xs text-(--color-text-muted)" role="status"><LoaderCircle size={14} className="animate-spin" />{loadedUsers.length ? `Loading users (${loadedUsers.length}${totalUsers ? ` of ${totalUsers}` : ''})` : 'Loading users...'}</span>}
-        </div>
+        </div>}
+      >
         <PageTable
           columns={columns}
           rows={filteredUsers}
@@ -522,7 +519,7 @@ const Users = () => {
       </SectionCard>
 
       <RightModal isOpen={modal.open} onClose={closeModal} onSubmit={handleSave} title={modal.form.id ? `Edit — ${modal.form.name}` : 'Add User'} saving={creating || updating}>
-        <UserForm form={modal.form} setForm={updateForm} roles={roles} employees={employees} loadEmployees={loadEmployeeOptions} loadRoles={loadRoleOptions} errors={errors} />
+        <UserForm form={modal.form} setForm={updateForm} roles={roles} errors={errors} />
       </RightModal>
 
       <ConfirmDelete

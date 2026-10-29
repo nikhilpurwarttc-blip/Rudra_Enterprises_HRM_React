@@ -71,7 +71,7 @@ const Login = () => {
     <main className="app-surface flex min-h-screen items-center justify-center px-4 py-8">
       {/* background image */}
       {/* <img src="/loginBG.avif" alt="" className="w-full h-full absolute inset-0 object-cover" /> */}
-      <span className="w-3xs absolute right-4 bottom-4">
+      <span className="max-w-3xs w-auto absolute right-4 bottom-4">
         <img src="/favicon.png" alt="HRM Logo" />
       </span>
       <div className="w-full max-w-md">
