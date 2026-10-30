@@ -19,6 +19,7 @@ import usePermission from '../../hooks/usePermission';
 import { useToast } from '../../contexts/ToastContext';
 import InputField from '../../components/InputField';
 import Switch from '../../components/Switch';
+import Badge from '../../components/Badge';
 import ConfirmDelete from '../../components/ConfirmDelete';
 import Button from '../../components/Button';
 import { Feedback } from '../../components/Feedback';
@@ -50,15 +51,12 @@ const getLocalDate = () => {
   return new Date(date.getTime() - offset).toISOString().slice(0, 10);
 };
 const getShutdownDefaults = (selectedDates = []) => {
-  const now = new Date();
   const dates = [...new Set(selectedDates)].sort();
   const startDate = dates[0] ?? getLocalDate();
   return {
     reason: 'Power cut / Maintenance',
     shutdown_start_date: startDate,
-    start_time: dates.length ? '00:00' : `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
     shutdown_end_date: dates[dates.length - 1] ?? startDate,
-    end_time: '23:59',
   };
 };
 const hasDateGaps = (dates) => {
@@ -602,40 +600,62 @@ const Plants = () => {
             </div>
 
             {shutdowns.length > 0 && (
-              <section className="" aria-label="Shutdown details">
+              <section aria-label="Shutdown details">
                 <h3 className="text-sm font-semibold text-(--color-text)">Shutdown details</h3>
-                <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 ">
                   {shutdowns.map((shutdown) => {
                     const { start, end } = getShutdownDates(shutdown);
                     const isPending = Number(shutdown.status) === 1;
                     const status = getShutdownStatus(shutdown);
-                    const statusClass = status.color === 'amber'
-                      ? 'border-amber-500/30 bg-amber-500/5 text-amber-800 dark:text-amber-200'
+                    const statusBadgeColor = status.color === 'amber'
+                      ? 'amber'
                       : status.color === 'red'
-                        ? 'border-red-500/30 bg-red-500/5 text-red-700 dark:text-red-300'
-                        : 'border-slate-500/30 bg-slate-500/5 text-slate-700 dark:text-slate-300';
+                        ? 'red'
+                        : 'gray';
+                    const statusAccent = status.color === 'amber'
+                      ? 'border-l-amber-500'
+                      : status.color === 'red'
+                        ? 'border-l-red-500'
+                        : 'border-l-slate-400';
 
                     return (
                       <div
                         key={shutdown.id ?? `${start}-${shutdown.reason}`}
-                        className={`flex flex-col justify-between gap-3 rounded-lg border px-4 py-3 sm:flex-row sm:items-center ${statusClass}`}
+                        className={`flex min-w-0 flex-col gap-3 rounded-xl border border-(--color-border) border-l-4 ${statusAccent} bg-(--color-surface)/70 p-4 shadow-sm`}
                       >
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold">
-                            {start}{end && end !== start ? ` – ${end}` : ''} · {status.label}
-                          </p>
-                          <p className="mt-1 text-sm text-(--color-text)">
-                            {shutdown.reason || shutdown.shutdown_type || 'Plant shutdown'}
-                          </p>
+                        <div className="flex min-w-0 items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium uppercase tracking-wide text-(--color-text-muted)">
+                              {start}{end && end !== start ? ` – ${end}` : ''}
+                            </p>
+                            <p className="mt-1 break-words text-sm font-semibold text-(--color-text)">
+                              {shutdown.reason || shutdown.shutdown_type || 'Plant shutdown'}
+                            </p>
+                          </div>
+                          <Badge color={statusBadgeColor} className="shrink-0">{status.label}</Badge>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div>
+                            <p className="text-xs font-medium text-(--color-text-muted)">Affected shifts</p>
+                            <div className="mt-1.5 flex flex-wrap gap-1.5">
+                              {shutdown.shifts?.length > 0
+                                ? shutdown.shifts.map((shift) => (
+                                  <Badge key={shift.id} color="primary">{shift.name}</Badge>
+                                ))
+                                : <span className="text-xs text-(--color-text-muted)">No shifts assigned</span>}
+                            </div>
+                          </div>
                           {Number(shutdown.status) === 3 && shutdown.remarks && (
-                            <p className="mt-1 text-sm text-(--color-text-muted)">
-                              Rejection reason: {shutdown.remarks}
+                            <p className="rounded-md border border-(--color-border) bg-(--color-bg-elevated) px-2.5 py-2 text-xs text-(--color-text-muted)">
+                              <span className="font-semibold text-(--color-text)">Rejection reason: </span>
+                              {shutdown.remarks}
                             </p>
                           )}
                         </div>
 
                         {isPending && (canApproveShutdown || canRejectShutdown) && (
-                          <div className="flex items-center gap-2 pt-2 sm:pt-0">
+                          <div className="flex flex-wrap items-center gap-2 border-t border-(--color-border) pt-3">
                             {canApproveShutdown && (
                               <Button
                                 type="button"
@@ -727,6 +747,7 @@ const Plants = () => {
           isOpen={shutdownRequestOpen}
           mode="request"
           plantId={selectedPlant?.id}
+          shifts={selectedPlant?.shifts ?? []}
           initialValues={getShutdownDefaults(shutdownRequestDates)}
           hasSelectedDateGaps={hasDateGaps(shutdownRequestDates)}
           saving={submittingShutdown || markingShutdownAttendees}
@@ -750,6 +771,8 @@ const Plants = () => {
           key={`approve-shutdown-${shutdownToApprove.id}`}
           isOpen={Boolean(shutdownToApprove)}
           mode="approve"
+          plantId={selectedPlant?.id}
+          shifts={selectedPlant?.shifts ?? []}
           initialValues={shutdownToApprove}
           saving={approvingShutdown}
           onClose={() => setShutdownToApprove(null)}

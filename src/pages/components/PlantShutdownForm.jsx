@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { UserRoundCheck } from 'lucide-react';
 import ConfirmDelete from '../../components/ConfirmDelete';
 import SearchableSelect from '../../components/SearchableSelect';
+import ChoiceChips from '../../components/ChoiceChips';
 import { useGetEmployeesQuery } from '../../store/api';
 import RightModal from './RightModal';
 
@@ -10,16 +11,16 @@ const unwrap = (value) => Array.isArray(value) ? value : value?.data ?? [];
 const getFormValues = (values = {}) => ({
   reason: values.reason ?? '',
   shutdown_start_date: String(values.shutdown_start_date ?? '').slice(0, 10),
-  start_time: String(values.start_time ?? '').slice(0, 5),
   shutdown_end_date: String(values.shutdown_end_date ?? values.shutdown_start_date ?? '').slice(0, 10),
-  end_time: String(values.end_time ?? '').slice(0, 5),
+  shift_ids: (values.shift_ids ?? values.shifts?.map((shift) => shift.id) ?? []).map(String),
 });
 
 const PlantShutdownForm = ({
   isOpen,
   mode,
-  initialValues,
+  initialValues = {},
   plantId,
+  shifts = [],
   hasSelectedDateGaps = false,
   saving = false,
   onClose,
@@ -39,20 +40,39 @@ const PlantShutdownForm = ({
     { skip: mode !== 'request' },
   );
   const employees = unwrap(employeesQuery.data);
-  const employeeOptions = useMemo(() => employees.map((employee) => ({
+  const isApproval = mode === 'approve';
+  const isRequest = mode === 'request';
+  const eligibleEmployees = useMemo(
+    () => employees.filter((employee) => form.shift_ids.includes(String(employee.shift_id))),
+    [employees, form.shift_ids],
+  );
+  const employeeOptions = useMemo(() => eligibleEmployees.map((employee) => ({
     value: String(employee.id),
     label: employee.name,
     searchText: `${employee.name ?? ''} ${employee.employee_code ?? ''}`,
-  })), [employees]);
-  const selectedAttendees = employees.filter((employee) => attendeeIds.includes(String(employee.id)));
+  })), [eligibleEmployees]);
+  const selectedAttendees = eligibleEmployees.filter((employee) => attendeeIds.includes(String(employee.id)));
+  const allAvailableShifts = [...shifts, ...(initialValues.shifts ?? [])]
+    .filter((shift, index, available) => available.findIndex((candidate) => String(candidate.id) === String(shift.id)) === index);
+  const availableShifts = isRequest
+    ? allAvailableShifts.filter((shift) => Number(shift.status) === 1)
+    : allAvailableShifts;
+  const shiftOptions = availableShifts.map((shift) => {
+    const timeRange = [shift.start_time, shift.end_time]
+      .map((time) => String(time ?? '').slice(0, 5))
+      .filter(Boolean)
+      .join(' - ');
+    return {
+      value: String(shift.id),
+      label: `${shift.name}${timeRange ? ` (${timeRange})` : ''}`,
+    };
+  });
   const initialStartDate = String(initialValues.shutdown_start_date ?? '').slice(0, 10);
   const initialEndDate = String(initialValues.shutdown_end_date ?? initialValues.shutdown_start_date ?? '').slice(0, 10);
   const [previousInitialDates, setPreviousInitialDates] = useState(() => ({
     start: initialStartDate,
     end: initialEndDate,
   }));
-  const isApproval = mode === 'approve';
-  const isRequest = mode === 'request';
   if (!isApproval && (
     previousInitialDates.start !== initialStartDate
     || previousInitialDates.end !== initialEndDate
@@ -67,12 +87,12 @@ const PlantShutdownForm = ({
   const isValid = Boolean(
     form.reason.trim()
     && form.shutdown_start_date
-    && form.start_time
     && form.shutdown_end_date
-    && form.end_time
-    && `${form.shutdown_start_date}T${form.start_time}` < `${form.shutdown_end_date}T${form.end_time}`,
+    && form.shutdown_start_date <= form.shutdown_end_date
+    && form.shift_ids.length > 0,
   );
   const update = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
+  const updateShifts = (shiftIds) => setForm((current) => ({ ...current, shift_ids: shiftIds }));
   const submitRequest = (markAttendees) => onSubmit({
     ...form,
     attendees: selectedAttendees,
@@ -101,8 +121,8 @@ const PlantShutdownForm = ({
         {isApproval
           ? 'Review and update the shutdown details before approving this request.'
           : hasSelectedDateGaps
-            ? 'This request applies only to the selected plant. It covers the full date range shown below, including any days between selected calendar cells. Attendance punching is paused for those dates after approval.'
-            : 'This request applies only to the selected plant. Attendance punching is paused for the requested dates until an authorized user approves or rejects it.'}
+            ? 'Select the plant shifts affected by this request. It covers the full date range shown below, including any days between selected calendar cells. Pending requests block punching only for these shifts.'
+            : 'Select the plant shifts affected by this request and the dates they will be shut down. Pending requests block punching only for these shifts.'}
       </p>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 max-w-sm">
         <label className="sm:col-span-2 text-sm font-medium text-(--color-text)">
@@ -120,25 +140,32 @@ const PlantShutdownForm = ({
           <input type="date" value={form.shutdown_start_date} onChange={update('shutdown_start_date')} required className="mt-1 w-full rounded-md border border-(--color-border-strong) bg-transparent px-3 py-2 text-sm font-normal text-(--color-text)" />
         </label>
         <label className="text-sm font-medium text-(--color-text)">
-          Start time
-          <input type="time" value={form.start_time} onChange={update('start_time')} required className="mt-1 w-full rounded-md border border-(--color-border-strong) bg-transparent px-3 py-2 text-sm font-normal text-(--color-text)" />
-        </label>
-        <label className="text-sm font-medium text-(--color-text)">
           End date
           <input type="date" value={form.shutdown_end_date} onChange={update('shutdown_end_date')} required className="mt-1 w-full rounded-md border border-(--color-border-strong) bg-transparent px-3 py-2 text-sm font-normal text-(--color-text)" />
         </label>
-        <label className="text-sm font-medium text-(--color-text)">
-          End time
-          <input type="time" value={form.end_time} onChange={update('end_time')} required className="mt-1 w-full rounded-md border border-(--color-border-strong) bg-transparent px-3 py-2 text-sm font-normal text-(--color-text)" />
-        </label>
       </div>
+      <ChoiceChips
+        label="Shutdown shifts (required)"
+        value={form.shift_ids}
+        options={shiftOptions}
+        onChange={updateShifts}
+        multiple
+      />
+      {shiftOptions.length === 0 && (
+        <p role="alert" className="text-sm text-(--color-danger)">
+          {isRequest ? 'Assign active shifts to this plant before requesting a shutdown.' : 'No shifts are available for this shutdown.'}
+        </p>
+      )}
+      {shiftOptions.length > 0 && form.shift_ids.length === 0 && (
+        <p role="status" className="text-sm text-(--color-text-muted)">Select at least one shift for the shutdown request.</p>
+      )}
       {isRequest && (
         <>
           <SearchableSelect
             label="Employees coming (optional)"
             ariaLabel="Select employees coming during shutdown"
             options={employeeOptions}
-            value={attendeeIds}
+            value={selectedAttendees.map((employee) => String(employee.id))}
             onChange={setAttendeeIds}
             placeholder="Select employees"
             multiSelect

@@ -441,15 +441,15 @@ export const api = createApi({
     }),
     createShift: builder.mutation({
       query: (body) => ({ url: '/shifts', method: 'POST', body }),
-      invalidatesTags: ['Shift', 'Employee'],
+      invalidatesTags: ['Shift', 'Employee', 'Plant', 'PlantShutdown'],
     }),
     updateShift: builder.mutation({
       query: ({ id, ...body }) => ({ url: `/shifts/${id}`, method: 'PUT', body }),
-      invalidatesTags: ['Shift', 'Employee'],
+      invalidatesTags: ['Shift', 'Employee', 'Plant', 'PlantShutdown'],
     }),
     deleteShift: builder.mutation({
       query: (id) => ({ url: `/shifts/${id}`, method: 'DELETE' }),
-      invalidatesTags: ['Shift', 'Employee'],
+      invalidatesTags: ['Shift', 'Employee', 'Plant', 'PlantShutdown'],
     }),
 
     // Master data

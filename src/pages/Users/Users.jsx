@@ -47,6 +47,14 @@ const getEmployeeOptionValue = (employee) => employee.id;
 const getEmployeeOptionLabel = (employee) => `${employee.name ?? ''} · ${employee.employee_code || 'No employee ID'} · ${employee.designation?.name || 'No designation'}`;
 const getRoleOptionValue = (role) => role.id;
 const getRoleOptionLabel = (role) => role.name;
+const isSystemSuperAdminRole = (role) => role?.name?.toLowerCase().replace(/[\s_-]+/g, '') === 'superadmin';
+const withoutSystemSuperAdminRole = (response) => {
+  if (Array.isArray(response)) return response.filter((role) => !isSystemSuperAdminRole(role));
+  if (Array.isArray(response?.data)) {
+    return { ...response, data: response.data.filter((role) => !isSystemSuperAdminRole(role)) };
+  }
+  return response;
+};
 // Identify system superadmin by username only — never hardcode email as a credential check
 const isSystemSuperAdmin = (user) => String(user?.username ?? '').toLowerCase() === 'superadmin';
 
@@ -56,8 +64,8 @@ const UserForm = memo(({ form, setForm, roles, errors }) => {
   const loadEmployees = useCallback(({ search: query, page, perPage }) => (
     fetchEmployeeOptions({ search: query, page, per_page: perPage }).unwrap()
   ), [fetchEmployeeOptions]);
-  const loadRoles = useCallback(({ search: query, page, perPage }) => (
-    fetchRoleOptions({ search: query, page, per_page: perPage }).unwrap()
+  const loadRoles = useCallback(async ({ search: query, page, perPage }) => (
+    withoutSystemSuperAdminRole(await fetchRoleOptions({ search: query, page, per_page: perPage }).unwrap())
   ), [fetchRoleOptions]);
   const set = (field) => (event) => setForm((current) => ({ ...current, [field]: event.target.value }));
   const handleEmployeeChange = (employeeId, employee) => {
@@ -109,7 +117,7 @@ const UserForm = memo(({ form, setForm, roles, errors }) => {
         loadOptions={loadRoles}
         selectedOptions={[
           ...roles.filter((role) => String(role.id) === String(form.role_id)),
-          ...(form.selected_role ? [form.selected_role] : []),
+          ...(form.selected_role && !isSystemSuperAdminRole(form.selected_role) ? [form.selected_role] : []),
         ]}
         getOptionValue={getRoleOptionValue}
         getOptionLabel={getRoleOptionLabel}
@@ -157,7 +165,7 @@ const Users = () => {
   const searchTimeout = useRef(null);
   const users = useMemo(() => loadedUsers.filter((user) => !isSystemSuperAdmin(user)), [loadedUsers]);
   const roles = useMemo(
-    () => (rolesData?.data ?? rolesData ?? []).filter((role) => role.name?.toLowerCase().replace(/[\s_-]+/g, '') !== 'superadmin'),
+    () => (rolesData?.data ?? rolesData ?? []).filter((role) => !isSystemSuperAdminRole(role)),
     [rolesData],
   );
   useRenderPerformance('getUsers', loadedUsers);
