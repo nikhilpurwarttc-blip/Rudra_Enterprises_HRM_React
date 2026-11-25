@@ -29,6 +29,7 @@ import usePermission from '../../hooks/usePermission';
 import Button from '../../components/Button';
 import { markShutdownAttendees } from '../../utils/markShutdownAttendees';
 import useDebouncedValue from '../../hooks/useDebouncedValue';
+import EmployeeAvatar from '../Employee/components/EmployeeAvatar';
 
 const unwrap = (value) => (Array.isArray(value) ? value : value?.data ?? []);
 const matchesEmployeeSearch = (employee, query) => {
@@ -56,14 +57,6 @@ const getShutdownDefaults = () => {
     end_time: '23:59',
   };
 };
-
-const initials = (name) => String(name ?? '?')
-  .split(/\s+/)
-  .filter(Boolean)
-  .slice(0, 2)
-  .map((part) => part[0])
-  .join('')
-  .toUpperCase();
 
 const formatTime = (time) => {
   if (!time) return '—';
@@ -478,9 +471,10 @@ const Marking = () => {
       label: 'Employee',
       render: (employee) => (
         <div className="flex min-w-48 items-center gap-3">
-          {employee.image
-            ? <img src={employee.image} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
-            : <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-(--color-accent-soft) text-sm font-semibold text-(--color-accent)">{initials(employee.name)}</span>}
+          <EmployeeAvatar
+            employee={employee}
+            className="h-10 w-10 text-sm"
+          />
           <span className="min-w-0">
             <span className="block truncate font-semibold">{employee.name}</span>
             <span className="block text-xs text-(--color-text-muted)">{employee.employee_code ?? `#${employee.id}`}</span>
