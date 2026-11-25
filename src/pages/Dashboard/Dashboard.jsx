@@ -351,7 +351,7 @@ const Dashboard = () => {
   };
 
   const dashboard = response?.data;
-  console.log('dashboard', dashboard)
+  // console.log('dashboard', dashboard)
   // Strict Permission Verification
   const capabilities = dashboard?.capabilities;
   const canViewEmployees = capabilities?.can_view_employees ?? permissionCheck(canModule, ['employees', 'employee', 'employee-view']);

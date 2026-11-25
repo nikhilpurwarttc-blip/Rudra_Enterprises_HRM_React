@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { LoaderCircle, Plus, Search, User, Trash2, Pencil } from 'lucide-react';
+import { LoaderCircle, Plus, Search, User, Trash2, Pencil, RefreshCw } from 'lucide-react';
 import {
   useLazyGetUsersQuery,
   useCreateUserMutation,
@@ -499,9 +499,9 @@ const Users = () => {
   ], [canDelete, canEdit, isSuperAdmin, isReadOnly, openEdit, handleStatusChange]);
 
   return (
-    <div className="p-4 sm:p-6 space-y-4">
-      <SectionCard
-        // title={pageTitle}
+    <div className=" max-w-7xl mx-auto p-4 sm:p-6 space-y-4">
+      {/* <SectionCard
+        title={pageTitle}
         action={canCreate && !isReadOnly && (
           <Button type="button" onClick={openAdd} className="flex items-center gap-1.5">
             <Plus size={15} /> Add User
@@ -513,7 +513,32 @@ const Users = () => {
           <SearchableSelect options={roleOptions} value={filterRole} onChange={setFilterRole} placeholder="Filter by role" className="min-w-48" />
           {isUserLoading && <span className="flex items-center gap-1.5 px-2 text-xs text-(--color-text-muted)" role="status"><LoaderCircle size={14} className="animate-spin" />{loadedUsers.length ? `Loading users (${loadedUsers.length}${totalUsers ? ` of ${totalUsers}` : ''})` : 'Loading users...'}</span>}
         </div>}
-      >
+      > */}
+      <div className="flex justify-between mb-4">
+        <div className="flex flex-wrap gap-2">
+          <InputField value={search} className="min-h-10" onChange={handleSearchChange} placeholder="Search name, username, or email" leftIcon={<Search size={16} />} />
+          <SearchableSelect options={roleOptions} value={filterRole} onChange={setFilterRole} placeholder="Filter by role" className="min-w-48" />
+          {isUserLoading && <span className="flex items-center gap-1.5 px-2 text-xs text-(--color-text-muted)" role="status"><LoaderCircle size={14} className="animate-spin" />{loadedUsers.length ? `Loading users (${loadedUsers.length}${totalUsers ? ` of ${totalUsers}` : ''})` : 'Loading users...'}</span>}
+        </div>
+        <div className="flex items-center gap-2">
+          {canCreate && !isReadOnly && (
+          <Button type="button" onClick={openAdd} className="flex items-center gap-1.5 p-2.5">
+            <Plus size={15} className="hover:scale-140" />
+          </Button>
+        )}
+        <Button
+            type="button"
+            variant="ghost"
+            aria-label="Refresh Users"
+            title="Refresh Users"
+            onClick={() => refreshUsers()}
+            disabled={isUserLoading || backgroundRefreshing}
+            className="flex items-center justify-center p-2.5 disabled:cursor-wait disabled:opacity-60"
+          >
+            <RefreshCw size={16} className={`transition-transform duration-200 ${backgroundRefreshing ? 'animate-spin' : 'hover:scale-110'}`} />
+          </Button>
+        </div>
+      </div>
         <PageTable
           columns={columns}
           rows={filteredUsers}
@@ -524,7 +549,7 @@ const Users = () => {
           onScroll={handleUserTableScroll}
         />
         {hasLoadError && filteredUsers.length > 0 && <p className="text-sm text-red-500" role="status">Unable to load the next page of users.</p>}
-      </SectionCard>
+      {/* </SectionCard> */}
 
       <RightModal isOpen={modal.open} onClose={closeModal} onSubmit={handleSave} title={modal.form.id ? `Edit — ${modal.form.name}` : 'Add User'} saving={creating || updating}>
         <UserForm form={modal.form} setForm={updateForm} roles={roles} errors={errors} />

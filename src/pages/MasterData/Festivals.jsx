@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { CalendarDays, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { CalendarDays, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
 import {
   useCreateHolidayMutation,
   useDeleteHolidayMutation,
@@ -34,7 +34,7 @@ const formatDate = (value) => {
 const Festivals = () => {
   const toast = useToast();
   const { canCreate, canEdit, canDelete, isReadOnly } = usePermission('/festivals');
-  const { data, isLoading, isError, refetch } = useGetHolidaysQuery();
+  const { data, isLoading, isFetching, isError, refetch } = useGetHolidaysQuery();
   const { data: plantsData, isLoading: plantsLoading } = useGetPlantsQuery();
   const [createHoliday, { isLoading: creating }] = useCreateHolidayMutation();
   const [updateHoliday, { isLoading: updating }] = useUpdateHolidayMutation();
@@ -123,11 +123,29 @@ const Festivals = () => {
   ], [canDelete, canEdit, handleStatusChange, isReadOnly, plantMap, togglingId]);
 
   return (
-    <div className="space-y-4 p-4 sm:p-6">
-      <SectionCard title="Festivals & Holidays" onRefresh={handleRefresh} action={canCreate && !isReadOnly && <Button onClick={() => setEditor({ open: true, festival: null })} className="flex items-center gap-1.5"><Plus size={15} /> Add Holiday</Button>}>
-        <div className="mb-4"><InputField value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search holidays" leftIcon={<Search size={16} />} /></div>
-        {isError ? <Feedback type="error" title="Unable to load holidays" message="Please refresh the page and try again." /> : <PageTable columns={columns} rows={filtered} total={filtered.length} label="holidays" isLoading={isLoading} />}
-      </SectionCard>
+    <div className=" max-w-7xl mx-auto space-y-4 p-4 sm:p-6">
+      {/* <SectionCard title="Festivals & Holidays" onRefresh={handleRefresh} action={canCreate && !isReadOnly && <Button onClick={() => setEditor({ open: true, festival: null })} className="flex items-center gap-1.5"><Plus size={15} /> Add Holiday</Button>}> */}
+      <div className="flex justify-between mb-4">
+        <div className="max-w-0 flex-1 sm:max-w-xs">
+          <InputField value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search holidays" leftIcon={<Search size={16} />} />
+        </div>
+        <div className="flex items-center gap-2">
+          {canCreate && !isReadOnly && <Button onClick={() => setEditor({ open: true, festival: null })} className="flex items-center gap-1.5 p-2.5"><Plus size={15} className="hover:scale-140" /> </Button>}
+          <Button
+            type="button"
+            variant="ghost"
+            aria-label="Refresh Holidays"
+            title="Refresh Holidays"
+            onClick={handleRefresh}
+            disabled={isFetching}
+            className="flex items-center justify-center p-2.5 disabled:cursor-wait disabled:opacity-60"
+          >
+            <RefreshCw size={16} className={`transition-transform duration-200 ${isFetching ? 'animate-spin' : 'hover:scale-110'}`} />
+          </Button>
+        </div>
+      </div>
+      {isError ? <Feedback type="error" title="Unable to load holidays" message="Please refresh the page and try again." /> : <PageTable columns={columns} rows={filtered} total={filtered.length} label="holidays" isLoading={isLoading} />}
+      {/* </SectionCard> */}
       <AddEditFestival key={`${editor.open}-${editor.festival?.id ?? 'new'}`} isOpen={editor.open} festival={editor.festival} plants={plants} plantsLoading={plantsLoading} saving={creating || updating} onClose={() => setEditor({ open: false, festival: null })} onSubmit={handleSave} />
       <ConfirmDelete isOpen={Boolean(deleteTarget)} title="Delete Holiday" message={`Delete holiday "${deleteTarget?.name}"? This cannot be undone.`} onConfirm={handleDelete} onCancel={() => setDeleteTarget(null)} />
     </div>

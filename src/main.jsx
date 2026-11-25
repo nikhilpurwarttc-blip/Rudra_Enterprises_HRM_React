@@ -14,7 +14,7 @@ setupListeners(store.dispatch)
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <Provider store={store}>
-      <BrowserRouter>
+      <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/+$/, '') || '/'}>
         <ThemeProvider>
           <ToastProvider>
             <SearchProvider>

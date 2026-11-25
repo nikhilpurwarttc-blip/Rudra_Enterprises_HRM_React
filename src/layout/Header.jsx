@@ -130,7 +130,7 @@ const Header = ({ onToggleSidebar }) => {
 
       {/* Middle — nav + search */}
       <Link to="/" className="hidden sm:flex items-center gap-2 shrink-0">
-        <img src="/favicon.png" alt="Logo" className="h-11 dark:grayscale dark:invert" />
+        <img src={`${import.meta.env.BASE_URL}favicon.png`} alt="Logo" className="h-11 dark:grayscale dark:invert" />
       </Link>
 
       {/* Right */}

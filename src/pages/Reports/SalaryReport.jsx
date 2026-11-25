@@ -167,7 +167,8 @@ const SalaryReport = () => {
     : activeReport === 'yearly'
       ? response?.employees ?? []
       : response?.items ?? [];
-  const statutoryDeductionTypes = response?.deduction_types ?? [];
+  const statutoryDeductionTypes = (response?.deduction_types ?? [])
+    .filter((type) => !['cash_advance', 'bank_advance'].includes(String(type.id)));
   const visibleDeductionTypes = deductionTypeIds.length
     ? statutoryDeductionTypes.filter((type) => deductionTypeIds.includes(String(type.id)))
     : statutoryDeductionTypes;
@@ -410,9 +411,9 @@ const SalaryReport = () => {
         </div>
       </header> */}
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
         <SalaryReportTabs activeReport={activeReport} onChange={handleReportChange} />
-        <div className="flex flex-wrap gap-2">
+        <div className="w-full flex flex-wrap justify-end gap-2">
           <FilterModal
             title="Filter salary report"
             values={{
@@ -495,7 +496,7 @@ const SalaryReport = () => {
             onClick={refreshReport}
             disabled={manualRefreshing || selectedQuery.isLoading || (activeReport === 'yearly' ? !validYear : !validPayrollMonth)}
             aria-label="Refresh salary report"
-          // className="flex items-center gap-2"
+            className="flex items-center justify-center p-2.5"
           >
             <RefreshCw size={16} className={manualRefreshing ? 'animate-spin' : ''} aria-hidden="true" />
             {/* {selectedQuery.isFetching ? 'Refreshing…' : 'Refresh'} */}
@@ -505,7 +506,7 @@ const SalaryReport = () => {
               type="button"
               onClick={handleExport}
               disabled={exporting || selectedQuery.isFetching || (activeReport === 'yearly' ? !validYear : !validPayrollMonth)}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 py-1"
             >
               <Download size={16} /> {exporting ? 'Preparing CSV…' : 'Export CSV'}
             </Button>
@@ -563,7 +564,7 @@ const SalaryReport = () => {
         saving={generatingPayroll || lockingPayrollEmployee || recordingPayment}
         submitDisabled={loadingPaymentAccounts}
         submitLabel="Record Payment"
-        submitLoadingLabel="Generating, locking & recording…"
+        submitLoadingLabel="Generating, recording…"
         className="max-w-xs"
       >
         {paymentDetails && (

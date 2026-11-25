@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useSelector } from 'react-redux';
 import { Building2, CalendarDays, Check, ChevronLeft, ChevronRight, Hammer, LoaderCircle, Pencil, Plus, Power, RefreshCw, Search, Trash2, XCircle } from 'lucide-react';
 import {
@@ -98,6 +99,7 @@ const Plants = () => {
   const [maintenanceDates, setMaintenanceDates] = useState([]);
   const [selectedCalendarDates, setSelectedCalendarDates] = useState([]);
   const [calendarContextMenu, setCalendarContextMenu] = useState(null);
+  const calendarContextMenuRef = useRef(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const plants = unwrap(data);
   useRenderPerformance('getPlants', data);
@@ -200,21 +202,49 @@ const Plants = () => {
   useEffect(() => {
     if (!calendarContextMenu) return undefined;
     const dismissMenu = (event) => {
-      if (!event.target.closest?.('[data-calendar-context-menu]')) setCalendarContextMenu(null);
+      if (!calendarContextMenuRef.current?.contains(event.target)) setCalendarContextMenu(null);
     };
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') setCalendarContextMenu(null);
     };
-    const dismissOnViewportChange = () => setCalendarContextMenu(null);
     document.addEventListener('mousedown', dismissMenu);
     window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('resize', dismissOnViewportChange);
-    window.addEventListener('scroll', dismissOnViewportChange, true);
     return () => {
       document.removeEventListener('mousedown', dismissMenu);
       window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('resize', dismissOnViewportChange);
-      window.removeEventListener('scroll', dismissOnViewportChange, true);
+    };
+  }, [calendarContextMenu]);
+
+  useLayoutEffect(() => {
+    if (!calendarContextMenu || !calendarContextMenuRef.current) return undefined;
+
+    const positionMenu = () => {
+      const menu = calendarContextMenuRef.current;
+      if (!menu) return;
+
+      const { width, height } = menu.getBoundingClientRect();
+      const margin = 12;
+      const viewportWidth = document.documentElement.clientWidth;
+      const viewportHeight = document.documentElement.clientHeight;
+      let left = calendarContextMenu.x;
+      let top = calendarContextMenu.y;
+
+      if (top + height > viewportHeight - margin) top = calendarContextMenu.y - height;
+      left = Math.max(margin, Math.min(left, viewportWidth - width - margin));
+      top = Math.max(margin, Math.min(top, viewportHeight - height - margin));
+      menu.style.left = `${left}px`;
+      menu.style.top = `${top}px`;
+      menu.style.visibility = 'visible';
+    };
+
+    positionMenu();
+    window.addEventListener('resize', positionMenu);
+    const closeOnScroll = () => setCalendarContextMenu(null);
+    document.addEventListener('scroll', closeOnScroll, true);
+
+    return () => {
+      window.removeEventListener('resize', positionMenu);
+      document.removeEventListener('scroll', closeOnScroll, true);
     };
   }, [calendarContextMenu]);
 
@@ -249,11 +279,10 @@ const Plants = () => {
       return;
     }
     event.preventDefault();
-    const menuHeight = (canScheduleShutdown ? 1 : 0) * 44 + (canScheduleMaintenance ? 1 : 0) * 44 + 8;
     setCalendarContextMenu({
       dates,
-      left: Math.max(8, Math.min(event.clientX, window.innerWidth - 232)),
-      top: Math.max(8, Math.min(event.clientY, window.innerHeight - menuHeight - 8)),
+      x: event.clientX,
+      y: event.clientY,
     });
   };
 
@@ -707,14 +736,27 @@ const Plants = () => {
         )}
       </main>
 
-      {calendarContextMenu && (
+      {calendarContextMenu && createPortal(
         <div
+          ref={calendarContextMenuRef}
           data-calendar-context-menu
           role="menu"
           aria-label="Calendar actions"
-          style={{ position: 'fixed', left: calendarContextMenu.left, top: calendarContextMenu.top, zIndex: 10000 }}
-          className="min-w-56 rounded-md border border-(--color-border-strong) bg-(--color-bg-elevated) p-1 text-(--color-text) shadow-xl"
-          onContextMenu={(event) => event.preventDefault()}
+          style={{
+            position: 'fixed',
+            left: calendarContextMenu.x,
+            top: calendarContextMenu.y,
+            visibility: 'hidden',
+            zIndex: 50,
+            maxHeight: 'calc(100vh - 24px)',
+            overflowY: 'auto',
+          }}
+          className="min-w-56 max-w-[calc(100vw-24px)] rounded-md border border-(--color-border-strong) bg-(--color-bg-elevated) p-1 text-(--color-text) shadow-xl"
+          onClick={(event) => event.stopPropagation()}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
         >
           {canScheduleShutdown && (
             <button
@@ -736,7 +778,8 @@ const Plants = () => {
               <Hammer size={16} /> Schedule Maintenance
             </button>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
 
       <AddEditPlant key={`${editor.open}-${editor.plant?.id ?? 'new'}`} isOpen={editor.open} plant={editor.plant} saving={creating || updating} onClose={() => setEditor({ open: false, plant: null })} onSubmit={handleSave} />

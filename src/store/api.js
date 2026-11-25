@@ -17,6 +17,8 @@ const toEmployeeDocumentRequestBody = (body) => {
 const getFetchUrl = (input) => (typeof input === 'string' ? input : input.url);
 
 const timedFetch = async (input, init) => {
+  if (!import.meta.env.DEV) return fetch(input, init);
+
   const fetchStartedAt = performance.now();
   const response = await fetch(input, init);
   const responseReceivedAt = performance.now();
@@ -67,31 +69,34 @@ const buildSearchQuery = (resource, value) => {
 };
 
 const timedBaseQuery = async (args, api, extraOptions) => {
-  const request = typeof args === 'string' ? { url: args, method: 'GET' } : args;
   const result = await rawBaseQuery(args, api, extraOptions);
-  const requestUrl = `${API_CONFIG.baseUrl}${request.url}`;
-  const timings = fetchTimings.get(requestUrl) ?? [];
-  const responseTiming = timings.shift();
-  if (timings.length === 0) fetchTimings.delete(requestUrl);
-  const responseReceivedAt = responseTiming?.responseReceivedAt ?? performance.now();
-  const durationMs = responseTiming
-    ? responseTiming.responseReceivedAt - responseTiming.fetchStartedAt
-    : null;
-  const endpointName = api.endpoint ?? 'unknown';
 
-  recordApiResponse(endpointName, responseReceivedAt);
-  console.groupCollapsed(`[API] ${endpointName} ${request.method ?? 'GET'} ${request.url}`);
-  console.log(JSON.stringify({
-    endpoint: endpointName,
-    method: request.method ?? 'GET',
-    url: request.url,
-    fetchDurationMs: durationMs == null ? 'unavailable' : Number(durationMs.toFixed(2)),
-    resultAvailableAt: performance.now(),
-    status: result.meta?.response?.status ?? result.error?.status ?? 'unknown',
-    responseReceivedAt,
-    ok: !result.error,
-  }));
-  console.groupEnd();
+  if (import.meta.env.DEV) {
+    const request = typeof args === 'string' ? { url: args, method: 'GET' } : args;
+    const requestUrl = `${API_CONFIG.baseUrl}${request.url}`;
+    const timings = fetchTimings.get(requestUrl) ?? [];
+    const responseTiming = timings.shift();
+    if (timings.length === 0) fetchTimings.delete(requestUrl);
+    const responseReceivedAt = responseTiming?.responseReceivedAt ?? performance.now();
+    const durationMs = responseTiming
+      ? responseTiming.responseReceivedAt - responseTiming.fetchStartedAt
+      : null;
+    const endpointName = api.endpoint ?? 'unknown';
+
+    recordApiResponse(endpointName, responseReceivedAt);
+    console.groupCollapsed(`[API] ${endpointName} ${request.method ?? 'GET'} ${request.url}`);
+    console.log(JSON.stringify({
+      endpoint: endpointName,
+      method: request.method ?? 'GET',
+      url: request.url,
+      fetchDurationMs: durationMs == null ? 'unavailable' : Number(durationMs.toFixed(2)),
+      resultAvailableAt: performance.now(),
+      status: result.meta?.response?.status ?? result.error?.status ?? 'unknown',
+      responseReceivedAt,
+      ok: !result.error,
+    }));
+    console.groupEnd();
+  }
 
   return result;
 };

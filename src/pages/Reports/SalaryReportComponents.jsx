@@ -178,22 +178,33 @@ const EmployeeInitialAvatar = ({ name, image }) => {
 };
 
 const SalaryReportTabs = ({ activeReport, onChange }) => (
-  <div className="flex flex-wrap gap-2 border-b border-(--color-border)" role="tablist" aria-label="Salary report type">
-    {REPORT_TABS.map(({ id, label, icon: Icon }) => (
-      <button
-        key={id}
-        type="button"
-        role="tab"
-        aria-selected={activeReport === id}
-        onClick={() => onChange(id)}
-        className={`capitalize flex items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-medium transition-colors ${activeReport === id
-            ? 'border-(--color-accent) text-(--color-accent)'
-            : 'border-transparent text-(--color-text-muted) hover:text-(--color-text)'
-          }`}
-      >
-        <Icon size={14} aria-hidden="true" /> {label}
-      </button>
-    ))}
+  <div className="w-full border-b border-(--color-border)">
+    <div 
+      className="flex w-full items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth sm:flex-wrap"
+      role="tablist" 
+      aria-label="Salary report type"
+    >
+      {REPORT_TABS.map(({ id, label, icon: Icon }) => {
+        const isActive = activeReport === id;
+        return (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={isActive}
+            onClick={() => onChange(id)}
+            className={`capitalize flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs font-medium transition-colors whitespace-nowrap ${
+              isActive
+                ? 'border-(--color-accent) text-(--color-accent)'
+                : 'border-transparent text-(--color-text-muted) hover:text-(--color-text)'
+            }`}
+          >
+            <Icon size={14} aria-hidden="true" className="shrink-0" />
+            <span>{label}</span>
+          </button>
+        );
+      })}
+    </div>
   </div>
 );
 
@@ -270,7 +281,7 @@ const SalaryReportSummary = ({ activeReport, summary }) => {
   if (!summary) return null;
 
   return (
-    <div className={`grid grid-cols-1 gap-2 ${activeReport === 'statutory' ? 'sm:grid-cols-2 xl:grid-cols-5' : 'sm:grid-cols-4'}`}>
+    <div className={`grid grid-cols-2 gap-2 ${activeReport === 'statutory' ? 'sm:grid-cols-3 xl:grid-cols-5' : 'sm:grid-cols-4'}`}>
       <MetricCard icon={Landmark} label="Employees" value={formatNumber(summary.total_employees)} />
       {activeReport === 'statutory' ? (
         <>
@@ -440,34 +451,34 @@ const getColumns = (activeReport, chargeColumns, onPayEmployee, payingEmployeeId
 
   if (activeReport === 'yearly') {
     return [
-      { key: 'employee_name', label: 'Employee', fullLabel: 'Employee Name', className: 'min-w-[160px]', tdClass: 'min-w-[160px]', sortable: false, render: (row) => <EmployeeCell code={row.employee_code} name={row.employee_name} image={row.image} /> },
-      { key: 'plant_name', label: 'Plant', fullLabel: 'Plant Name', className: 'min-w-[110px]', tdClass: 'min-w-[110px]' },
+      { key: 'employee_name', label: 'Employee', fullLabel: 'Employee Name', className: 'min-w-[140px]', tdClass: 'min-w-[140px]', render: (row) => <EmployeeCell code={row.employee_code} name={row.employee_name} image={row.image} /> },
+      { key: 'plant_name', label: 'Plant', fullLabel: 'Plant Name', className: 'min-w-[100px]', tdClass: 'min-w-[100px]' },
       ...['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((monthName) => ({
         key: `months.${monthName}`,
         label: monthName,
         fullLabel: `${monthName} Gross Pay`,
         sortable: false,
-        className: 'min-w-[85px]',
-        tdClass: 'min-w-[85px] text-right',
+        className: 'min-w-[60px] text-right tabular-nums ',
+        tdClass: 'min-w-[60px] text-right tabular-nums',
         render: (row) => formatCurrency(row.months?.[monthName]),
       })),
-      { key: 'year_gross', label: 'Yr Gross', fullLabel: 'Yearly Gross Salary', className: 'min-w-[100px]', tdClass: 'min-w-[100px] text-right font-semibold', render: (row) => formatCurrency(row.year_gross) },
-      { key: 'year_deductions', label: 'Deductions', fullLabel: 'Yearly Total Deductions', className: 'min-w-[100px]', tdClass: 'min-w-[100px] text-right', render: (row) => formatCurrency(row.year_deductions) },
-      { key: 'year_net_salary', label: 'Yr Net', fullLabel: 'Yearly Net Salary', className: 'min-w-[105px]', tdClass: 'min-w-[105px] text-right font-semibold text-emerald-700 dark:text-emerald-400', render: (row) => formatCurrency(row.year_net_salary) },
+      { key: 'year_gross', label: 'Yr Gross', fullLabel: 'Yearly Gross Salary', sortable: false, className: 'min-w-[100px] text-right font-semibold tabular-nums', tdClass: 'min-w-[100px] text-right font-semibold tabular-nums', render: (row) => formatCurrency(row.year_gross) },
+      { key: 'year_deductions', label: 'Deductions', fullLabel: 'Yearly Total Deductions', sortable: false, className: 'min-w-[100px] text-right font-semibold tabular-nums', tdClass: 'min-w-[100px] text-right font-semibold tabular-nums', render: (row) => formatCurrency(row.year_deductions) },
+      { key: 'year_net_salary', label: 'Yr Net', fullLabel: 'Yearly Net Salary', sortable: false, className: 'min-w-[105px] text-right font-bold tabular-nums text-emerald-700 dark:text-emerald-400', tdClass: 'min-w-[105px] text-right font-bold tabular-nums text-emerald-700 dark:text-emerald-400', render: (row) => formatCurrency(row.year_net_salary) },
     ];
   }
 
   return [
     { key: 'employee_name', label: 'Employee', fullLabel: 'Employee Name', className: 'min-w-[160px]', tdClass: 'min-w-[160px]', sortable: false, render: (row) => <EmployeeCell code={row.employee_code} name={row.employee_name} image={row.image} /> },
     { key: 'plant_name', label: 'Plant', fullLabel: 'Working Plant', className: 'min-w-[120px]', tdClass: 'min-w-[120px]' },
-    { key: 'basic_pay', label: 'Basic Pay', fullLabel: 'Regular earned pay used as the deduction basis; falls back to gross salary when regular pay is unavailable', className: 'min-w-[110px]', tdClass: 'min-w-[110px] text-right', render: (row) => formatCurrency(row.basic_pay ?? row.gross_wages) },
+    { key: 'basic_pay', label: 'Basic Pay', fullLabel: 'Regular earned pay used as the deduction basis; falls back to gross salary when regular pay is unavailable', className: 'min-w-[110px] text-right tabular-nums', tdClass: 'min-w-[110px] text-right tabular-nums', render: (row) => formatCurrency(row.basic_pay ?? row.gross_wages) },
     ...deductionTypes.flatMap((type) => [
       {
         key: `deductions.${type.id}.employee_share`,
         label: `${type.code || type.name} · Emp.`,
         fullLabel: `${type.name} paid by employee`,
-        className: 'min-w-[125px]',
-        tdClass: 'min-w-[125px] text-right',
+        className: 'min-w-[125px] text-right tabular-nums',
+        tdClass: 'min-w-[125px] text-right tabular-nums',
         sortable: false,
         render: (row) => formatCurrency(row.deductions?.[type.id]?.employee_share),
       },
@@ -475,15 +486,15 @@ const getColumns = (activeReport, chargeColumns, onPayEmployee, payingEmployeeId
         key: `deductions.${type.id}.employer_share`,
         label: `${type.code || type.name} · Empr.`,
         fullLabel: `${type.name} paid by employer`,
-        className: 'min-w-[125px]',
-        tdClass: 'min-w-[125px] text-right',
+        className: 'min-w-[125px] text-right tabular-nums',
+        tdClass: 'min-w-[125px] text-right tabular-nums',
         sortable: false,
         render: (row) => formatCurrency(row.deductions?.[type.id]?.employer_share),
       },
     ]),
-    { key: 'employee_share', label: 'Employee Total', fullLabel: 'Total deductions paid by employee', className: 'min-w-[125px]', tdClass: 'min-w-[125px] text-right font-semibold', render: (row) => formatCurrency(row.employee_share) },
-    { key: 'employer_share', label: 'Employer Total', fullLabel: 'Total contributions paid by employer', className: 'min-w-[125px]', tdClass: 'min-w-[125px] text-right font-semibold', render: (row) => formatCurrency(row.employer_share) },
-    { key: 'total_contribution', label: 'Combined Total', fullLabel: 'Employee deductions plus employer contributions', className: 'min-w-[130px]', tdClass: 'min-w-[130px] text-right font-bold', render: (row) => formatCurrency(row.total_contribution) },
+    { key: 'employee_share', label: 'Employee Total', fullLabel: 'Total deductions paid by employee', className: 'min-w-[125px]', tdClass: 'min-w-[125px] text-right font-semibold tabular-nums', render: (row) => formatCurrency(row.employee_share) },
+    { key: 'employer_share', label: 'Employer Total', fullLabel: 'Total contributions paid by employer', className: 'min-w-[125px]', tdClass: 'min-w-[125px] text-right font-semibold tabular-nums', render: (row) => formatCurrency(row.employer_share) },
+    { key: 'total_contribution', label: 'Combined Total', fullLabel: 'Employee deductions plus employer contributions', className: 'min-w-[130px]', tdClass: 'min-w-[130px] text-right font-bold tabular-nums', render: (row) => formatCurrency(row.total_contribution) },
   ];
 };
 
@@ -554,11 +565,11 @@ const SalaryReportTable = ({
   }, [activeReport, visibleRows, employeeSearch, sort]);
 
   const footerRow = !isLoading && sortedRows.length > 0 ? (
-    <tr className="flex w-full border-t-2 border-(--color-border-strong) bg-(--color-bg-elevated) font-bold text-(--color-text)">
+    <tr className="border-t-2 border-(--color-border-strong) bg-(--color-bg-elevated) font-bold text-(--color-text)">
       {columns.map((column) => (
         <td
           key={column.key}
-          className={`flex-1 min-w-0 w-0 px-4 py-3 text-sm last:border-r-0 ${column.tdClass ?? ''}`}
+          className={`px-4 py-3 text-sm last:border-r-0 ${column.tdClass ?? ''}`}
         >
           {getTotalValue(column, activeReport === 'monthly' ? sortedRows : rows, activeReport)}
         </td>
@@ -838,7 +849,7 @@ const SalaryReportTable = ({
   return (
     // <div className="relative flex-1 min-h-0 w-full overflow-auto">
     <PageTable
-      className="w-full min-w-max"
+      className="w-full min-w-0"
       columns={columns}
       rows={rows}
       total={rows.length}

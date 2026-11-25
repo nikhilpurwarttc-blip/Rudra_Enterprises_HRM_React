@@ -98,7 +98,7 @@ const AppDownloadButton = ({ downloadUrl = APP_DOWNLOAD_URL }) => {
         className="h-auto rounded-md p-1 transition-colors hover:bg-[var(--color-border)]"
         title="Download app"
       >
-        <img src="/appDownload.png" alt="" className="h-5 w-auto" />
+        <img src={`${import.meta.env.BASE_URL}appDownload.png`} alt="" className="h-5 w-auto" />
       </button>
       <AppDownloadModal
         id={popoverId}

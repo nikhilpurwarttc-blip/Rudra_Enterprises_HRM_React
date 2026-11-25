@@ -810,7 +810,7 @@ const Employees = () => {
               {canCreate && !isReadOnly && <Button type="button" onClick={() => { setCreatedEmployee(null); setAddSessionKey((k) => k + 1); navigate('/employees/add'); }} className="flex items-center gap-1.5 p-2.5"><Plus size={18} className='hover:scale-160 transition-transform duration-200' /></Button>}
             </div>
           </div>
-          <div className="mt-4 flex items-center justify-between gap-2">
+          <div className="mt-[15PX] flex items-center justify-between gap-2">
             <InputField className="min-w-0 min-h-0 h-10" value={search} onChange={handleSearchChange} placeholder="Search employees" leftIcon={<Search size={16} />} rightIcon={isEmployeeLoading && <LoaderCircle size={15} className="animate-spin" />} />
             <FilterModal
               buttonRef={filterTriggerRef}
@@ -912,7 +912,7 @@ const Employees = () => {
               >
                 <EmployeeAvatar employee={employee} className="h-11 w-11 text-sm shrink-0 shadow-sm border border-(--color-border)/40" />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold text-(--color-text)">{employee.name}</span>
+                  <span className="block truncate capitalize text-sm font-semibold text-(--color-text)">{employee.name}</span>
                   <span className="mt-0.5 block truncate text-xs text-(--color-text-muted)">{employee.employee_code} · {employee.plant?.name}</span>
                   <span className="mt-1 block truncate text-xs font-medium text-(--color-accent)">{employee.department?.name ?? employee.designation?.name}</span>
                   {employee.approval_status_label && employee.approval_status !== 1 && (

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
 import Button from '../../../components/Button';
 import { InlineError, LoadingState } from '../../../components/Feedback';
-import SearchableSelect from '../../../components/SearchableSelect';
+import ChoiceChips from '../../../components/ChoiceChips';
 import SectionCard from '../../../components/SectionCard';
 import InputField from '../../../components/InputField';
 
@@ -44,6 +44,7 @@ const formatSalaryInput = (value) => {
 
 const EmployeeSalarySection = ({
   employeeId,
+  joiningDate,
   salaries,
   isLoading,
   isError,
@@ -73,7 +74,12 @@ const EmployeeSalarySection = ({
     ), ''),
     [salaries],
   );
-  const minEffectiveFrom = toNextDate(latestEffectiveFrom);
+  const normalizedJoiningDate = String(joiningDate ?? '').slice(0, 10);
+  const latestSalaryStart = toNextDate(latestEffectiveFrom);
+  const minEffectiveFrom = [normalizedJoiningDate, latestSalaryStart].reduce(
+    (latest, date) => date > latest ? date : latest,
+    '',
+  );
 
   const handleSaveCharges = async () => {
     setChargesError('');
@@ -95,6 +101,8 @@ const EmployeeSalarySection = ({
     }
     if (!effectiveFrom) {
       nextErrors.effective_from = 'Effective-from date is required.';
+    } else if (normalizedJoiningDate && effectiveFrom < normalizedJoiningDate) {
+      nextErrors.effective_from = `Effective-from date cannot be before the joining date (${normalizedJoiningDate}).`;
     } else if (minEffectiveFrom && effectiveFrom < minEffectiveFrom) {
       nextErrors.effective_from = `Choose a date on or after ${minEffectiveFrom}.`;
     }
@@ -214,13 +222,12 @@ const EmployeeSalarySection = ({
 
       <SectionCard title="Charges & allowances">
         <div className="space-y-4">
-          <SearchableSelect
+          <ChoiceChips
             label="Charges & allowances"
             options={charges}
             value={chargeIds}
             onChange={onChargeIdsChange}
-            multiSelect
-            placeholder="Select charges"
+            multiple
           />
           {chargesError && <InlineError message={chargesError} />}
           {chargesSuccess && <p role="status" className="text-sm text-emerald-600 dark:text-emerald-400">{chargesSuccess}</p>}

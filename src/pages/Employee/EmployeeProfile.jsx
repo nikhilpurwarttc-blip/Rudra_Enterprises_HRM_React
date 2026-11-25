@@ -194,11 +194,11 @@ const EmployeeProfile = ({ employeeId, initialEmployee, embedded = false, onClos
                 <div className="absolute top-2 left-1/2 -translate-x-1/2 w-10 h-1 bg-black/30 rounded-full" />
                 <div className="flex items-center justify-between mt-1">
                   {/* <img
-                    src="/icon.png"
+                    src={`${import.meta.env.BASE_URL}icon.png`}
                     alt="Rudra Alloys logo"
                     className="h-9 w-9 rounded-lg bg-white p-1 object-contain shadow-sm"
                   /> */}
-                  <span className="text-[10px] font-bold tracking-widest uppercase opacity-90">Riya Enterprises</span>
+                  <span className="text-[10px] font-bold tracking-widest uppercase opacity-90">Rudra Enterprises</span>
                   <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-white/20 backdrop-blur-md text-white`}>
                     {active ? <UserCheck size={10} /> : <UserX size={10} />}
                     {active ? 'ACTIVE' : 'INACTIVE'}
@@ -211,7 +211,7 @@ const EmployeeProfile = ({ employeeId, initialEmployee, embedded = false, onClos
               {/* ID Card Body */}
               <div className="relative isolate overflow-hidden bg-gradient-to-b from-(--color-bg-elevated) to-(--color-bg)/80">
                 <img
-                  src="/icon.png"
+                  src={`${import.meta.env.BASE_URL}icon.png`}
                   alt=""
                   aria-hidden="true"
                   className="pointer-events-none absolute left-1/2 bottom-0 z-0 w-200 max-w-[94%] -translate-x-1/2 object-contain opacity-[0.15] select-none dark:grayscale dark:invert"

@@ -42,7 +42,7 @@ const SectionCard = ({
     >
       {(title || left || action || onRefresh) && (
         <div
-          className={`flex items-center justify-between pr-4 ${
+          className={`flex items-center justify-between gap-2 pr-4 ${
             collapsed ? 'mb-4' : ''
           }`}
         >
@@ -61,7 +61,7 @@ const SectionCard = ({
               <button
                 title="collapse"
                 onClick={sectionCollapse}
-                className="rounded-full border border-[var(--color-border)] p-1.5 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-accent-soft)] disabled:opacity-50"
+                className="rounded-full border border-[var(--color-border)] p-2.5 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-accent-soft)] disabled:opacity-50"
               >
                 <ChevronDown
                   size={14}
@@ -75,7 +75,7 @@ const SectionCard = ({
                 title="Refresh"
                 onClick={handleRefresh}
                 disabled={spinning}
-                className="rounded-full border border-[var(--color-border)] p-1.5 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-accent-soft)] disabled:opacity-50"
+                className="rounded-full border border-[var(--color-border)] p-2.5 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-accent-soft)] disabled:opacity-50"
               >
                 <RefreshCw
                   size={14}

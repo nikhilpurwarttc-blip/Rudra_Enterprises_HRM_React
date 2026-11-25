@@ -344,6 +344,7 @@ const AddEditEmployee = ({
           {activeStep === 'salary' && showSalaryStep && (
             <EmployeeSalarySection
               employeeId={employeeId}
+              joiningDate={form.joining_date}
               salaries={salaryHistory}
               isLoading={salaryHistoryLoading}
               isError={salaryHistoryError}

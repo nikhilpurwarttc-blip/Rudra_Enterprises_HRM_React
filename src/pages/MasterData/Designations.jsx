@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { BriefcaseBusiness, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { BriefcaseBusiness, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
 import {
   useCreateDesignationMutation,
   useDeleteDesignationMutation,
@@ -8,7 +8,6 @@ import {
 } from '../../store/api';
 import usePermission from '../../hooks/usePermission';
 import { useToast } from '../../contexts/ToastContext';
-import SectionCard from '../../components/SectionCard';
 import PageTable from '../../components/PageTable';
 import InputField from '../../components/InputField';
 import Switch from '../../components/Switch';
@@ -24,7 +23,7 @@ const unwrap = (value) => Array.isArray(value) ? value : value?.data ?? [];
 const Designations = () => {
   const toast = useToast();
   const { canCreate, canEdit, canDelete, isReadOnly } = usePermission('/designations');
-  const { data, isLoading, isError } = useGetDesignationsQuery({ all: true, per_page: 100 });
+  const { data, isLoading, isFetching, isError, refetch } = useGetDesignationsQuery({ all: true, per_page: 100 });
   const [createDesignation, { isLoading: creating }] = useCreateDesignationMutation();
   const [updateDesignation, { isLoading: updating }] = useUpdateDesignationMutation();
   const [deleteDesignation] = useDeleteDesignationMutation();
@@ -35,6 +34,14 @@ const Designations = () => {
   const designations = unwrap(data);
 
   useRenderPerformance('getDesignations', data);
+
+  const handleRefresh = useCallback(async () => {
+    try {
+      await refetch().unwrap();
+    } catch (error) {
+      toast(getApiErrorMessage(error, 'Unable to refresh designations.'), 'error');
+    }
+  }, [refetch, toast]);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -122,16 +129,33 @@ const Designations = () => {
   ], [canDelete, canEdit, handleStatusChange, isReadOnly, togglingId]);
 
   return (
-    <div className="space-y-4 p-4 sm:p-6">
-      <SectionCard
+    <div className="h-full w-full max-w-7xl mx-auto space-y-4 p-4 sm:p-6">
+      {/* <SectionCard
         title="Designations"
+        onRefresh={refetch}
         action={canCreate && !isReadOnly && <Button type="button" onClick={() => setEditor({ open: true, designation: null })} className="flex items-center gap-1.5"><Plus size={15} /> Add Designation</Button>}
-      >
-        <div className="mb-4">
+      > */}
+      <div className="flex justify-between mb-4">
+        <div className="max-w-0 flex-1 sm:max-w-xs">
           <InputField value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search designations" leftIcon={<Search size={16} />} />
         </div>
-        {isError ? <Feedback type="error" title="Unable to load designations" message="Please refresh the page and try again." /> : <PageTable columns={columns} rows={filtered} total={filtered.length} label="designations" isLoading={isLoading} />}
-      </SectionCard>
+        <div className="flex items-center gap-2">
+          {canCreate && !isReadOnly && <Button type="button" onClick={() => setEditor({ open: true, designation: null })} className="flex items-center gap-1.5 p-2.5"><Plus size={17} className="hover:scale-140" /> </Button>}
+          <Button
+            type="button"
+            variant="ghost"
+            aria-label="Refresh Designations"
+            title="Refresh Designations"
+            onClick={handleRefresh}
+            disabled={isFetching}
+            className="flex items-center justify-center p-2.5 disabled:cursor-wait disabled:opacity-60"
+          >
+            <RefreshCw size={16} className={`transition-transform duration-200 ${isFetching ? 'animate-spin' : 'hover:scale-110'}`} />
+          </Button>
+        </div>
+      </div>
+      {isError ? <Feedback type="error" title="Unable to load designations" message="Please refresh the page and try again." /> : <PageTable columns={columns} rows={filtered} total={filtered.length} label="designations" isLoading={isLoading} />}
+      {/* </SectionCard> */}
 
       <AddEditDesignation
         key={`${editor.open}-${editor.designation?.id ?? 'new'}`}

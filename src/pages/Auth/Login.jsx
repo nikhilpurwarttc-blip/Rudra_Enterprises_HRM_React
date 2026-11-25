@@ -72,7 +72,7 @@ const Login = () => {
       {/* background image */}
       {/* <img src="/loginBG.avif" alt="" className="w-full h-full absolute inset-0 object-cover" /> */}
       <span className="max-w-3xs w-auto absolute right-4 bottom-4">
-        <img src="/favicon.png" alt="HRM Logo" />
+        <img src={`${import.meta.env.BASE_URL}favicon.png`} alt="HRM Logo" />
       </span>
       <div className="w-full max-w-md">
         <div className="mb-5 flex items-center justify-between px-1">

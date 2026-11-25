@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Clock3, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { Clock3, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
 
 import {
   useCreateShiftMutation,
@@ -26,7 +26,7 @@ const Shifts = () => {
   const toast = useToast();
   const { canCreate, canEdit, canDelete, isReadOnly } = usePermission('/shifts');
 
-  const { data, isLoading, isError } = useGetShiftsQuery({ all: true, per_page: 100 });
+  const { data, isLoading, isFetching, isError, refetch } = useGetShiftsQuery({ all: true, per_page: 100 });
   const [createShift, { isLoading: creating }] = useCreateShiftMutation();
   const [updateShift, { isLoading: updating }] = useUpdateShiftMutation();
   const [deleteShift] = useDeleteShiftMutation();
@@ -39,6 +39,14 @@ const Shifts = () => {
 
   const shifts = unwrap(data);
   useRenderPerformance('getShifts', data);
+
+  const handleRefresh = useCallback(async () => {
+    try {
+      await refetch().unwrap();
+    } catch (error) {
+      toast(getApiErrorMessage(error, 'Unable to refresh shifts.'), 'error');
+    }
+  }, [refetch, toast]);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -90,21 +98,21 @@ const Shifts = () => {
   };
 
   const handleStatusChange = useCallback(
-  async (shift) => {
-    if (!canEdit || isReadOnly) return;
-    const newStatus = Number(shift.status) === 1 ? 0 : 1;
-    setTogglingId(shift.id);
-    try {
-      await updateShift({ id: shift.id, status: newStatus }).unwrap();
-      toast('Shift status updated.', 'success');
-    } catch (error) {
-      toast(getApiErrorMessage(error, 'Unable to update shift status.'), 'error');
-    } finally {
-      setTogglingId(null);
-    }
-  },
-  [canEdit, isReadOnly, toast, updateShift]
-);
+    async (shift) => {
+      if (!canEdit || isReadOnly) return;
+      const newStatus = Number(shift.status) === 1 ? 0 : 1;
+      setTogglingId(shift.id);
+      try {
+        await updateShift({ id: shift.id, status: newStatus }).unwrap();
+        toast('Shift status updated.', 'success');
+      } catch (error) {
+        toast(getApiErrorMessage(error, 'Unable to update shift status.'), 'error');
+      } finally {
+        setTogglingId(null);
+      }
+    },
+    [canEdit, isReadOnly, toast, updateShift]
+  );
 
   const columns = useMemo(
     () => [
@@ -136,21 +144,21 @@ const Shifts = () => {
         render: (shift) => (shift.duration_hours == null ? '—' : `${shift.duration_hours} hrs`),
       },
       {
-  key: 'status',
-  label: 'Active',
-  render: (shift) => {
-    const isActive = Number(shift.status) === 1;
-    return (
-      <Switch
-        checked={isActive}
-        disabled={!canEdit || isReadOnly}
-        loading={togglingId === shift.id}
-        onClick={() => handleStatusChange(shift)}
-        ariaLabel={isActive ? 'Active' : 'Inactive'}
-      />
-    );
-  },
-},
+        key: 'status',
+        label: 'Active',
+        render: (shift) => {
+          const isActive = Number(shift.status) === 1;
+          return (
+            <Switch
+              checked={isActive}
+              disabled={!canEdit || isReadOnly}
+              loading={togglingId === shift.id}
+              onClick={() => handleStatusChange(shift)}
+              ariaLabel={isActive ? 'Active' : 'Inactive'}
+            />
+          );
+        },
+      },
       {
         key: 'actions',
         label: 'Actions',
@@ -188,9 +196,10 @@ const Shifts = () => {
   );
 
   return (
-    <div className="space-y-4 p-4 sm:p-6">
-      <SectionCard
+    <div className=" max-w-7xl mx-auto space-y-4 p-4 sm:p-6">
+      {/* <SectionCard
         title="Shift Hours"
+        onRefresh={refetch}
         action={
           canCreate &&
           !isReadOnly && (
@@ -205,8 +214,9 @@ const Shifts = () => {
             </Button>
           )
         }
-      >
-        <div className="mb-4">
+      > */}
+      <div className="flex justify-between mb-4">
+        <div className="max-w-0 flex-1 sm:max-w-xs">
           <InputField
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -214,23 +224,47 @@ const Shifts = () => {
             leftIcon={<Search size={16} />}
           />
         </div>
-
-        {isError ? (
-          <Feedback
-            type="error"
-            title="Unable to load shifts"
-            message="Please refresh the page and try again."
-          />
-        ) : (
-          <PageTable
-            columns={columns}
-            rows={filtered}
-            total={filtered.length}
-            label="shifts"
-            isLoading={isLoading}
-          />
-        )}
-      </SectionCard>
+        <div className="flex items-center gap-2">
+          {canCreate && !isReadOnly && (
+            <Button
+              onClick={() => {
+                setErrors({});
+                setEditor({ open: true, shift: null });
+              }}
+              className="flex items-center gap-1.5 p-2.5"
+            >
+              <Plus size={15} className="hover:scale-140" />
+            </Button>
+          )}
+          <Button
+            type="button"
+            variant="ghost"
+            aria-label="Refresh Shifts"
+            title="Refresh Shifts"
+            onClick={handleRefresh}
+            disabled={isFetching}
+            className="flex items-center justify-center p-2.5 disabled:cursor-wait disabled:opacity-60"
+          >
+            <RefreshCw size={16} className={`transition-transform duration-200 ${isFetching ? 'animate-spin' : 'hover:scale-110'}`} />
+          </Button>
+        </div>
+      </div>
+      {isError ? (
+        <Feedback
+          type="error"
+          title="Unable to load shifts"
+          message="Please refresh the page and try again."
+        />
+      ) : (
+        <PageTable
+          columns={columns}
+          rows={filtered}
+          total={filtered.length}
+          label="shifts"
+          isLoading={isLoading}
+        />
+      )}
+      {/* </SectionCard> */}
 
       <AddEditShift
         key={`${editor.open}-${editor.shift?.id ?? 'new'}`}

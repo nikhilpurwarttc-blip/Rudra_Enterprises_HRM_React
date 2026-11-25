@@ -59,5 +59,26 @@ export const buildSelectOptions = (items, getLabel) => items.map((item) => ({
   label: getLabel(item),
 }));
 
-export const displayDate = (value) =>
-  value ? new Date(`${String(value).slice(0, 10)}T00:00:00`).toLocaleDateString() : '\u2014';
+export const displayDate = (value) => {
+  if (!value) return '—';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+
+  return new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date);
+};
+
+export const displayDateTime = (value) =>
+  value
+    ? new Intl.DateTimeFormat('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(value))
+    : '—';

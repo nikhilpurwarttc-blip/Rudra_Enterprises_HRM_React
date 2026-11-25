@@ -16,6 +16,7 @@ const InputField = ({
   leftIcon,
   rightIcon,
   className,
+  inputClass,
   ...props
 }) => {
   const inputId = useId();
@@ -58,6 +59,7 @@ const InputField = ({
           className={cn(
             "min-w-0 flex-1 bg-transparent py-3 text-sm text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)]",
             disabled && "cursor-not-allowed text-[var(--color-text-muted)]",
+            inputClass
           )}
           {...props}
         />

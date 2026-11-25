@@ -11,7 +11,7 @@ const getLatestApiResponse = (endpointName) => latestApiResponses.get(endpointNa
 
 export const useRenderPerformance = (endpointName, data, enabled = true) => {
   useLayoutEffect(() => {
-    if (!enabled || data == null) return;
+    if (!import.meta.env.DEV || !enabled || data == null) return;
 
     const responseReceivedAt = getLatestApiResponse(endpointName);
     if (responseReceivedAt == null) return;

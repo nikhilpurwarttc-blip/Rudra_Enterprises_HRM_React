@@ -306,9 +306,9 @@ const Sidebar = () => {
       <div></div>
       {/* <Link to="/" className="flex-shrink-0">
        { !isOpen ? (
-        <img src="/icon.png" alt="" className="w-10 py-1 pl-2 mx-auto" />
+        <img src={`${import.meta.env.BASE_URL}icon.png`} alt="" className="w-10 py-1 pl-2 mx-auto" />
        ) : (
-        <img src="/favicon.png" alt="" className="w-auto h-14 px-2 pt-1"  />
+        <img src={`${import.meta.env.BASE_URL}favicon.png`} alt="" className="w-auto h-14 px-2 pt-1"  />
       )}
       </Link> */}
 

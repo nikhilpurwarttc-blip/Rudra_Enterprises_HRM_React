@@ -180,7 +180,7 @@ const Advances = () => {
       <SectionCard
         title="Cash & Bank Advances"
         onRefresh={refetch}
-        action={canCreate && !isReadOnly && <Button type="button" onClick={() => { setFormErrors({}); setEditor({ open: true, advance: null }); }} className="flex items-center gap-1.5"><Plus size={15} /> Add Advance</Button>}
+        action={canCreate && !isReadOnly && <Button type="button" onClick={() => { setFormErrors({}); setEditor({ open: true, advance: null }); }} className="flex items-center gap-1.5 p-2.5"><Plus size={15} /></Button>}
       >
         <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <SearchableSelect options={employeeOptions} value={filters.employee_id} onChange={(value) => updateFilter('employee_id', value)} placeholder="All employees" isLoading={employeesLoading} />

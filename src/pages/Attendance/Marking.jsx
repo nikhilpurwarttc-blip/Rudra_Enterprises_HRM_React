@@ -109,7 +109,7 @@ const Marking = () => {
   const [rejectAllReason, setRejectAllReason] = useState('');
   const [pendingAbsentEmployee, setPendingAbsentEmployee] = useState(null);
   const [absentReason, setAbsentReason] = useState('');
-  
+
   const [checkIn] = useCheckInAttendanceMutation();
   const [checkOut] = useCheckOutAttendanceMutation();
   const [markShutdownPresent, { isLoading: markingShutdownAttendees }] = useMarkShutdownPresentMutation();
@@ -135,7 +135,7 @@ const Marking = () => {
     : '';
   const effectivePlant = singleAssignedPlant || filters.plant;
   const today = getLocalDate();
-  
+
   const shutdownQuery = useGetPlantShutdownsQuery({
     ...(effectivePlant ? { plant_id: effectivePlant } : {}),
     start_date: today,
@@ -153,7 +153,7 @@ const Marking = () => {
         && String(shutdown.shutdown_end_date ?? shutdown.shutdown_start_date ?? '').slice(0, 10) >= today),
     [shutdownQuery.currentData, shutdownQuery.data, today],
   );
-  
+
   const activeShutdowns = useMemo(
     () => todayShutdowns.filter((shutdown) => Number(shutdown.status) === 2),
     [todayShutdowns],
@@ -166,7 +166,7 @@ const Marking = () => {
     .find((shutdown) => Number(shutdown.status) === 3) ?? null;
   const activeShutdown = activeShutdowns.find((shutdown) => String(shutdown.plant_id) === String(effectivePlant)) ?? null;
   const pendingShutdown = pendingShutdowns.find((shutdown) => String(shutdown.plant_id) === String(effectivePlant)) ?? null;
-  
+
   const hasPendingShutdown = useCallback(
     (employee) => pendingShutdowns.some((shutdown) => String(shutdown.plant_id) === String(employee.working_plant_id ?? employee.plant_id)),
     [pendingShutdowns],
@@ -181,7 +181,7 @@ const Marking = () => {
     ...(filters.shift ? { shift_id: filters.shift } : {}),
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
   });
-  
+
   const refetchAttendanceRoster = employeeQuery.refetch;
   const isRefreshing = employeeQuery.isFetching
     || filtersQuery.isFetching
@@ -197,7 +197,7 @@ const Marking = () => {
     && (!filters.shift || String(employee.shift_id) === String(filters.shift))
     && (!searchQuery || matchesEmployeeSearch(employee, searchQuery))
   )), [employees, effectivePlant, filters.department, filters.shift, searchQuery]);
-  
+
   const isSearchPending = searchQuery !== debouncedSearch;
   const useCachedSearchResults = Boolean(searchQuery) && (isSearchPending || !employeeQuery.currentData);
   const pageEmployees = useCachedSearchResults ? cachedEmployees : employees;
@@ -211,7 +211,7 @@ const Marking = () => {
   const meta = (useCachedSearchResults ? undefined : employeeQuery.currentData ?? employeeQuery.data)?.meta ?? {};
   const currentPage = Number(meta.current_page ?? page);
   const lastPage = Number(meta.last_page ?? 1);
-  
+
   const plantMap = useMemo(() => new Map(plants.map((plant) => [String(plant.id), plant])), [plants]);
   const departmentMap = useMemo(() => new Map(departments.map((department) => [String(department.id), department])), [departments]);
   const shiftMap = useMemo(() => new Map(shifts.map((shift) => [String(shift.id), shift])), [shifts]);
@@ -243,7 +243,7 @@ const Marking = () => {
     else total.punchedIn += 1;
     return total;
   }, { roster: 0, notStarted: 0, punchedIn: 0, completed: 0, shutdownPresent: 0, pendingVerification: 0 }), [pageEmployees]);
-  
+
   const counts = useMemo(() => {
     const summary = employeeQuery.currentData?.summary ?? employeeQuery.data?.summary ?? {};
     if (useCachedSearchResults) return pageCounts;
@@ -256,13 +256,13 @@ const Marking = () => {
       pendingVerification: Number(summary.pending_verification ?? summary.pendingVerification ?? pageCounts.pendingVerification ?? 0),
     };
   }, [employeeQuery.currentData, employeeQuery.data, pageCounts, useCachedSearchResults]);
-  
+
   const pendingApprovalCount = Number(
     employeeQuery.currentData?.summary?.pending_verification
     ?? employeeQuery.data?.summary?.pending_verification
     ?? pageCounts.pendingVerification,
   );
-  
+
   const bulkDecisionFilters = useMemo(() => ({
     date: today,
     ...(effectivePlant ? { plant_id: effectivePlant } : {}),
@@ -769,6 +769,7 @@ const Marking = () => {
               title="Refresh attendance roster"
               onClick={() => { employeeQuery.refetch(); filtersQuery.refetch(); shiftsQuery.refetch(); shutdownQuery.refetch(); if (effectivePlant) rejectedShutdownQuery.refetch(); }}
               disabled={isRefreshing}
+              className="flex items-center justify-center p-2.5 disabled:cursor-wait disabled:opacity-60"
             >
               <RefreshCw size={15} className={isRefreshing ? 'animate-spin' : ''} />
             </Button>

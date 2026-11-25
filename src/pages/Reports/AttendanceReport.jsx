@@ -85,6 +85,7 @@ const AttendanceReport = () => {
 		start_date: dateFrom,
 		end_date: dateTo,
 		per_page: 100,
+		status: 2,
 	}, { skip: !selectedEmployee || !selectedPlantId || !canViewShutdowns });
 	const maintenanceRecordsQuery = useGetMaintenanceRecordsQuery({
 		plant_id: selectedPlantId,
@@ -136,7 +137,7 @@ const AttendanceReport = () => {
 
 	return (
 		<div className="flex min-h-0 flex-col lg:h-full lg:flex-row lg:overflow-hidden">
-			<aside className="flex w-full max-w-sm min-h-80 shrink-0 flex-col border-r border-(--color-border) bg-(--color-bg-elevated) lg:min-h-0 lg:w-92">
+			<aside className="flex w-full max-w-xs min-h-80 shrink-0 flex-col border-r border-(--color-border) bg-(--color-bg-elevated) lg:min-h-0 lg:w-92">
 				<div className="border-b border-(--color-border) px-4 py-4">
 					<div>
 						<p className="text-xs font-semibold uppercase tracking-wider text-(--color-text-muted)">Attendance Report</p>

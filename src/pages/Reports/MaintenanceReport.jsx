@@ -373,26 +373,26 @@ const MaintenanceReport = () => {
         <LoadingState message="Loading report…" />
       ) : (
         <>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3">
             <GlassCard className="rounded-xl border border-(--color-border) bg-(--color-surface) px-4 py-3">
-              <p className="text-xs text-(--color-text-muted)">{isMaintenance ? 'Matching maintenance records' : 'Matching shutdown periods'}</p>
+              <p className="capitalize text-xs text-(--color-text-muted)">{isMaintenance ? 'Matching maintenance records' : 'Matching shutdown periods'}</p>
               <p className="mt-1 text-lg font-semibold text-(--color-text)">{formatNumber(total)}</p>
             </GlassCard>
             {isMaintenance &&
               <GlassCard className="rounded-xl border border-(--color-border) bg-(--color-surface) px-4 py-3">
-                <p className="text-xs text-(--color-text-muted)">Completed on this page</p>
+                <p className="capitalize text-xs text-(--color-text-muted)">Completed on this page</p>
                 <p className="mt-1 text-lg font-semibold text-(--color-text)">{formatNumber(completedMaintenanceCount)}</p>
               </GlassCard>
             }
             {isMaintenance &&
               <GlassCard className="rounded-xl border border-(--color-border) bg-(--color-surface) px-4 py-3">
-                <p className="text-xs text-(--color-text-muted)">Maintenance amount on this page</p>
+                <p className="capitalize text-xs text-(--color-text-muted)">Maintenance amount on this page</p>
                 <p className="mt-1 text-lg font-semibold text-(--color-text)">{formatCurrency(maintenanceAmount)}</p>
               </GlassCard>
             }
             {!isMaintenance &&
               <GlassCard className="rounded-xl border border-(--color-border) bg-(--color-surface) px-4 py-3">
-                <p className="text-xs text-(--color-text-muted)">Approved shutdown periods on this page</p>
+                <p className="capitalize text-xs text-(--color-text-muted)">Approved shutdown periods on this page</p>
                 <p className="mt-1 text-lg font-semibold text-(--color-text)">{formatNumber(rows.filter((shutdown) => Number(shutdown.status) === 2).length)}</p>
               </GlassCard>
             }

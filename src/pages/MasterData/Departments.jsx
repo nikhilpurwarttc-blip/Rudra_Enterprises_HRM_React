@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Building2, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { Building2, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
 
 import {
   useCreateDepartmentMutation,
@@ -27,7 +27,7 @@ const Departments = () => {
   const toast = useToast();
   const { canCreate, canEdit, canDelete, isReadOnly } = usePermission('/departments');
 
-  const { data, isLoading, isError } = useGetDepartmentsQuery({ all: true, per_page: 100 });
+  const { data, isLoading, isFetching, isError, refetch } = useGetDepartmentsQuery({ all: true, per_page: 100 });
   const { data: plantsData, isLoading: plantsLoading } = useGetPlantsQuery();
 
   const [createDepartment, { isLoading: creating }] = useCreateDepartmentMutation();
@@ -49,6 +49,14 @@ const Departments = () => {
 
   useRenderPerformance('getDepartments', data);
   useRenderPerformance('getPlants', plantsData);
+
+  const handleRefresh = useCallback(async () => {
+    try {
+      await refetch().unwrap();
+    } catch (error) {
+      toast(getApiErrorMessage(error, 'Unable to refresh departments.'), 'error');
+    }
+  }, [refetch, toast]);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -193,7 +201,7 @@ const Departments = () => {
   );
 
   return (
-    <div className="space-y-4 p-4 sm:p-6">
+    <div className=" max-w-7xl mx-auto space-y-4 p-4 sm:p-6">
       {/* <SectionCard
         title="Departments"
         action={
@@ -208,39 +216,52 @@ const Departments = () => {
           )
         }
       > */}
-        <div className="flex justify-between mb-4">
-          <InputField
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search departments"
-            leftIcon={<Search size={16} />}
-          />
+      <div className="flex justify-between mb-4">
+        <InputField
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search departments"
+          leftIcon={<Search size={16} />}
+        />
+        <div className="flex items-center gap-2">
           {canCreate &&
-          !isReadOnly && (
-            <Button
-              onClick={() => setEditor({ open: true, department: null })}
-              className="flex items-center gap-1.5"
-            >
-              <Plus size={15} /> Add Department
-            </Button>
-          )}
+            !isReadOnly && (
+              <Button
+                onClick={() => setEditor({ open: true, department: null })}
+                className="flex items-center gap-1.5 p-2.5"
+              >
+                <Plus size={17} className="hover:scale-140" />
+              </Button>
+            )}
+          <Button
+            type="button"
+            variant="ghost"
+            aria-label="Refresh Departments"
+            title="Refresh Departments"
+            onClick={handleRefresh}
+            disabled={isFetching}
+            className="flex items-center justify-center p-2.5 disabled:cursor-wait disabled:opacity-60"
+          >
+            <RefreshCw size={16} className={`transition-transform duration-200 ${isFetching ? 'animate-spin' : 'hover:scale-110'}`} />
+          </Button>
         </div>
+      </div>
 
-        {isError ? (
-          <Feedback
-            type="error"
-            title="Unable to load departments"
-            message="Please refresh the page and try again."
-          />
-        ) : (
-          <PageTable
-            columns={columns}
-            rows={filtered}
-            total={filtered.length}
-            label="departments"
-            isLoading={isLoading}
-          />
-        )}
+      {isError ? (
+        <Feedback
+          type="error"
+          title="Unable to load departments"
+          message="Please refresh the page and try again."
+        />
+      ) : (
+        <PageTable
+          columns={columns}
+          rows={filtered}
+          total={filtered.length}
+          label="departments"
+          isLoading={isLoading}
+        />
+      )}
       {/* </SectionCard> */}
 
       <AddEditDepartment

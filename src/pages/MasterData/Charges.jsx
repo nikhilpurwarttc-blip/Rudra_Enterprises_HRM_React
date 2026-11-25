@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Coins, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { Coins, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
 
 import {
   useCreateChargeMutation,
@@ -38,7 +38,7 @@ const Charges = () => {
   const { canCreate, canEdit, canDelete, isReadOnly } = usePermission('/charges');
 
   // Queries & Mutations
-  const { data, isLoading, isError } = useGetChargesQuery({ all: true, per_page: 100 });
+  const { data, isLoading, isFetching, isError, refetch } = useGetChargesQuery({ all: true, per_page: 100 });
   const [createCharge, { isLoading: creating }] = useCreateChargeMutation();
   const [updateCharge, { isLoading: updating }] = useUpdateChargeMutation();
   const [deleteCharge] = useDeleteChargeMutation();
@@ -52,6 +52,14 @@ const Charges = () => {
 
   const charges = unwrap(data);
   useRenderPerformance('getCharges', data);
+
+  const handleRefresh = useCallback(async () => {
+    try {
+      await refetch().unwrap();
+    } catch (error) {
+      toast(getApiErrorMessage(error, 'Unable to refresh charges.'), 'error');
+    }
+  }, [refetch, toast]);
 
   // Filter charges based on search input
   const filtered = useMemo(() => {
@@ -241,8 +249,8 @@ const Charges = () => {
   );
 
   return (
-    <div className="space-y-4 p-4 sm:p-6">
-      <SectionCard
+    <div className="w-auto mx-auto space-y-4 p-4 sm:p-6">
+      {/* <SectionCard
         title="Charges & Allowances"
         action={
           canCreate &&
@@ -258,17 +266,45 @@ const Charges = () => {
             </Button>
           )
         }
-      >
-        <div className="mb-4">
+      > */}
+      <div className="flex justify-between mb-4">
+        <div className="max-w-0 flex-1 sm:max-w-xs">
           <InputField
             value={search}
+            className="min-h-10"
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search charges"
             leftIcon={<Search size={16} />}
           />
         </div>
-      </SectionCard>
-      
+        <div className="flex items-center gap-2">
+          {canCreate &&
+            !isReadOnly && (
+              <Button
+                onClick={() => {
+                  setErrors({});
+                  setEditor({ open: true, charge: null });
+                }}
+                className="flex items-center gap-1.5 p-2.5"
+              >
+                <Plus size={17} className="hover:scale-140" />
+              </Button>
+            )}
+          <Button
+            type="button"
+            variant="ghost"
+            aria-label="Refresh Charges"
+            title="Refresh Charges"
+            onClick={handleRefresh}
+            disabled={isFetching}
+            className="flex items-center justify-center p-2.5 disabled:cursor-wait disabled:opacity-60"
+          >
+            <RefreshCw size={16} className={`transition-transform duration-200 ${isFetching ? 'animate-spin' : 'hover:scale-110'}`} />
+          </Button>
+        </div>
+      </div>
+      {/* </SectionCard> */}
+
       {isError ? (
         <Feedback
           type="error"

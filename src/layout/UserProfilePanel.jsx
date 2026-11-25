@@ -25,7 +25,7 @@ const UserProfilePanel = ({ user, roleName, isOpen, onClose, onNavigate, onLogou
 
   return (
     <RightModal isOpen={isOpen} onClose={onClose} title="My Profile" settingoff={false} bodyClassName="space-y-5">
-      <div className="flex items-center gap-3 border-b border-(--color-border) pb-5">
+      <div className="flex items-center gap-3">
         <EmployeeAvatar
           employee={{ name: user.name, image: employee?.image ?? user.image }}
           className="h-14 w-14 text-lg"

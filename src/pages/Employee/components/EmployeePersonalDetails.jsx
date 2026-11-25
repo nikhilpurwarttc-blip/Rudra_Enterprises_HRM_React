@@ -56,6 +56,7 @@ const EmployeePersonalDetails = ({ form, errors, setField, setGender, setMarital
             onChange={setField('name')}
             error={errors.name}
             required
+            inputClass="capitalize"
           />
         </div>
         <div className="sm:col-span-2">
